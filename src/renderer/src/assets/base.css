@@ -1,0 +1,39 @@
+:root {
+  font-family:
+    Inter, "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+  color: #eef2ff;
+  background: #080c18;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 900px;
+  height: 100%;
+  min-height: 640px;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+input {
+  outline: none;
+}
