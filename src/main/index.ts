@@ -7,7 +7,9 @@ import type {
   ApiResult,
   LoginData,
   LoginRequest,
-  LoginResponse
+  LoginResponse,
+  SubscriptionCheckResponse,
+  SubscriptionData
 } from '../shared/auth'
 
 /**
@@ -92,8 +94,87 @@ function registerAuthIpc(): void {
     }
   )
 }
+
+/**
+ * 注册订阅查询IPC接口。
+ *
+ * React页面不会直接拿到Token，
+ * 由Electron主进程携带Token请求Java后端。
+ */
+function registerSubscriptionIpc(): void {
+  ipcMain.handle(
+    'subscription:get-current',
+    async (): Promise<SubscriptionCheckResponse> => {
+      const token = authSession.accessToken
+
+      if (!token) {
+        return {
+          success: false,
+          authenticated: false,
+          message: '登录状态已失效，请重新登录',
+          subscription: null
+        }
+      }
+
+      try {
+        const response = await net.fetch(
+          `${API_BASE_URL}/api/user/subscription`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+        const result =
+          (await response.json()) as ApiResult<SubscriptionData>
+
+        /*
+         * Token失效时，清空主进程中的登录会话。
+         */
+        if (response.status === 401) {
+          authSession.accessToken = null
+
+          return {
+            success: false,
+            authenticated: false,
+            message: result.msg || '登录状态已失效，请重新登录',
+            subscription: null
+          }
+        }
+
+        if (!response.ok || !result.data) {
+          return {
+            success: false,
+            authenticated: true,
+            message: result.msg || '订阅状态查询失败',
+            subscription: null
+          }
+        }
+
+        return {
+          success: true,
+          authenticated: true,
+          message: '订阅状态查询成功',
+          subscription: result.data
+        }
+      } catch (error) {
+        console.error('查询用户订阅失败：', error)
+
+        return {
+          success: false,
+          authenticated: true,
+          message: '无法连接服务器，请稍后重试',
+          subscription: null
+        }
+      }
+    }
+  )
+}
+
 function createWindow(): void {
-  // Create the browser window.
+  // 创建浏览器窗口
   const mainWindow = new BrowserWindow({
     width: 1180,
     height: 760,
@@ -120,8 +201,8 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
+  // 基于 electron-vite cli 的渲染器热更新
+  // 开发环境加载远程URL，生产环境加载本地html文件
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -129,41 +210,39 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// 当Electron完成初始化并准备好创建浏览器窗口时调用此方法
+// 初始化完成后，Electron会初始化并准备创建浏览器窗口。
+// 某些API只能在此事件发生后使用
 app.whenReady().then(() => {
-  // Set app user model id for windows
+  // 设置Windows 10+ 系统的应用用户模型ID
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+  // 开发环境下，按 F12 打开或关闭 DevTools
+  // 生产环境下，忽略 CommandOrControl + R  // https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
+  // IPC 测试接口
   ipcMain.on('ping', () => console.log('pong'))
 
   registerAuthIpc()
+  registerSubscriptionIpc()
+  
   createWindow()
 
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
+    // 在macOS上，当点击dock图标且没有其他窗口打开时
+    // 通常会在应用中重新创建一个窗口
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// 当所有窗口关闭时退出，但macOS除外...
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+// 在此文件中，您可以包含应用的其他特定主进程代码...

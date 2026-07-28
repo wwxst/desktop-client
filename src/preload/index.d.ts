@@ -1,11 +1,20 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
-import type { LoginRequest, LoginResponse } from '../shared/auth'
+import type {
+  LoginRequest,
+  LoginResponse,
+  SubscriptionCheckResponse,
+} from '../shared/auth'
 
 interface DesktopApi {
   /**
-   * 调用普通用户登录接口。
+   * 用户登录。
    */
   login(loginRequest: LoginRequest): Promise<LoginResponse>
+
+  /**
+   * 查询当前用户订阅。
+   */
+  getSubscription(): Promise<SubscriptionCheckResponse>
 }
 
 declare global {

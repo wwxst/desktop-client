@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { LoginRequest, LoginResponse } from '../shared/auth'
+import type {
+  LoginRequest,
+  LoginResponse,
+  SubscriptionCheckResponse,
+} from '../shared/auth'
 
 /**
  * 只向React页面开放允许使用的功能。
@@ -9,8 +13,18 @@ import type { LoginRequest, LoginResponse } from '../shared/auth'
  * 避免React页面随意调用主进程能力。
  */
 const api = {
+  /**
+   * 用户登录。
+   */
   login: (loginRequest: LoginRequest): Promise<LoginResponse> => {
     return ipcRenderer.invoke('auth:login', loginRequest)
+  },
+
+  /**
+   * 查询当前登录用户的订阅状态。
+   */
+  getSubscription: (): Promise<SubscriptionCheckResponse> => {
+    return ipcRenderer.invoke('subscription:get-current')
   }
 }
 

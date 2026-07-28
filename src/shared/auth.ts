@@ -34,3 +34,31 @@ export interface LoginResponse {
   success: boolean
   message: string
 }
+
+/**
+ * 当前用户的订阅信息。
+ *
+ * 字段与Java后端的UserSubscriptionVO对应。
+ */
+export interface SubscriptionData {
+  productId: number | null
+  productCode: string | null
+  productName: string | null
+  accessStatus: string
+  accessStatusDescription: string
+  valid: boolean
+  startedAt: string | null
+  expiresAt: string | null
+  serverTime: string
+  remainingSeconds: number
+}
+
+/**
+ * Electron主进程返回给React页面的订阅查询结果。
+ */
+export interface SubscriptionCheckResponse {
+  success: boolean
+  authenticated: boolean
+  message: string
+  subscription: SubscriptionData | null
+}
