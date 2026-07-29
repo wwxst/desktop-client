@@ -1,23 +1,13 @@
 /*
  * 客户端登录后的整体三栏布局。
  *
- * 左侧：菜单栏
- * 中间：主要工作区
- * 右侧：AI助手
+ * 左侧和右侧使用浅灰背景，中间使用白色背景。
+ * 三个区域之间不显示分割线。
  */
 
 .app-layout,
 .app-layout * {
   box-sizing: border-box;
-}
-
-.app-layout button,
-.app-layout textarea {
-  font: inherit;
-}
-
-.app-layout button {
-  border: 0;
 }
 
 .app-layout {
@@ -40,7 +30,7 @@
   min-height: 680px;
 
   overflow: hidden;
-  background: #f5f6f8;
+  background: #f3f3f3;
 }
 
 /*
@@ -59,17 +49,15 @@
 }
 
 .app-layout__sidebar {
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background: #f3f3f3;
 }
 
 .app-layout__content {
-  background: #f5f6f8;
+  background: #ffffff;
 }
 
 .app-layout__ai-panel {
-  background: #ffffff;
-  border-left: 1px solid #e5e7eb;
+  background: #f3f3f3;
 }
 
 /* 小尺寸窗口下压缩左右两栏，保留中间工作区可用宽度。 */

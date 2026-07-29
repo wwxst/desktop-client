@@ -1,22 +1,11 @@
-import {
-  useEffect,
-  useState,
-  type JSX,
-  type SubmitEvent
-} from 'react'
+import { useEffect, useState, type JSX, type SubmitEvent } from 'react'
 import AiPanel from './components/AiPanel/AiPanel'
-import Activation from './components/Activation/Activation'
 import Sidebar from './components/Sidebar/Sidebar'
 import WorkspaceView from './components/WorkspaceView/WorkspaceView'
-import {
-  workspaceMenuItems,
-  type MenuKey
-} from './components/shared/workspaceNavigation'
 import Layout from './layouts/Layout'
-import type { SubscriptionData } from '../../shared/auth'
 import './App.css'
 
-type AppView = 'login' | 'workspace' | 'activation'
+type AppView = 'login' | 'workspace'
 
 function App(): JSX.Element {
   const [account, setAccount] = useState('')
@@ -34,20 +23,6 @@ function App(): JSX.Element {
 
   // 当前显示的页面
   const [currentView, setCurrentView] = useState<AppView>('login')
-
-  // 工作台三栏共享的当前菜单
-  const [activeMenu, setActiveMenu] = useState<MenuKey>('workspace')
-
-  // 当前登录账号
-  const [loggedInUsername, setLoggedInUsername] = useState('')
-
-  // 当前查询到的订阅信息
-  const [subscription, setSubscription] =
-    useState<SubscriptionData | null>(null)
-
-  // 是否正在检查订阅权限
-  const [isCheckingSubscription, setIsCheckingSubscription] =
-    useState(false)
 
   /**
    * Toast 显示2.5秒后自动关闭。
@@ -72,9 +47,7 @@ function App(): JSX.Element {
    * 登录成功后直接进入工作台，
    * 此时不查询订阅状态。
    */
-  const handleLogin = async (
-    event: SubmitEvent<HTMLFormElement>
-  ): Promise<void> => {
+  const handleLogin = async (event: SubmitEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
 
     if (isLoading) {
@@ -120,7 +93,6 @@ function App(): JSX.Element {
        * 登录成功后直接进入工作台。
        * 不在登录阶段检查订阅。
        */
-      setLoggedInUsername(username)
       setCurrentView('workspace')
       setToastMessage('登录成功')
     } catch (error) {
@@ -129,90 +101,6 @@ function App(): JSX.Element {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  /**
-   * 用户点击需要订阅的功能时，
-   * 再向后端查询订阅权限。
-   */
-  const handleCreateTask = async (): Promise<void> => {
-    if (isCheckingSubscription) {
-      return
-    }
-
-    try {
-      setIsCheckingSubscription(true)
-      setToastMessage('')
-
-      const result = await window.api.getSubscription()
-
-      /*
-       * Token失效或没有登录。
-       */
-      if (!result.authenticated) {
-        setToastMessage(result.message)
-        setCurrentView('login')
-        setPassword('')
-        return
-      }
-
-      /*
-       * 网络异常或后端查询失败。
-       */
-      if (!result.success || !result.subscription) {
-        setToastMessage(result.message)
-        return
-      }
-
-      setSubscription(result.subscription)
-
-      /*
-       * 有有效订阅，可以使用剪辑功能。
-       */
-      if (result.subscription.valid) {
-        setToastMessage('使用权限验证通过')
-
-        /*
-         * 新建剪辑任务页面暂时还没开发。
-         * 下一步在这里切换到 create-task 页面。
-         */
-        return
-      }
-
-      /*
-       * 没有有效订阅，进入兑换页面。
-       */
-      setCurrentView('activation')
-    } catch (error) {
-      console.error('检查订阅失败：', error)
-      setToastMessage('订阅状态检查失败，请稍后重试')
-    } finally {
-      setIsCheckingSubscription(false)
-    }
-  }
-
-  /**
-   * 从工作台主动进入兑换页面。
-   *
-   * 主动进入时不强制查询订阅，
-   * 用户可以直接输入兑换码。
-   */
-  const handleOpenActivation = (): void => {
-    setCurrentView('activation')
-  }
-
-  /**
-   * 从兑换页面返回工作台。
-   */
-  const handleBackToWorkspace = (): void => {
-    setCurrentView('workspace')
-  }
-
-  /**
-   * 兑换功能暂未接入。
-   */
-  const handleRedeemNotReady = (): void => {
-    setToastMessage('兑换接口下一步接入')
   }
 
   const handleForgotPassword = (): void => {
@@ -227,19 +115,11 @@ function App(): JSX.Element {
     window.alert('请联系管理员')
   }
 
-  const currentMenu =
-    workspaceMenuItems.find((item) => item.key === activeMenu) ??
-    workspaceMenuItems[0]
-
   return (
     <>
       {/* 所有页面共用的顶部轻提示 */}
       {toastMessage && (
-        <div
-          className="toast-message"
-          role="alert"
-          aria-live="assertive"
-        >
+        <div className="toast-message" role="alert" aria-live="assertive">
           <span className="toast-icon" aria-hidden="true">
             !
           </span>
@@ -262,11 +142,7 @@ function App(): JSX.Element {
             <form className="login-form" onSubmit={handleLogin}>
               {/* 账号输入框 */}
               <div className="form-group">
-                <div
-                  className={`form-field ${
-                    accountError ? 'form-field--error' : ''
-                  }`}
-                >
+                <div className={`form-field ${accountError ? 'form-field--error' : ''}`}>
                   <span className="field-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                       <circle cx="12" cy="8" r="3.5" />
@@ -299,20 +175,10 @@ function App(): JSX.Element {
 
               {/* 密码输入框 */}
               <div className="form-group">
-                <div
-                  className={`form-field ${
-                    passwordError ? 'form-field--error' : ''
-                  }`}
-                >
+                <div className={`form-field ${passwordError ? 'form-field--error' : ''}`}>
                   <span className="field-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
-                      <rect
-                        x="5"
-                        y="10"
-                        width="14"
-                        height="10"
-                        rx="2"
-                      />
+                      <rect x="5" y="10" width="14" height="10" rx="2" />
                       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
                     </svg>
                   </span>
@@ -389,11 +255,7 @@ function App(): JSX.Element {
               </div>
 
               {/* 登录按钮 */}
-              <button
-                className="login-button"
-                type="submit"
-                disabled={isLoading}
-              >
+              <button className="login-button" type="submit" disabled={isLoading}>
                 {isLoading ? '正在登录...' : '登录'}
               </button>
             </form>
@@ -401,11 +263,7 @@ function App(): JSX.Element {
             <div className="register-row">
               <span>还没有账号？</span>
 
-              <button
-                type="button"
-                onClick={handleRegister}
-                disabled={isLoading}
-              >
+              <button type="button" onClick={handleRegister} disabled={isLoading}>
                 立即注册
               </button>
             </div>
@@ -429,33 +287,7 @@ function App(): JSX.Element {
 
       {/* ==================== 工作台页面 ==================== */}
       {currentView === 'workspace' && (
-        <Layout
-          sidebar={
-            <Sidebar
-              username={loggedInUsername}
-              activeMenu={activeMenu}
-              onMenuChange={setActiveMenu}
-              onOpenActivation={handleOpenActivation}
-            />
-          }
-          content={
-            <WorkspaceView
-              currentMenu={currentMenu}
-              isCheckingSubscription={isCheckingSubscription}
-              onCreateTask={handleCreateTask}
-            />
-          }
-          aiPanel={<AiPanel currentMenu={currentMenu} />}
-        />
-      )}
-
-      {/* ==================== 兑换页面 ==================== */}
-      {currentView === 'activation' && (
-        <Activation
-          subscription={subscription}
-          onBack={handleBackToWorkspace}
-          onRedeemNotReady={handleRedeemNotReady}
-        />
+        <Layout sidebar={<Sidebar />} content={<WorkspaceView />} aiPanel={<AiPanel />} />
       )}
     </>
   )
