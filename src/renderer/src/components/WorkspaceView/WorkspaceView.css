@@ -1,0 +1,126 @@
+/* 中间核心工作区的标题、操作区和内容区域样式。 */
+
+.studio-workspace {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 76px minmax(0, 1fr);
+
+  min-width: 0;
+  min-height: 0;
+
+  background: #f5f6f8;
+}
+
+/* 当前菜单标题及工作区快捷操作。 */
+.studio-workspace__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 22px;
+
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.studio-workspace__eyebrow {
+  color: #0052d9;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.studio-workspace__header h1 {
+  margin: 4px 0 2px;
+
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.studio-workspace__header p {
+  margin: 0;
+
+  color: #86909c;
+  font-size: 9px;
+}
+
+.studio-workspace__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.studio-secondary-button,
+.studio-primary-button {
+  height: 32px;
+  padding: 0 13px;
+
+  font-size: 9px;
+  cursor: pointer;
+
+  border-radius: 5px;
+}
+
+.studio-secondary-button {
+  color: #4e5969;
+  background: #ffffff;
+  border: 1px solid #dfe3e8 !important;
+}
+
+.studio-primary-button {
+  color: #ffffff;
+  background: #0052d9;
+}
+
+.studio-primary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+/* 当前页面的主要内容承载区域。 */
+.studio-workspace__body {
+  min-width: 0;
+  min-height: 0;
+
+  padding: 18px;
+  overflow: auto;
+}
+
+.studio-workspace-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+
+  text-align: center;
+
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.studio-placeholder-label {
+  color: #0052d9;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+.studio-workspace-placeholder h2 {
+  margin: 10px 0 7px;
+
+  font-size: 18px;
+}
+
+.studio-workspace-placeholder p {
+  max-width: 390px;
+  margin: 0;
+
+  color: #86909c;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+/* ==================== 右侧AI助手 ==================== */

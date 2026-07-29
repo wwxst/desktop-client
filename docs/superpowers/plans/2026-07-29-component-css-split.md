@@ -4,7 +4,7 @@
 
 **Goal:** Replace the renderer's monolithic stylesheet with component-owned stylesheets while removing CSS that current TSX does not use.
 
-**Architecture:** Global reset rules remain in `assets/base.css` and are loaded once by `main.tsx`. `App.tsx`, `activation.tsx`, and `workspace.tsx` each import a colocated plain CSS file containing only the selectors owned by that view; selector names and active declaration order remain unchanged.
+**Architecture:** Global reset rules remain in `assets/base.css` and are loaded once by `main.tsx`. `App.tsx`, `Activation.tsx`, and `Workspace.tsx` each import a colocated plain CSS file containing only the selectors owned by that view; selector names and active declaration order remain unchanged.
 
 **Tech Stack:** Electron, React 19, TypeScript 5.9, Vite 7, plain CSS, ESLint, Prettier
 
@@ -62,13 +62,13 @@ Expected: active App selectors are present and the four unused selectors are abs
 ### Task 2: Move Activation Styles
 
 **Files:**
-- Create: `src/renderer/src/components/activation.css`
-- Modify: `src/renderer/src/components/activation.tsx`
+- Create: `src/renderer/src/components/Activation.css`
+- Modify: `src/renderer/src/components/Activation.tsx`
 - Source: `src/renderer/src/assets/main.css`
 
 - [ ] **Step 1: Create the activation stylesheet**
 
-Move the complete `.activation-*` rule block to `components/activation.css`, preserving these selectors and their pseudo states:
+Move the complete `.activation-*` rule block to `components/Activation.css`, preserving these selectors and their pseudo states:
 
 ```text
 .activation-page .activation-back .activation-card .activation-logo
@@ -85,10 +85,10 @@ Move the complete `.activation-*` rule block to `components/activation.css`, pre
 
 - [ ] **Step 2: Import the activation stylesheet**
 
-Add after the React import in `components/activation.tsx`:
+Add after the React import in `components/Activation.tsx`:
 
 ```tsx
-import './activation.css'
+import './Activation.css'
 ```
 
 - [ ] **Step 3: Verify activation ownership**
@@ -96,7 +96,7 @@ import './activation.css'
 Run:
 
 ```powershell
-rg -n "activation-" src/renderer/src/components/activation.tsx src/renderer/src/components/activation.css
+rg -n "activation-" src/renderer/src/components/Activation.tsx src/renderer/src/components/Activation.css
 ```
 
 Expected: JSX references and CSS definitions appear only in the activation component pair.
@@ -104,8 +104,8 @@ Expected: JSX references and CSS definitions appear only in the activation compo
 ### Task 3: Move Current Workspace Styles
 
 **Files:**
-- Create: `src/renderer/src/components/workspace.css`
-- Modify: `src/renderer/src/components/workspace.tsx`
+- Create: `src/renderer/src/components/Workspace.css`
+- Modify: `src/renderer/src/components/Workspace.tsx`
 - Source: `src/renderer/src/assets/main.css`
 
 - [ ] **Step 1: Confirm the active workspace prefix**
@@ -113,21 +113,21 @@ Expected: JSX references and CSS definitions appear only in the activation compo
 Run:
 
 ```powershell
-rg -n "className=.*(studio-|workspace-|editor-)" src/renderer/src/components/workspace.tsx
+rg -n "className=.*(studio-|workspace-|editor-)" src/renderer/src/components/Workspace.tsx
 ```
 
 Expected: only `studio-*` class names are used.
 
 - [ ] **Step 2: Create the workspace stylesheet**
 
-Move the entire current studio section, beginning with `.studio-shell, .studio-shell *` and ending with the `@media (max-width: 1120px)` block, into `components/workspace.css`. Preserve all `studio-*` selectors, declarations, and media rules exactly. Do not move either `editor-*` block or the old `workspace-*` block.
+Move the entire current studio section, beginning with `.studio-shell, .studio-shell *` and ending with the `@media (max-width: 1120px)` block, into `components/Workspace.css`. Preserve all `studio-*` selectors, declarations, and media rules exactly. Do not move either `editor-*` block or the old `workspace-*` block.
 
 - [ ] **Step 3: Import the workspace stylesheet**
 
-Add after the React import in `components/workspace.tsx`:
+Add after the React import in `components/Workspace.tsx`:
 
 ```tsx
-import './workspace.css'
+import './Workspace.css'
 ```
 
 - [ ] **Step 4: Verify workspace cleanup**
@@ -135,7 +135,7 @@ import './workspace.css'
 Run:
 
 ```powershell
-rg -n "editor-|^\.workspace-" src/renderer/src/components/workspace.tsx src/renderer/src/components/workspace.css
+rg -n "editor-|^\.workspace-" src/renderer/src/components/Workspace.tsx src/renderer/src/components/Workspace.css
 ```
 
 Expected: no output.
@@ -144,7 +144,7 @@ Expected: no output.
 
 **Files:**
 - Modify: `src/renderer/src/main.tsx`
-- Modify: `src/renderer/src/layouts/layout.tsx`
+- Modify: `src/renderer/src/layouts/Layout.tsx`
 - Delete: `src/renderer/src/assets/main.css`
 
 - [ ] **Step 1: Load only global CSS at the renderer entry**
@@ -155,12 +155,12 @@ Replace the first line of `main.tsx` with:
 import './assets/base.css'
 ```
 
-- [ ] **Step 2: Normalize layout stylesheet path casing**
+- [ ] **Step 2: Keep layout stylesheet path casing consistent**
 
-Use the lowercase filename already present on disk:
+Use the PascalCase filename already present on disk:
 
 ```tsx
-import './layout.css'
+import './Layout.css'
 ```
 
 - [ ] **Step 3: Delete the migrated monolithic stylesheet**

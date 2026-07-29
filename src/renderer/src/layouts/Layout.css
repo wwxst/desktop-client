@@ -1,0 +1,83 @@
+/*
+ * 客户端登录后的整体三栏布局。
+ *
+ * 左侧：菜单栏
+ * 中间：主要工作区
+ * 右侧：AI助手
+ */
+
+.app-layout,
+.app-layout * {
+  box-sizing: border-box;
+}
+
+.app-layout button,
+.app-layout textarea {
+  font: inherit;
+}
+
+.app-layout button {
+  border: 0;
+}
+
+.app-layout {
+  display: grid;
+
+  /*
+   * 左侧固定 220px。
+   * 中间自动占据剩余空间。
+   * 右侧固定 340px。
+   */
+  grid-template-columns:
+    220px
+    minmax(0, 1fr)
+    340px;
+
+  width: 100%;
+  height: 100%;
+
+  min-width: 1000px;
+  min-height: 680px;
+
+  overflow: hidden;
+  background: #f5f6f8;
+}
+
+/*
+ * min-width: 0 非常重要。
+ *
+ * Grid 子元素默认可能被内部内容撑开，
+ * 导致中间区域无法正常缩小。
+ */
+.app-layout__sidebar,
+.app-layout__content,
+.app-layout__ai-panel {
+  min-width: 0;
+  min-height: 0;
+
+  overflow: hidden;
+}
+
+.app-layout__sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+}
+
+.app-layout__content {
+  background: #f5f6f8;
+}
+
+.app-layout__ai-panel {
+  background: #ffffff;
+  border-left: 1px solid #e5e7eb;
+}
+
+/* 小尺寸窗口下压缩左右两栏，保留中间工作区可用宽度。 */
+@media (max-width: 1120px) {
+  .app-layout {
+    grid-template-columns:
+      190px
+      minmax(430px, 1fr)
+      290px;
+  }
+}

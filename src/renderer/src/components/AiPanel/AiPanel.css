@@ -1,0 +1,206 @@
+/* 右侧 AI 助手的上下文、内容区和输入区域样式。 */
+
+.studio-ai-panel {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows:
+    58px
+    34px
+    minmax(0, 1fr)
+    auto;
+
+  min-width: 0;
+  min-height: 0;
+
+  background: #ffffff;
+}
+
+/* AI 助手标题和身份信息。 */
+.studio-ai-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 13px;
+
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.studio-ai-panel__identity {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.studio-ai-logo {
+  display: grid;
+
+  width: 31px;
+  height: 31px;
+
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 600;
+
+  background: #0052d9;
+  border-radius: 8px;
+
+  place-items: center;
+}
+
+.studio-ai-panel__identity strong,
+.studio-ai-panel__identity span {
+  display: block;
+}
+
+.studio-ai-panel__identity strong {
+  font-size: 11px;
+}
+
+.studio-ai-panel__identity span {
+  margin-top: 3px;
+
+  color: #a2a9b4;
+  font-size: 8px;
+}
+
+.studio-ai-more {
+  width: 28px;
+  height: 28px;
+
+  color: #86909c;
+  font-size: 14px;
+  cursor: pointer;
+
+  background: transparent;
+  border-radius: 4px;
+}
+
+/* 展示当前 AI 助手所处的功能上下文。 */
+.studio-ai-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 12px;
+
+  font-size: 8px;
+  background: #f8f9fb;
+  border-bottom: 1px solid #edf0f2;
+}
+
+.studio-ai-context span {
+  color: #86909c;
+}
+
+.studio-ai-context strong {
+  color: #0052d9;
+  font-weight: 500;
+}
+
+/* AI 对话内容区域及空状态。 */
+.studio-ai-panel__body {
+  min-height: 0;
+
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.studio-ai-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding: 34px 18px;
+
+  color: #86909c;
+  text-align: center;
+
+  background: #f8faff;
+  border: 1px solid #dce8ff;
+  border-radius: 8px;
+}
+
+.studio-ai-placeholder__icon {
+  display: grid;
+
+  width: 42px;
+  height: 42px;
+  margin-bottom: 13px;
+
+  color: #0052d9;
+  font-size: 11px;
+  font-weight: 600;
+
+  background: #eaf2ff;
+  border-radius: 10px;
+
+  place-items: center;
+}
+
+.studio-ai-placeholder h2 {
+  margin: 0;
+
+  color: #1d2129;
+  font-size: 12px;
+}
+
+.studio-ai-placeholder p {
+  margin: 8px 0 0;
+
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+/* AI 指令输入框和发送操作。 */
+.studio-ai-input {
+  padding: 11px;
+
+  border-top: 1px solid #e5e7eb;
+}
+
+.studio-ai-input textarea {
+  width: 100%;
+  min-height: 66px;
+  padding: 9px;
+
+  color: #1d2129;
+  font-size: 9px;
+  line-height: 1.6;
+  resize: none;
+
+  background: #ffffff;
+  border: 1px solid #dfe3e8;
+  border-radius: 6px;
+  outline: none;
+}
+
+.studio-ai-input textarea:focus {
+  border-color: #0052d9;
+}
+
+.studio-ai-input__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 7px;
+}
+
+.studio-ai-input__footer button {
+  height: 27px;
+  padding: 0 8px;
+
+  color: #86909c;
+  font-size: 8px;
+  cursor: pointer;
+
+  background: transparent;
+  border-radius: 4px;
+}
+
+.studio-ai-input__footer .studio-ai-send {
+  color: #ffffff;
+  background: #b7c8e7;
+}

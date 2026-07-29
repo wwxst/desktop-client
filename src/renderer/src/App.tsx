@@ -1,11 +1,24 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import WorkspaceView from './components/WorkspaceView'
-import ActivationView from './components/ActivationView'
+import {
+  useEffect,
+  useState,
+  type JSX,
+  type SubmitEvent
+} from 'react'
+import AiPanel from './components/AiPanel/AiPanel'
+import Activation from './components/Activation/Activation'
+import Sidebar from './components/Sidebar/Sidebar'
+import WorkspaceView from './components/WorkspaceView/WorkspaceView'
+import {
+  workspaceMenuItems,
+  type MenuKey
+} from './components/shared/workspaceNavigation'
+import Layout from './layouts/Layout'
 import type { SubscriptionData } from '../../shared/auth'
+import './App.css'
 
 type AppView = 'login' | 'workspace' | 'activation'
 
-function App() {
+function App(): JSX.Element {
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [rememberPassword, setRememberPassword] = useState(false)
@@ -21,6 +34,9 @@ function App() {
 
   // 当前显示的页面
   const [currentView, setCurrentView] = useState<AppView>('login')
+
+  // 工作台三栏共享的当前菜单
+  const [activeMenu, setActiveMenu] = useState<MenuKey>('workspace')
 
   // 当前登录账号
   const [loggedInUsername, setLoggedInUsername] = useState('')
@@ -56,7 +72,9 @@ function App() {
    * 登录成功后直接进入工作台，
    * 此时不查询订阅状态。
    */
-  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (
+    event: SubmitEvent<HTMLFormElement>
+  ): Promise<void> => {
     event.preventDefault()
 
     if (isLoading) {
@@ -117,7 +135,7 @@ function App() {
    * 用户点击需要订阅的功能时，
    * 再向后端查询订阅权限。
    */
-  const handleCreateTask = async () => {
+  const handleCreateTask = async (): Promise<void> => {
     if (isCheckingSubscription) {
       return
     }
@@ -179,35 +197,39 @@ function App() {
    * 主动进入时不强制查询订阅，
    * 用户可以直接输入兑换码。
    */
-  const handleOpenActivation = () => {
+  const handleOpenActivation = (): void => {
     setCurrentView('activation')
   }
 
   /**
    * 从兑换页面返回工作台。
    */
-  const handleBackToWorkspace = () => {
+  const handleBackToWorkspace = (): void => {
     setCurrentView('workspace')
   }
 
   /**
    * 兑换功能暂未接入。
    */
-  const handleRedeemNotReady = () => {
+  const handleRedeemNotReady = (): void => {
     setToastMessage('兑换接口下一步接入')
   }
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = (): void => {
     window.alert('忘记密码功能正在开发中')
   }
 
-  const handleRegister = () => {
+  const handleRegister = (): void => {
     window.alert('注册功能正在开发中')
   }
 
-  const handleContactAdmin = () => {
-    window.alert('请联系卡司管理员')
+  const handleContactAdmin = (): void => {
+    window.alert('请联系管理员')
   }
+
+  const currentMenu =
+    workspaceMenuItems.find((item) => item.key === activeMenu) ??
+    workspaceMenuItems[0]
 
   return (
     <>
@@ -230,10 +252,10 @@ function App() {
       {currentView === 'login' && (
         <main className="login-page">
           <section className="login-container">
-            <div className="brand-logo">K</div>
+            <div className="brand-logo">AI</div>
 
             <header className="login-heading">
-              <h1>登录卡司</h1>
+              <h1>账号登录</h1>
               <p>登录账号后进入自动剪辑工作台</p>
             </header>
 
@@ -399,7 +421,7 @@ function App() {
           </section>
 
           <footer className="login-footer">
-            <span>卡司自动剪辑</span>
+            <span>自动剪辑</span>
             <span>V1.0.0</span>
           </footer>
         </main>
@@ -407,17 +429,29 @@ function App() {
 
       {/* ==================== 工作台页面 ==================== */}
       {currentView === 'workspace' && (
-        <WorkspaceView
-          username={loggedInUsername}
-          isCheckingSubscription={isCheckingSubscription}
-          onCreateTask={handleCreateTask}
-          onOpenActivation={handleOpenActivation}
+        <Layout
+          sidebar={
+            <Sidebar
+              username={loggedInUsername}
+              activeMenu={activeMenu}
+              onMenuChange={setActiveMenu}
+              onOpenActivation={handleOpenActivation}
+            />
+          }
+          content={
+            <WorkspaceView
+              currentMenu={currentMenu}
+              isCheckingSubscription={isCheckingSubscription}
+              onCreateTask={handleCreateTask}
+            />
+          }
+          aiPanel={<AiPanel currentMenu={currentMenu} />}
         />
       )}
 
       {/* ==================== 兑换页面 ==================== */}
       {currentView === 'activation' && (
-        <ActivationView
+        <Activation
           subscription={subscription}
           onBack={handleBackToWorkspace}
           onRedeemNotReady={handleRedeemNotReady}

@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
-import type { SubscriptionData } from '../../../shared/auth'
+import { useState, type JSX, type SubmitEvent } from 'react'
+import type { SubscriptionData } from '../../../../shared/auth'
+import './Activation.css'
 
 interface ActivationViewProps {
   subscription: SubscriptionData | null
@@ -11,10 +12,10 @@ function ActivationView({
   subscription,
   onBack,
   onRedeemNotReady
-}: ActivationViewProps) {
+}: ActivationViewProps): JSX.Element {
   const [redeemCode, setRedeemCode] = useState('')
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault()
 
     if (!redeemCode.trim()) {
@@ -29,29 +30,21 @@ function ActivationView({
 
   return (
     <main className="activation-page">
-      <button
-        className="activation-back"
-        type="button"
-        onClick={onBack}
-      >
+      <button className="activation-back" type="button" onClick={onBack}>
         ← 返回工作台
       </button>
 
       <section className="activation-card">
-        <div className="activation-logo">K</div>
+        <div className="activation-logo">AI</div>
 
         <header>
           <h1>开通使用权限</h1>
-          <p>
-            当前账号暂时没有有效订阅，输入兑换码后即可开通或延长使用时间。
-          </p>
+          <p>当前账号暂时没有有效订阅，输入兑换码后即可开通或延长使用时间。</p>
         </header>
 
         <div className="activation-status">
           <span>当前状态</span>
-          <strong>
-            {subscription?.accessStatusDescription || '暂未开通'}
-          </strong>
+          <strong>{subscription?.accessStatusDescription || '暂未开通'}</strong>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -62,21 +55,16 @@ function ActivationView({
             value={redeemCode}
             onChange={(event) => setRedeemCode(event.target.value)}
             type="text"
-            placeholder="请输入KASI开头的兑换码"
+            placeholder="请输入兑换码"
             autoComplete="off"
           />
 
-          <button
-            type="submit"
-            disabled={!redeemCode.trim()}
-          >
+          <button type="submit" disabled={!redeemCode.trim()}>
             立即兑换
           </button>
         </form>
 
-        <p className="activation-tip">
-          兑换成功后，客户端会重新检查当前订阅状态。
-        </p>
+        <p className="activation-tip">兑换成功后，客户端会重新检查当前订阅状态。</p>
       </section>
     </main>
   )

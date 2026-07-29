@@ -9,8 +9,8 @@ Split the renderer's monolithic `assets/main.css` into stylesheets owned by the 
 - `main.tsx` imports `assets/main.css`, which in turn imports `base.css`.
 - `main.css` contains login, toast, activation, legacy workspace, editor, and current studio workspace styles.
 - `App.tsx` owns the login view and the shared toast markup.
-- `components/activation.tsx` owns the activation view.
-- `components/workspace.tsx` owns the current workspace and uses the `studio-*` selector family.
+- `components/Activation.tsx` owns the activation view.
+- `components/Workspace.tsx` owns the current workspace and uses the `studio-*` selector family.
 - No current TSX file references the `editor-*` or old `workspace-*` selector families.
 - `layouts/layout.css` is already colocated with its component and remains separate.
 
@@ -20,9 +20,9 @@ The resulting renderer styles will be organized as follows:
 
 - `assets/base.css`: global reset and document-level defaults only; imported by `main.tsx`.
 - `App.css`: login view, form state, and toast styles; imported by `App.tsx`.
-- `components/activation.css`: activation view styles; imported by `activation.tsx`.
-- `components/workspace.css`: current `studio-*` workspace styles; imported by `workspace.tsx`.
-- `layouts/layout.css`: existing layout styles; imported by `layout.tsx` using matching lowercase path casing.
+- `components/Activation.css`: activation view styles; imported by `Activation.tsx`.
+- `components/Workspace.css`: current `studio-*` workspace styles; imported by `Workspace.tsx`.
+- `layouts/Layout.css`: existing layout styles; imported by `Layout.tsx` with matching PascalCase path casing.
 
 `assets/main.css` will be removed after all active rules have been moved to their owning files.
 
