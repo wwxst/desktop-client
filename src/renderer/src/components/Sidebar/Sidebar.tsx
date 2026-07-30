@@ -1,11 +1,61 @@
-import type { JSX } from 'react'
+import { useState, type JSX } from 'react'
+import { BookOpen, Home, Settings, UserRound, type LucideIcon } from 'lucide-react'
 import './Sidebar.css'
 
+type SidebarItem = 'home' | 'novel-promotion'
+
+interface SidebarMenuItem {
+  id: SidebarItem
+  label: string
+  icon: LucideIcon
+}
+
+const sidebarMenuItems: SidebarMenuItem[] = [
+  { id: 'home', label: '首页', icon: Home },
+  { id: 'novel-promotion', label: '小说推文', icon: BookOpen }
+]
+
 /**
- * 三栏布局中的左侧空白区域。
+ * 工作台左侧的主菜单。
  */
 function Sidebar(): JSX.Element {
-  return <div className="studio-sidebar" />
+  const [activeItem, setActiveItem] = useState<SidebarItem>('home')
+
+  return (
+    <nav className="studio-sidebar" aria-label="主菜单">
+      <ul className="studio-sidebar__menu">
+        {sidebarMenuItems.map((item) => {
+          const Icon = item.icon
+
+          return (
+            <li key={item.id}>
+              <button
+                className="studio-sidebar__menu-item"
+                type="button"
+                aria-current={activeItem === item.id ? 'page' : undefined}
+                onClick={() => setActiveItem(item.id)}
+              >
+                <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      <div className="studio-sidebar__user">
+        <div className="studio-sidebar__avatar" aria-hidden="true">
+          <UserRound size={18} strokeWidth={1.75} />
+        </div>
+
+        <span className="studio-sidebar__nickname">用户昵称</span>
+
+        <button className="studio-sidebar__settings" type="button" aria-label="设置" title="设置">
+          <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      </div>
+    </nav>
+  )
 }
 
 export default Sidebar

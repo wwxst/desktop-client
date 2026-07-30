@@ -19,9 +19,41 @@ test('workspace renders three empty regions', async () => {
   assert.match(app, /sidebar={<Sidebar\s*\/>}/)
   assert.match(app, /content={<WorkspaceView\s*\/>}/)
   assert.match(app, /aiPanel={<AiPanel\s*\/>}/)
-  assert.match(sidebar, /return <div className="studio-sidebar"\s*\/>/)
+  assert.match(sidebar, /className="studio-sidebar"/)
   assert.match(workspace, /return <div className="studio-workspace"\s*\/>/)
   assert.match(aiPanel, /return <div className="studio-ai-panel"\s*\/>/)
+})
+
+test('sidebar shows home above novel promotion with an active menu state', async () => {
+  const [packageJson, sidebar, sidebarCss] = await Promise.all([
+    readFile(new URL('../package.json', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.css', import.meta.url), 'utf8')
+  ])
+  const packageData = JSON.parse(packageJson)
+
+  assert.equal(typeof packageData.dependencies?.['lucide-react'], 'string')
+  assert.match(sidebar, /import\s*{[^}]*BookOpen[^}]*Home[^}]*}\s*from 'lucide-react'/s)
+  assert.ok(sidebar.indexOf('首页') < sidebar.indexOf('小说推文'))
+  assert.match(sidebar, /useState<SidebarItem>\('home'\)/)
+  assert.match(sidebar, /aria-current={activeItem === item\.id \? 'page' : undefined}/)
+  assert.match(sidebarCss, /\.studio-sidebar__menu-item\[aria-current='page'\]/)
+})
+
+test('sidebar pins avatar nickname and settings to one bottom row', async () => {
+  const [sidebar, sidebarCss] = await Promise.all([
+    readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.css', import.meta.url), 'utf8')
+  ])
+
+  assert.match(sidebar, /Settings/)
+  assert.match(sidebar, /UserRound/)
+  assert.match(sidebar, /className="studio-sidebar__user"/)
+  assert.match(sidebar, /<span className="studio-sidebar__nickname">用户昵称<\/span>/)
+  assert.match(sidebar, /aria-label="设置"/)
+  assert.match(sidebarCss, /\.studio-sidebar\s*{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s)
+  assert.match(sidebarCss, /\.studio-sidebar__user\s*{[^}]*display:\s*flex;[^}]*margin-top:\s*auto;/s)
+  assert.match(sidebarCss, /\.studio-sidebar__nickname\s*{[^}]*text-overflow:\s*ellipsis;/s)
 })
 
 test('workspace layout uses gray white gray columns without dividers', async () => {
