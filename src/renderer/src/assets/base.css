@@ -21,6 +21,10 @@ body,
   margin: 0;
 }
 
+#root {
+  padding-top: 32px;
+}
+
 body {
   overflow: hidden;
 }

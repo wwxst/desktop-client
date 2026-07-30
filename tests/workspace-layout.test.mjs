@@ -35,3 +35,63 @@ test('workspace layout uses gray white gray columns without dividers', async () 
   assert.match(layoutCss, /\.app-layout__ai-panel\s*{[^}]*background:\s*#f3f3f3;/s)
   assert.doesNotMatch(layoutCss, /border-(?:left|right):/)
 })
+
+test('workspace columns resize from accessible focusable handles', async () => {
+  const [packageJson, layout, layoutCss] = await Promise.all([
+    readFile(new URL('../package.json', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/layouts/Layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/layouts/Layout.css', import.meta.url), 'utf8')
+  ])
+  const packageData = JSON.parse(packageJson)
+
+  assert.equal(typeof packageData.dependencies?.['react-resizable-panels'], 'string')
+  assert.match(layout, /from 'react-resizable-panels'/)
+  assert.equal(layout.match(/className="app-layout__resize-handle"/g)?.length, 2)
+  assert.match(layout, /minSize=/)
+  assert.match(layoutCss, /\.app-layout__resize-handle\s*{[^}]*width:\s*8px/s)
+  assert.match(layoutCss, /\.app-layout__resize-handle\s*{[^}]*cursor:\s*col-resize/s)
+  assert.match(layoutCss, /\.app-layout__resize-handle::after\s*{[^}]*opacity:\s*0/s)
+  assert.match(layoutCss, /\.app-layout__resize-handle:hover::after/)
+  assert.match(layoutCss, /\.app-layout__resize-handle:focus-visible::after/)
+  assert.match(layoutCss, /\[data-separator='active'\]::after/)
+  assert.match(layoutCss, /background:\s*#606060/)
+})
+
+test('window uses a gray draggable title bar with native window controls', async () => {
+  const [main, app, baseCss, titleBar, titleBarCss] = await Promise.all([
+    readFile(new URL('../src/main/index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/App.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/renderer/src/assets/base.css', import.meta.url), 'utf8'),
+    readFile(
+      new URL('../src/renderer/src/components/TitleBar/TitleBar.tsx', import.meta.url),
+      'utf8'
+    ).catch(() => ''),
+    readFile(
+      new URL('../src/renderer/src/components/TitleBar/TitleBar.css', import.meta.url),
+      'utf8'
+    ).catch(() => '')
+  ])
+
+  assert.match(main, /titleBarStyle:\s*'hidden'/)
+  assert.match(main, /titleBarOverlay:\s*{[^}]*color:\s*'#e8e8e8'/s)
+  assert.match(main, /titleBarOverlay:\s*{[^}]*symbolColor:\s*'#1f1f1f'/s)
+  assert.match(main, /titleBarOverlay:\s*{[^}]*height:\s*32/s)
+  assert.match(app, /import TitleBar from '.\/components\/TitleBar\/TitleBar'/)
+  assert.match(app, /<TitleBar\s*\/>/)
+  assert.match(baseCss, /#root\s*{[^}]*padding-top:\s*32px/s)
+  assert.match(titleBar, /<span>自动剪辑<\/span>/)
+  assert.match(titleBarCss, /position:\s*fixed/)
+  assert.match(titleBarCss, /height:\s*32px/)
+  assert.match(titleBarCss, /background:\s*#e8e8e8/)
+  assert.match(titleBarCss, /-webkit-app-region:\s*drag/)
+})
+
+test('development login enters the workspace without removing production authentication', async () => {
+  const app = await readFile(new URL('../src/renderer/src/App.tsx', import.meta.url), 'utf8')
+
+  assert.match(
+    app,
+    /if\s*\(import\.meta\.env\.DEV\)\s*{[^}]*setCurrentView\('workspace'\)[^}]*return/s
+  )
+  assert.match(app, /const result = await window\.api\.login\(/)
+})

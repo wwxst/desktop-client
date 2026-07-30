@@ -1,6 +1,7 @@
 import { useEffect, useState, type JSX, type SubmitEvent } from 'react'
 import AiPanel from './components/AiPanel/AiPanel'
 import Sidebar from './components/Sidebar/Sidebar'
+import TitleBar from './components/TitleBar/TitleBar'
 import WorkspaceView from './components/WorkspaceView/WorkspaceView'
 import Layout from './layouts/Layout'
 import './App.css'
@@ -49,6 +50,12 @@ function App(): JSX.Element {
    */
   const handleLogin = async (event: SubmitEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
+
+    // 开发阶段免登录，生产环境仍执行下方原有账号密码认证逻辑。
+    if (import.meta.env.DEV) {
+      setCurrentView('workspace')
+      return
+    }
 
     if (isLoading) {
       return
@@ -117,6 +124,8 @@ function App(): JSX.Element {
 
   return (
     <>
+      <TitleBar />
+
       {/* 所有页面共用的顶部轻提示 */}
       {toastMessage && (
         <div className="toast-message" role="alert" aria-live="assertive">

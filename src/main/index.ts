@@ -181,11 +181,17 @@ function createWindow(): void {
     minWidth: 1000,
     minHeight: 680,
     title: '自动剪辑',
-    backgroundColor: '#ffffff',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#e8e8e8',
+      symbolColor: '#1f1f1f',
+      height: 32
+    },
+    backgroundColor: '#f3f3f3',
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
-    
+
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -228,7 +234,7 @@ app.whenReady().then(() => {
 
   registerAuthIpc()
   registerSubscriptionIpc()
-  
+
   createWindow()
 
   app.on('activate', function () {

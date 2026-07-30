@@ -1,4 +1,5 @@
 import type { JSX, ReactNode } from 'react'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 
 import './Layout.css'
 
@@ -14,18 +15,52 @@ interface LayoutProps {
 }
 
 /**
- * 客户端登录后的空白三栏布局。
- * 只负责三栏排列和区域尺寸，具体内容由外部组件传入。
+ * 客户端登录后的可调整三栏布局。
+ * 只负责三栏排列、尺寸约束和拖拽边界，具体内容由外部组件传入。
  */
 function Layout({ sidebar, content, aiPanel }: LayoutProps): JSX.Element {
   return (
-    <div className="app-layout">
-      <aside className="app-layout__sidebar">{sidebar}</aside>
+    <Group
+      className="app-layout"
+      orientation="horizontal"
+      resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}
+    >
+      <Panel
+        id="sidebar"
+        defaultSize={220}
+        minSize={160}
+        maxSize={360}
+        groupResizeBehavior="preserve-pixel-size"
+      >
+        <aside className="app-layout__sidebar">{sidebar}</aside>
+      </Panel>
 
-      <main className="app-layout__content">{content}</main>
+      <Separator
+        id="sidebar-resize-handle"
+        className="app-layout__resize-handle"
+        aria-label="调整左侧栏宽度"
+      />
 
-      <aside className="app-layout__ai-panel">{aiPanel}</aside>
-    </div>
+      <Panel id="content" minSize={430}>
+        <main className="app-layout__content">{content}</main>
+      </Panel>
+
+      <Separator
+        id="ai-panel-resize-handle"
+        className="app-layout__resize-handle"
+        aria-label="调整右侧栏宽度"
+      />
+
+      <Panel
+        id="ai-panel"
+        defaultSize={340}
+        minSize={260}
+        maxSize={520}
+        groupResizeBehavior="preserve-pixel-size"
+      >
+        <aside className="app-layout__ai-panel">{aiPanel}</aside>
+      </Panel>
+    </Group>
   )
 }
 

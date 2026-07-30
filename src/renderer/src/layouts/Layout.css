@@ -1,8 +1,8 @@
 /*
- * 客户端登录后的整体三栏布局。
+ * 客户端登录后的可调整三栏布局。
  *
  * 左侧和右侧使用浅灰背景，中间使用白色背景。
- * 三个区域之间不显示分割线。
+ * 拖拽边界默认不显示，交互时显示加粗深色线。
  */
 
 .app-layout,
@@ -11,18 +11,6 @@
 }
 
 .app-layout {
-  display: grid;
-
-  /*
-   * 左侧固定 220px。
-   * 中间自动占据剩余空间。
-   * 右侧固定 340px。
-   */
-  grid-template-columns:
-    220px
-    minmax(0, 1fr)
-    340px;
-
   width: 100%;
   height: 100%;
 
@@ -42,6 +30,8 @@
 .app-layout__sidebar,
 .app-layout__content,
 .app-layout__ai-panel {
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
 
@@ -60,12 +50,44 @@
   background: #f3f3f3;
 }
 
-/* 小尺寸窗口下压缩左右两栏，保留中间工作区可用宽度。 */
-@media (max-width: 1120px) {
-  .app-layout {
-    grid-template-columns:
-      190px
-      minmax(430px, 1fr)
-      290px;
-  }
+/*
+ * 8px 透明命中区覆盖在栏位边界上，方便鼠标选中且不占用可见空间。
+ */
+.app-layout__resize-handle {
+  position: relative;
+  z-index: 2;
+
+  width: 8px;
+  margin: 0 -4px;
+
+  cursor: col-resize;
+  background: transparent;
+  outline: none;
+}
+
+/* 默认隐藏的边界视觉线。 */
+.app-layout__resize-handle::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+
+  width: 1px;
+
+  pointer-events: none;
+  content: '';
+  background: #606060;
+  opacity: 0;
+  transform: translateX(-50%);
+  transition:
+    width 120ms ease,
+    opacity 120ms ease;
+}
+
+/* 悬停、键盘聚焦或拖拽时显示加粗、加深的边界线。 */
+.app-layout__resize-handle:hover::after,
+.app-layout__resize-handle:focus-visible::after,
+.app-layout__resize-handle[data-separator='active']::after {
+  width: 3px;
+  opacity: 1;
 }
