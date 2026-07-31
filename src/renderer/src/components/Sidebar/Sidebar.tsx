@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react'
-import { BookOpen, Home, Settings, UserRound, type LucideIcon } from 'lucide-react'
+import { BookOpen, Home, Settings, type LucideIcon } from 'lucide-react'
 import './Sidebar.css'
 
 type SidebarItem = 'home' | 'novel-promotion'
@@ -45,10 +45,13 @@ function Sidebar(): JSX.Element {
 
       <div className="studio-sidebar__user">
         <div className="studio-sidebar__avatar" aria-hidden="true">
-          <UserRound size={18} strokeWidth={1.75} />
+          KA
         </div>
 
-        <span className="studio-sidebar__nickname">用户昵称</span>
+        <div className="studio-sidebar__identity">
+          <span className="studio-sidebar__nickname">kasixmb</span>
+          <span className="studio-sidebar__plan">Plus</span>
+        </div>
 
         <button className="studio-sidebar__settings" type="button" aria-label="设置" title="设置">
           <Settings size={18} strokeWidth={1.75} aria-hidden="true" />

@@ -27,7 +27,7 @@ function Layout({ sidebar, content, aiPanel }: LayoutProps): JSX.Element {
     >
       <Panel
         id="sidebar"
-        defaultSize={220}
+        defaultSize={160}
         minSize={160}
         maxSize={360}
         groupResizeBehavior="preserve-pixel-size"
@@ -53,7 +53,7 @@ function Layout({ sidebar, content, aiPanel }: LayoutProps): JSX.Element {
 
       <Panel
         id="ai-panel"
-        defaultSize={340}
+        defaultSize={260}
         minSize={260}
         maxSize={520}
         groupResizeBehavior="preserve-pixel-size"

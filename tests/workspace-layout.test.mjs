@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-test('workspace renders three empty regions', async () => {
-  const [app, sidebar, workspace, aiPanel] = await Promise.all([
+test('workspace renders sidebar player and ai regions', async () => {
+  const [app, sidebar, workspace, playerPanel, aiPanel] = await Promise.all([
     readFile(new URL('../src/renderer/src/App.tsx', import.meta.url), 'utf8'),
     readFile(
       new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url),
@@ -13,21 +13,30 @@ test('workspace renders three empty regions', async () => {
       new URL('../src/renderer/src/components/WorkspaceView/WorkspaceView.tsx', import.meta.url),
       'utf8'
     ),
+    readFile(
+      new URL('../src/renderer/src/components/WorkspaceView/PlayerPanel.tsx', import.meta.url),
+      'utf8'
+    ),
     readFile(new URL('../src/renderer/src/components/AiPanel/AiPanel.tsx', import.meta.url), 'utf8')
   ])
 
   assert.match(app, /sidebar={<Sidebar\s*\/>}/)
   assert.match(app, /content={<WorkspaceView\s*\/>}/)
   assert.match(app, /aiPanel={<AiPanel\s*\/>}/)
+  assert.doesNotMatch(app, /\bTimeline\b/)
   assert.match(sidebar, /className="studio-sidebar"/)
-  assert.match(workspace, /return <div className="studio-workspace"\s*\/>/)
+  assert.match(workspace, /<PlayerPanel\s*\/>/)
+  assert.match(playerPanel, /className="studio-player"/)
   assert.match(aiPanel, /return <div className="studio-ai-panel"\s*\/>/)
 })
 
 test('sidebar shows home above novel promotion with an active menu state', async () => {
   const [packageJson, sidebar, sidebarCss] = await Promise.all([
     readFile(new URL('../package.json', import.meta.url), 'utf8'),
-    readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url), 'utf8'),
+    readFile(
+      new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url),
+      'utf8'
+    ),
     readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.css', import.meta.url), 'utf8')
   ])
   const packageData = JSON.parse(packageJson)
@@ -40,20 +49,35 @@ test('sidebar shows home above novel promotion with an active menu state', async
   assert.match(sidebarCss, /\.studio-sidebar__menu-item\[aria-current='page'\]/)
 })
 
-test('sidebar pins avatar nickname and settings to one bottom row', async () => {
+test('sidebar pins account identity and settings to one bottom row', async () => {
   const [sidebar, sidebarCss] = await Promise.all([
-    readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url), 'utf8'),
+    readFile(
+      new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url),
+      'utf8'
+    ),
     readFile(new URL('../src/renderer/src/components/Sidebar/Sidebar.css', import.meta.url), 'utf8')
   ])
 
   assert.match(sidebar, /Settings/)
-  assert.match(sidebar, /UserRound/)
+  assert.doesNotMatch(sidebar, /UserRound/)
   assert.match(sidebar, /className="studio-sidebar__user"/)
-  assert.match(sidebar, /<span className="studio-sidebar__nickname">用户昵称<\/span>/)
+  assert.match(sidebar, /className="studio-sidebar__avatar"[^>]*>\s*KA\s*</)
+  assert.match(sidebar, /className="studio-sidebar__identity"/)
+  assert.match(sidebar, /<span className="studio-sidebar__nickname">kasixmb<\/span>/)
+  assert.match(sidebar, /<span className="studio-sidebar__plan">Plus<\/span>/)
   assert.match(sidebar, /aria-label="设置"/)
-  assert.match(sidebarCss, /\.studio-sidebar\s*{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s)
-  assert.match(sidebarCss, /\.studio-sidebar__user\s*{[^}]*display:\s*flex;[^}]*margin-top:\s*auto;/s)
-  assert.match(sidebarCss, /\.studio-sidebar__nickname\s*{[^}]*text-overflow:\s*ellipsis;/s)
+  assert.match(
+    sidebarCss,
+    /\.studio-sidebar\s*{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s
+  )
+  assert.match(
+    sidebarCss,
+    /\.studio-sidebar__user\s*{[^}]*display:\s*flex;[^}]*margin-top:\s*auto;/s
+  )
+  assert.match(
+    sidebarCss,
+    /\.studio-sidebar__nickname,\s*\.studio-sidebar__plan\s*{[^}]*text-overflow:\s*ellipsis;/s
+  )
 })
 
 test('workspace layout uses gray white gray columns without dividers', async () => {
@@ -68,6 +92,22 @@ test('workspace layout uses gray white gray columns without dividers', async () 
   assert.doesNotMatch(layoutCss, /border-(?:left|right):/)
 })
 
+test('outer side panels start at their minimum widths', async () => {
+  const layout = await readFile(
+    new URL('../src/renderer/src/layouts/Layout.tsx', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(
+    layout,
+    /<Panel\s+id="sidebar"\s+defaultSize=\{160\}\s+minSize=\{160\}[^>]*groupResizeBehavior="preserve-pixel-size"/s
+  )
+  assert.match(
+    layout,
+    /<Panel\s+id="ai-panel"\s+defaultSize=\{260\}\s+minSize=\{260\}[^>]*groupResizeBehavior="preserve-pixel-size"/s
+  )
+})
+
 test('workspace columns resize from accessible focusable handles', async () => {
   const [packageJson, layout, layoutCss] = await Promise.all([
     readFile(new URL('../package.json', import.meta.url), 'utf8'),
@@ -78,6 +118,8 @@ test('workspace columns resize from accessible focusable handles', async () => {
 
   assert.equal(typeof packageData.dependencies?.['react-resizable-panels'], 'string')
   assert.match(layout, /from 'react-resizable-panels'/)
+  assert.match(layout, /className="app-layout"[^>]*orientation="horizontal"/s)
+  assert.doesNotMatch(layout, /orientation="vertical"/)
   assert.equal(layout.match(/className="app-layout__resize-handle"/g)?.length, 2)
   assert.match(layout, /minSize=/)
   assert.match(layoutCss, /\.app-layout__resize-handle\s*{[^}]*width:\s*8px/s)
@@ -111,7 +153,10 @@ test('window uses a gray draggable title bar with native window controls', async
   assert.match(app, /import TitleBar from '.\/components\/TitleBar\/TitleBar'/)
   assert.match(app, /<TitleBar\s*\/>/)
   assert.match(baseCss, /#root\s*{[^}]*padding-top:\s*32px/s)
-  assert.match(titleBar, /<span>自动剪辑<\/span>/)
+  assert.match(
+    titleBar,
+    /<span>文件<\/span>\s*<span>编辑<\/span>\s*<span>查看<\/span>\s*<span>帮助<\/span>/
+  )
   assert.match(titleBarCss, /position:\s*fixed/)
   assert.match(titleBarCss, /height:\s*32px/)
   assert.match(titleBarCss, /background:\s*#e8e8e8/)

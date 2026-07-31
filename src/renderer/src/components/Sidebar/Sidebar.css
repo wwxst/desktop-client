@@ -75,29 +75,55 @@
   margin-top: auto;
 }
 
-/* 默认头像使用固定圆形区域。 */
+/* 头像使用固定圆形区域，展示用户昵称缩写。 */
 .studio-sidebar__avatar {
   display: grid;
-  flex: 0 0 28px;
+  flex: 0 0 24px;
   place-items: center;
 
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 
-  color: #4a4a4a;
-  background: #dcdcdc;
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1;
+  color: #ffffff;
+
+  background: #ef493f;
   border-radius: 50%;
 }
 
-/* 昵称只显示一行，空间不足时使用省略号。 */
-.studio-sidebar__nickname {
+/* 昵称与套餐纵向排列，并共享剩余宽度。 */
+.studio-sidebar__identity {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  justify-content: center;
+
   min-width: 0;
+}
+
+/* 两行账户信息在空间不足时都使用省略号。 */
+.studio-sidebar__nickname,
+.studio-sidebar__plan {
   overflow: hidden;
 
-  font-size: 13px;
-  color: #2f2f2f;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.studio-sidebar__nickname {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 15px;
+  color: #262626;
+}
+
+.studio-sidebar__plan {
+  font-size: 10px;
+  line-height: 12px;
+  color: #777777;
 }
 
 /* 设置按钮固定在用户信息行右侧。 */

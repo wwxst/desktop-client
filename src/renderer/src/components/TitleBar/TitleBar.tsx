@@ -11,7 +11,10 @@ function TitleBar(): JSX.Element {
     <header className="app-title-bar">
       <div className="app-title-bar__identity">
         <img src={appIcon} alt="" />
-        <span>自动剪辑</span>
+        <span>文件</span>
+        <span>编辑</span>
+        <span>查看</span>
+        <span>帮助</span>
       </div>
     </header>
   )
