@@ -155,7 +155,7 @@ test('inserts, updates, and deletes draft rows while retaining at least one row'
 test('starts with a 9:16 canvas and updates its selected aspect ratio', async () => {
   const initial = project.createInitialEditorProjectState('row-1')
   assert.deepEqual(initial.aspectRatio, project.DEFAULT_CANVAS_ASPECT_RATIO)
-  assert.deepEqual(initial.aspectRatio, { id: '9:16', label: '抖音', width: 9, height: 16 })
+  assert.deepEqual(initial.aspectRatio, { id: '9:16', label: '9:16（抖音）', width: 9, height: 16 })
   const selected = project.editorProjectReducer(initial, {
     type: 'aspectRatio/selected',
     aspectRatio: { id: '16:9', label: '横屏', width: 16, height: 9 }

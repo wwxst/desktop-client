@@ -8,6 +8,8 @@ import Timeline from './Timeline'
 import {
   createInitialEditorProjectState,
   editorProjectReducer,
+  selectActiveAsset,
+  type CanvasAspectRatio,
   type DraftRow,
   type MediaAsset
 } from './editorProject'
@@ -25,6 +27,7 @@ function WorkspaceView(): JSX.Element {
     () => new Set(project.clips.map((clip) => clip.assetId)),
     [project.clips]
   )
+  const activeAsset = selectActiveAsset(project)
 
   useEffect(() => {
     const mediaUrls = mediaUrlsRef.current
@@ -69,6 +72,10 @@ function WorkspaceView(): JSX.Element {
     dispatch({ type: 'draft/rowDeleted', rowId })
   }
 
+  const handleAspectRatioChange = (aspectRatio: CanvasAspectRatio): void => {
+    dispatch({ type: 'aspectRatio/selected', aspectRatio })
+  }
+
   return (
     <section className="studio-workspace" aria-label="剪辑工作区">
       <Group
@@ -107,7 +114,12 @@ function WorkspaceView(): JSX.Element {
               />
 
               <Panel id="player-panel" minSize={220}>
-                <PlayerPanel />
+                <PlayerPanel
+                  key={activeAsset?.id ?? 'empty-player'}
+                  activeAsset={activeAsset}
+                  selectedRatio={project.aspectRatio}
+                  onAspectRatioChange={handleAspectRatioChange}
+                />
               </Panel>
 
               <Separator

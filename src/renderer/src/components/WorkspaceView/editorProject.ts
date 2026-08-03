@@ -39,7 +39,7 @@ export interface EditorProjectState {
 
 export const DEFAULT_CANVAS_ASPECT_RATIO: CanvasAspectRatio = {
   id: '9:16',
-  label: '抖音',
+  label: '9:16（抖音）',
   width: 9,
   height: 16
 }

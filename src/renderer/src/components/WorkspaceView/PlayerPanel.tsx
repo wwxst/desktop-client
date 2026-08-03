@@ -1,9 +1,4 @@
-import type {
-  CSSProperties,
-  FormEvent,
-  JSX,
-  KeyboardEvent as ReactKeyboardEvent
-} from 'react'
+import type { CSSProperties, FormEvent, JSX, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
@@ -13,15 +8,16 @@ import {
   Maximize2,
   Menu,
   Monitor,
+  Pause,
   Play,
   Ratio
 } from 'lucide-react'
+import type { CanvasAspectRatio, MediaAsset } from './editorProject'
 
-interface AspectRatioOption {
-  id: string
-  label: string
-  width: number
-  height: number
+interface PlayerPanelProps {
+  activeAsset: MediaAsset | null
+  selectedRatio: CanvasAspectRatio
+  onAspectRatioChange: (ratio: CanvasAspectRatio) => void
 }
 
 interface CanvasStyle extends CSSProperties {
@@ -37,14 +33,14 @@ interface RatioPreviewStyle extends CSSProperties {
 const DEFAULT_ASPECT_RATIO_ID = '9:16'
 const SOURCE_RATIO_LABEL = '适应（原始）'
 
-const DEFAULT_ASPECT_RATIO: AspectRatioOption = {
+const DEFAULT_ASPECT_RATIO: CanvasAspectRatio = {
   id: DEFAULT_ASPECT_RATIO_ID,
   label: '9:16（抖音）',
   width: 9,
   height: 16
 }
 
-const LANDSCAPE_RATIOS: AspectRatioOption[] = [
+const LANDSCAPE_RATIOS: CanvasAspectRatio[] = [
   { id: '16:9', label: '16:9（西瓜视频）', width: 16, height: 9 },
   { id: '4:3', label: '4:3', width: 4, height: 3 },
   { id: '2.35:1', label: '2.35:1', width: 2.35, height: 1 },
@@ -52,21 +48,46 @@ const LANDSCAPE_RATIOS: AspectRatioOption[] = [
   { id: '1.85:1', label: '1.85:1', width: 1.85, height: 1 }
 ]
 
-const PORTRAIT_RATIOS: AspectRatioOption[] = [
+const PORTRAIT_RATIOS: CanvasAspectRatio[] = [
   DEFAULT_ASPECT_RATIO,
   { id: '3:4', label: '3:4', width: 3, height: 4 },
   { id: '5.8-inch', label: '5.8寸', width: 9, height: 19.5 },
   { id: '1:1', label: '1:1', width: 1, height: 1 }
 ]
 
-function PlayerPanel(): JSX.Element {
+const getWholeSeconds = (seconds: number): number =>
+  Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+
+const formatPlaybackTime = (seconds: number): string => {
+  const totalSeconds = getWholeSeconds(seconds)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const remainingSeconds = totalSeconds % 60
+
+  return [hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')
+}
+
+const resetVideo = (video: HTMLVideoElement): void => {
+  video.pause()
+  if (video.readyState > 0) video.currentTime = 0
+}
+
+function PlayerPanel({
+  activeAsset,
+  selectedRatio,
+  onAspectRatioChange
+}: PlayerPanelProps): JSX.Element {
   const ratioButtonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [selectedRatio, setSelectedRatio] = useState<AspectRatioOption>(DEFAULT_ASPECT_RATIO)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [isRatioMenuOpen, setIsRatioMenuOpen] = useState(false)
   const [isCustomMode, setIsCustomMode] = useState(false)
   const [customWidth, setCustomWidth] = useState('9')
   const [customHeight, setCustomHeight] = useState('16')
+  const [isVideoReady, setIsVideoReady] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
 
   const parsedCustomWidth = Number(customWidth)
   const parsedCustomHeight = Number(customHeight)
@@ -87,6 +108,15 @@ function PlayerPanel(): JSX.Element {
   }
 
   useEffect(() => {
+    const video = videoRef.current
+    if (video) resetVideo(video)
+
+    return () => {
+      if (video) resetVideo(video)
+    }
+  }, [activeAsset?.id])
+
+  useEffect(() => {
     if (!isRatioMenuOpen) {
       return undefined
     }
@@ -94,10 +124,7 @@ function PlayerPanel(): JSX.Element {
     const handlePointerDown = (event: PointerEvent): void => {
       const target = event.target as Node
 
-      if (
-        !menuRef.current?.contains(target) &&
-        !ratioButtonRef.current?.contains(target)
-      ) {
+      if (!menuRef.current?.contains(target) && !ratioButtonRef.current?.contains(target)) {
         closeRatioMenu()
       }
     }
@@ -132,10 +159,26 @@ function PlayerPanel(): JSX.Element {
     return () => window.cancelAnimationFrame(focusFrame)
   }, [isCustomMode, isRatioMenuOpen])
 
-  const selectAspectRatio = (option: AspectRatioOption): void => {
-    setSelectedRatio(option)
+  const selectAspectRatio = (option: CanvasAspectRatio): void => {
+    onAspectRatioChange(option)
     closeRatioMenu()
     ratioButtonRef.current?.focus()
+  }
+
+  const togglePlayback = async (): Promise<void> => {
+    const video = videoRef.current
+    if (!video || !activeAsset || !isVideoReady) return
+
+    if (!video.paused) {
+      video.pause()
+      return
+    }
+
+    try {
+      await video.play()
+    } catch {
+      if (videoRef.current === video) setIsPlaying(false)
+    }
   }
 
   const applyCustomRatio = (event: FormEvent<HTMLFormElement>): void => {
@@ -168,9 +211,7 @@ function PlayerPanel(): JSX.Element {
     }
 
     const menuItems = Array.from(
-      menuRef.current.querySelectorAll<HTMLButtonElement>(
-        '[role^="menuitem"]:not(:disabled)'
-      )
+      menuRef.current.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)')
     )
 
     if (menuItems.length === 0) {
@@ -194,7 +235,7 @@ function PlayerPanel(): JSX.Element {
     menuItems[nextIndex]?.focus()
   }
 
-  const renderRatioOption = (option: AspectRatioOption): JSX.Element => {
+  const renderRatioOption = (option: CanvasAspectRatio): JSX.Element => {
     const previewStyle: RatioPreviewStyle = {
       '--option-ratio': `${option.width} / ${option.height}`,
       '--option-ratio-value': option.width / option.height
@@ -234,22 +275,54 @@ function PlayerPanel(): JSX.Element {
         <div
           className="studio-player__canvas"
           style={canvasStyle}
-          role="img"
-          aria-label={`暂无预览内容，画面比例 ${selectedRatio.label}`}
+          role={activeAsset ? undefined : 'img'}
+          aria-label={
+            activeAsset
+              ? `${activeAsset.name} 播放器画布，画面比例 ${selectedRatio.label}`
+              : `暂无预览内容，画面比例 ${selectedRatio.label}`
+          }
         >
-          <Film size={34} strokeWidth={1.4} aria-hidden="true" />
+          {activeAsset ? (
+            <video
+              key={activeAsset.id}
+              ref={videoRef}
+              src={activeAsset.url}
+              preload="auto"
+              playsInline
+              aria-label={`${activeAsset.name}播放器预览`}
+              onLoadedData={(event) => {
+                event.currentTarget.currentTime = 0
+                setCurrentTime(0)
+                setDuration(event.currentTarget.duration)
+                setIsVideoReady(true)
+              }}
+              onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
+              onError={() => {
+                setIsVideoReady(false)
+                setIsPlaying(false)
+              }}
+            />
+          ) : (
+            <Film size={34} strokeWidth={1.4} aria-hidden="true" />
+          )}
         </div>
       </div>
 
       <footer className="studio-player__controls" aria-label="播放控制">
         <div className="studio-player__controls-left">
-          <time className="studio-player__current-time" dateTime="PT0S">
-            00:00:00
+          <time
+            className="studio-player__current-time"
+            dateTime={`PT${getWholeSeconds(currentTime)}S`}
+          >
+            {formatPlaybackTime(currentTime)}
           </time>
           <span className="studio-player__time-divider" aria-hidden="true">
             /
           </span>
-          <time dateTime="PT0S">00:00:00</time>
+          <time dateTime={`PT${getWholeSeconds(duration)}S`}>{formatPlaybackTime(duration)}</time>
 
           <button type="button" aria-label="片段列表" title="片段列表" disabled>
             <ListVideo size={17} strokeWidth={1.75} aria-hidden="true" />
@@ -259,11 +332,16 @@ function PlayerPanel(): JSX.Element {
         <button
           className="studio-player__play"
           type="button"
-          aria-label="播放"
-          title="播放"
-          disabled
+          aria-label={isPlaying ? '暂停' : '播放'}
+          title={isPlaying ? '暂停' : '播放'}
+          disabled={!activeAsset || !isVideoReady}
+          onClick={() => void togglePlayback()}
         >
-          <Play size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+          {isPlaying ? (
+            <Pause size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+          ) : (
+            <Play size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+          )}
         </button>
 
         <div className="studio-player__controls-right">

@@ -29,9 +29,9 @@ test('renders the light player with an enabled ratio control', () => {
   assert.match(playerPanelSource, /<h2>播放器<\/h2>/)
   assert.match(playerPanelSource, /className="studio-player__stage"/)
   assert.match(playerPanelSource, /className="studio-player__canvas"/)
-  assert.match(playerPanelSource, /aria-label={`暂无预览内容，画面比例 \${selectedRatio\.label}`}/)
+  assert.match(playerPanelSource, /暂无预览内容，画面比例/)
   assert.match(playerPanelSource, /className="studio-player__controls" aria-label="播放控制"/)
-  assert.match(playerPanelSource, /aria-label="播放"[^>]*disabled/)
+  assert.match(playerPanelSource, /disabled=\{!activeAsset \|\| !isVideoReady\}/)
   assert.match(playerPanelSource, /aria-label="全屏"[^>]*disabled/)
   assert.match(playerPanelSource, /aria-label="画面比例"[^>]*aria-expanded=/s)
   assert.doesNotMatch(playerPanelSource, /aria-label="画面比例"[^>]*disabled/s)
@@ -50,7 +50,7 @@ test('keeps the function player parameter and timeline regions inside WorkspaceV
     /className="studio-workspace__columns"[^>]*orientation="horizontal"/s
   )
   assert.match(workspaceSource, /<FunctionPanel/)
-  assert.match(workspaceSource, /<PlayerPanel\s*\/>/)
+  assert.match(workspaceSource, /<PlayerPanel/)
   assert.match(workspaceSource, /<ParameterPanel\s*\/>/)
   assert.match(workspaceSource, /<Timeline/)
   assert.equal(
@@ -210,7 +210,8 @@ test('keeps the player rows and vertical preview stable', () => {
 test('defaults the canvas and ratio menu to the 9:16 Douyin preset', () => {
   assert.match(playerPanelSource, /const DEFAULT_ASPECT_RATIO_ID = '9:16'/)
   assert.match(playerPanelSource, /id: DEFAULT_ASPECT_RATIO_ID,\s*label: '9:16（抖音）'/)
-  assert.match(playerPanelSource, /useState<AspectRatioOption>\(DEFAULT_ASPECT_RATIO\)/)
+  assert.doesNotMatch(playerPanelSource, /useState<AspectRatioOption>\(DEFAULT_ASPECT_RATIO\)/)
+  assert.match(playerPanelSource, /selectedRatio:\s*CanvasAspectRatio/)
   assert.match(playerPanelSource, /aria-checked={selectedRatio\.id === option\.id}/)
   assert.match(playerPanelSource, /--canvas-aspect-ratio/)
   assert.match(playerPanelSource, /--canvas-ratio-value/)
@@ -233,7 +234,7 @@ test('opens an accessible ratio menu and applies preset or custom ratios', () =>
   assert.match(playerPanelSource, /role="menu"[^>]*aria-label="画面比例"/s)
   assert.match(playerPanelSource, /role="menuitemradio"/)
   assert.match(playerPanelSource, /适应（原始）[^]*disabled/s)
-  assert.match(playerPanelSource, /setSelectedRatio\(option\)/)
+  assert.match(playerPanelSource, /onAspectRatioChange\(option\)/)
   assert.match(playerPanelSource, /className="studio-player__ratio-custom"/)
   assert.match(playerPanelSource, /aria-label="自定义宽度"/)
   assert.match(playerPanelSource, /aria-label="自定义高度"/)
@@ -308,5 +309,30 @@ test('keeps player controls readable at default and minimum middle widths', () =
   assert.match(
     workspaceStyles,
     /\.studio-player__controls-right button:first-child\s*{[^}]*display:\s*none;/s
+  )
+})
+
+test('previews and controls the active timeline video without autoplay', () => {
+  assert.match(playerPanelSource, /interface PlayerPanelProps/)
+  assert.match(playerPanelSource, /activeAsset:\s*MediaAsset \| null/)
+  assert.match(playerPanelSource, /selectedRatio:\s*CanvasAspectRatio/)
+  assert.match(playerPanelSource, /<video/)
+  assert.match(playerPanelSource, /src=\{activeAsset\.url\}/)
+  assert.match(playerPanelSource, /preload="auto"/)
+  assert.doesNotMatch(playerPanelSource, /<video[^>]*autoPlay/s)
+  assert.match(playerPanelSource, /onLoadedData=/)
+  assert.match(playerPanelSource, /onTimeUpdate=/)
+  assert.match(playerPanelSource, /currentTime = 0/)
+  assert.match(playerPanelSource, /\.play\(\)/)
+  assert.match(playerPanelSource, /\.pause\(\)/)
+  assert.match(playerPanelSource, /isPlaying \? '暂停' : '播放'/)
+  assert.match(playerPanelSource, /formatPlaybackTime/)
+  assert.match(workspaceSource, /activeAsset=\{activeAsset\}/)
+  assert.match(workspaceSource, /key=\{activeAsset\?\.id \?\? 'empty-player'\}/)
+  assert.match(workspaceSource, /selectedRatio=\{project\.aspectRatio\}/)
+  assert.match(workspaceSource, /onAspectRatioChange=\{handleAspectRatioChange\}/)
+  assert.match(
+    workspaceStyles,
+    /\.studio-player__canvas video\s*{[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*object-fit:\s*contain;[^}]*background:\s*#111111;/s
   )
 })
