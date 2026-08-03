@@ -1,15 +1,57 @@
 import type { JSX } from 'react'
+import { useEffect, useMemo, useReducer, useRef } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import FunctionPanel from './FunctionPanel'
 import ParameterPanel from './ParameterPanel'
 import PlayerPanel from './PlayerPanel'
 import Timeline from './Timeline'
+import {
+  createInitialEditorProjectState,
+  editorProjectReducer,
+  type MediaAsset
+} from './editorProject'
 import './WorkspaceView.css'
 
 /**
  * 中间剪辑工作区：上方为功能、播放和参数区域，下方为横跨三块的时间线。
  */
 function WorkspaceView(): JSX.Element {
+  const [project, dispatch] = useReducer(editorProjectReducer, undefined, () =>
+    createInitialEditorProjectState(crypto.randomUUID())
+  )
+  const mediaUrlsRef = useRef(new Set<string>())
+  const addedMediaIds = useMemo(
+    () => new Set(project.clips.map((clip) => clip.assetId)),
+    [project.clips]
+  )
+
+  useEffect(() => {
+    const mediaUrls = mediaUrlsRef.current
+
+    return () => {
+      mediaUrls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [])
+
+  const handleImportMedia = (assets: MediaAsset[]): void => {
+    assets.forEach((asset) => {
+      mediaUrlsRef.current.add(asset.url)
+      dispatch({ type: 'assets/imported', asset })
+    })
+  }
+
+  const handleMediaReady = (mediaId: string, duration: number): void => {
+    dispatch({ type: 'asset/ready', assetId: mediaId, duration })
+  }
+
+  const handleMediaError = (mediaId: string): void => {
+    dispatch({ type: 'asset/failed', assetId: mediaId, error: '无法预览该视频' })
+  }
+
+  const handleAddMedia = (mediaId: string): void => {
+    dispatch({ type: 'timeline/assetAdded', assetId: mediaId })
+  }
+
   return (
     <section className="studio-workspace" aria-label="剪辑工作区">
       <Group
@@ -31,7 +73,14 @@ function WorkspaceView(): JSX.Element {
                 maxSize={240}
                 groupResizeBehavior="preserve-pixel-size"
               >
-                <FunctionPanel />
+                <FunctionPanel
+                  mediaItems={project.assets}
+                  addedMediaIds={addedMediaIds}
+                  onImportMedia={handleImportMedia}
+                  onMediaReady={handleMediaReady}
+                  onMediaError={handleMediaError}
+                  onAddMedia={handleAddMedia}
+                />
               </Panel>
 
               <Separator

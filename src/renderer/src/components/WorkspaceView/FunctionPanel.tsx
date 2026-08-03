@@ -4,7 +4,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent
 } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ArrowRightLeft,
   Check,
@@ -22,17 +22,20 @@ import {
   VideoOff,
   type LucideIcon
 } from 'lucide-react'
+import type { MediaAsset } from './editorProject'
 
 interface FunctionTool {
   label: string
   icon: LucideIcon
 }
 
-interface MediaItem {
-  id: number
-  name: string
-  url: string
-  duration: number | null
+interface FunctionPanelProps {
+  mediaItems: MediaAsset[]
+  addedMediaIds: ReadonlySet<string>
+  onImportMedia: (assets: MediaAsset[]) => void
+  onMediaReady: (mediaId: string, duration: number) => void
+  onMediaError: (mediaId: string) => void
+  onAddMedia: (mediaId: string) => void
 }
 
 const functionTools: FunctionTool[] = [
@@ -60,75 +63,37 @@ const formatDuration = (duration: number | null): string => {
   return hours > 0 ? `${hours}:${minuteText}:${secondText}` : `${minuteText}:${secondText}`
 }
 
-function FunctionPanel(): JSX.Element {
+function FunctionPanel({
+  mediaItems,
+  addedMediaIds,
+  onImportMedia,
+  onMediaReady,
+  onMediaError,
+  onAddMedia
+}: FunctionPanelProps): JSX.Element {
   const [selectedCategory, setSelectedCategory] = useState('媒体')
   const [isDragging, setIsDragging] = useState(false)
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
-  const [addedMediaIds, setAddedMediaIds] = useState<number[]>([])
-  const [readyMediaIds, setReadyMediaIds] = useState<number[]>([])
-  const [failedMediaIds, setFailedMediaIds] = useState<number[]>([])
   const categoryListRef = useRef<HTMLElement | null>(null)
   const mediaInputRef = useRef<HTMLInputElement | null>(null)
-  const mediaUrlsRef = useRef<string[]>([])
-  const nextMediaIdRef = useRef(1)
   const activePointerIdRef = useRef<number | null>(null)
   const dragStartXRef = useRef(0)
   const dragStartScrollLeftRef = useRef(0)
   const suppressClickRef = useRef(false)
 
-  useEffect(() => {
-    return () => {
-      mediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
-    }
-  }, [])
-
   const handleMediaImport = (event: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(event.currentTarget.files ?? [])
     if (files.length === 0) return
 
-    const importedItems = files.map((file) => {
-      const url = URL.createObjectURL(file)
-      const item: MediaItem = {
-        id: nextMediaIdRef.current,
-        name: file.name,
-        url,
-        duration: null
-      }
+    const importedItems: MediaAsset[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      name: file.name,
+      url: URL.createObjectURL(file),
+      duration: null,
+      status: 'loading'
+    }))
 
-      nextMediaIdRef.current += 1
-      mediaUrlsRef.current.push(url)
-      return item
-    })
-
-    setMediaItems((currentItems) => [...currentItems, ...importedItems])
+    onImportMedia(importedItems)
     event.currentTarget.value = ''
-  }
-
-  const handleMediaMetadata = (mediaId: number, duration: number): void => {
-    setMediaItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === mediaId ? { ...item, duration } : item
-      )
-    )
-  }
-
-  const handleAddMedia = (mediaId: number): void => {
-    setAddedMediaIds((currentIds) =>
-      currentIds.includes(mediaId) ? currentIds : [...currentIds, mediaId]
-    )
-  }
-
-  const handleMediaPreviewReady = (mediaId: number): void => {
-    setReadyMediaIds((currentIds) =>
-      currentIds.includes(mediaId) ? currentIds : [...currentIds, mediaId]
-    )
-    setFailedMediaIds((currentIds) => currentIds.filter((id) => id !== mediaId))
-  }
-
-  const handleMediaPreviewError = (mediaId: number): void => {
-    setFailedMediaIds((currentIds) =>
-      currentIds.includes(mediaId) ? currentIds : [...currentIds, mediaId]
-    )
   }
 
   const handleCategoryPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
@@ -254,9 +219,9 @@ function FunctionPanel(): JSX.Element {
 
             <div className="studio-function-panel__media-grid">
               {mediaItems.map((mediaItem) => {
-                const isAdded = addedMediaIds.includes(mediaItem.id)
-                const isPreviewReady = readyMediaIds.includes(mediaItem.id)
-                const hasPreviewFailed = failedMediaIds.includes(mediaItem.id)
+                const isAdded = addedMediaIds.has(mediaItem.id)
+                const isPreviewReady = mediaItem.status === 'ready'
+                const hasPreviewFailed = mediaItem.status === 'error'
 
                 return (
                   <article className="studio-function-panel__media-card" key={mediaItem.id}>
@@ -282,19 +247,23 @@ function FunctionPanel(): JSX.Element {
                         preload="auto"
                         data-ready={isPreviewReady}
                         aria-label={`${mediaItem.name}预览`}
-                        onLoadedMetadata={(event) =>
-                          handleMediaMetadata(mediaItem.id, event.currentTarget.duration)
+                        onLoadedMetadata={(event) => {
+                          if (event.currentTarget.readyState >= 2) {
+                            onMediaReady(mediaItem.id, event.currentTarget.duration)
+                          }
+                        }}
+                        onLoadedData={(event) =>
+                          onMediaReady(mediaItem.id, event.currentTarget.duration)
                         }
-                        onLoadedData={() => handleMediaPreviewReady(mediaItem.id)}
-                        onError={() => handleMediaPreviewError(mediaItem.id)}
+                        onError={() => onMediaError(mediaItem.id)}
                       />
                       <button
                         className="studio-function-panel__media-add"
                         type="button"
                         title={isAdded ? '已添加媒体' : '添加媒体'}
                         aria-label={isAdded ? `已添加${mediaItem.name}` : `添加${mediaItem.name}`}
-                        disabled={isAdded}
-                        onClick={() => handleAddMedia(mediaItem.id)}
+                        disabled={isAdded || mediaItem.status !== 'ready'}
+                        onClick={() => onAddMedia(mediaItem.id)}
                       >
                         {isAdded ? (
                           <Check size={11} strokeWidth={2} aria-hidden="true" />

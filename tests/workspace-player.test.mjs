@@ -22,20 +22,14 @@ const playerPanelSource = await readFile(
   new URL('../src/renderer/src/components/WorkspaceView/PlayerPanel.tsx', import.meta.url),
   'utf8'
 ).catch(() => '')
-const rendererHtml = await readFile(
-  new URL('../src/renderer/index.html', import.meta.url),
-  'utf8'
-)
+const rendererHtml = await readFile(new URL('../src/renderer/index.html', import.meta.url), 'utf8')
 
 test('renders the light player with an enabled ratio control', () => {
   assert.match(playerPanelSource, /<section[^>]*className="studio-player"[^>]*aria-label="播放器"/s)
   assert.match(playerPanelSource, /<h2>播放器<\/h2>/)
   assert.match(playerPanelSource, /className="studio-player__stage"/)
   assert.match(playerPanelSource, /className="studio-player__canvas"/)
-  assert.match(
-    playerPanelSource,
-    /aria-label={`暂无预览内容，画面比例 \${selectedRatio\.label}`}/
-  )
+  assert.match(playerPanelSource, /aria-label={`暂无预览内容，画面比例 \${selectedRatio\.label}`}/)
   assert.match(playerPanelSource, /className="studio-player__controls" aria-label="播放控制"/)
   assert.match(playerPanelSource, /aria-label="播放"[^>]*disabled/)
   assert.match(playerPanelSource, /aria-label="全屏"[^>]*disabled/)
@@ -55,7 +49,7 @@ test('keeps the function player parameter and timeline regions inside WorkspaceV
     workspaceSource,
     /className="studio-workspace__columns"[^>]*orientation="horizontal"/s
   )
-  assert.match(workspaceSource, /<FunctionPanel\s*\/>/)
+  assert.match(workspaceSource, /<FunctionPanel/)
   assert.match(workspaceSource, /<PlayerPanel\s*\/>/)
   assert.match(workspaceSource, /<ParameterPanel\s*\/>/)
   assert.match(workspaceSource, /<Timeline\s*\/>/)
@@ -125,7 +119,7 @@ test('renders an importable light media library in the media category', () => {
   )
   assert.match(functionPanelSource, /handleMediaImport/)
   assert.match(functionPanelSource, /URL\.createObjectURL/)
-  assert.match(functionPanelSource, /URL\.revokeObjectURL/)
+  assert.match(workspaceSource, /URL\.revokeObjectURL/)
   assert.match(functionPanelSource, /mediaItems\.map/)
   assert.match(functionPanelSource, /<video/)
   assert.match(functionPanelSource, /onLoadedMetadata=/)
@@ -135,7 +129,7 @@ test('renders an importable light media library in the media category', () => {
   assert.match(functionPanelSource, /className="studio-function-panel__media-placeholder"/)
   assert.match(functionPanelSource, /data-ready=\{isPreviewReady\}/)
   assert.match(functionPanelSource, /formatDuration/)
-  assert.match(functionPanelSource, /handleAddMedia/)
+  assert.match(functionPanelSource, /onAddMedia/)
   assert.match(functionPanelSource, /添加/)
 
   assert.match(
@@ -146,10 +140,7 @@ test('renders an importable light media library in the media category', () => {
     workspaceStyles,
     /\.studio-function-panel__media-import\s*{[^}]*display:\s*flex;[^}]*height:\s*28px;/s
   )
-  assert.match(
-    workspaceStyles,
-    /\.studio-function-panel__media-grid\s*{[^}]*display:\s*grid;/s
-  )
+  assert.match(workspaceStyles, /\.studio-function-panel__media-grid\s*{[^}]*display:\s*grid;/s)
   assert.match(
     workspaceStyles,
     /\.studio-function-panel__media-thumbnail\s*{[^}]*aspect-ratio:\s*16\s*\/\s*9;/s
@@ -166,6 +157,27 @@ test('renders an importable light media library in the media category', () => {
     workspaceStyles,
     /\.studio-function-panel__media-thumbnail video\[data-ready='true'\]\s*{[^}]*opacity:\s*1;/s
   )
+})
+
+test('owns imported media and timeline additions in WorkspaceView', () => {
+  assert.match(workspaceSource, /useReducer\(editorProjectReducer/)
+  assert.match(workspaceSource, /createInitialEditorProjectState\(crypto\.randomUUID\(\)\)/)
+  assert.match(workspaceSource, /URL\.revokeObjectURL\(url\)/)
+  assert.match(workspaceSource, /<FunctionPanel[\s\S]*mediaItems=\{project\.assets\}/)
+  assert.match(workspaceSource, /addedMediaIds=\{addedMediaIds\}/)
+  assert.match(workspaceSource, /onImportMedia=\{handleImportMedia\}/)
+  assert.match(workspaceSource, /onMediaReady=\{handleMediaReady\}/)
+  assert.match(workspaceSource, /onMediaError=\{handleMediaError\}/)
+  assert.match(workspaceSource, /onAddMedia=\{handleAddMedia\}/)
+
+  assert.match(functionPanelSource, /interface FunctionPanelProps/)
+  assert.match(functionPanelSource, /mediaItems:\s*MediaAsset\[\]/)
+  assert.match(functionPanelSource, /onImportMedia:\s*\(assets:\s*MediaAsset\[\]\) => void/)
+  assert.match(functionPanelSource, /URL\.createObjectURL\(file\)/)
+  assert.doesNotMatch(functionPanelSource, /useState<MediaItem\[\]>/)
+  assert.doesNotMatch(functionPanelSource, /setAddedMediaIds/)
+  assert.doesNotMatch(functionPanelSource, /readyMediaIds|failedMediaIds|mediaUrlsRef/)
+  assert.match(functionPanelSource, /disabled=\{isAdded \|\| mediaItem\.status !== 'ready'\}/)
 })
 
 test('allows imported blob videos through the renderer content security policy', () => {
@@ -197,10 +209,7 @@ test('keeps the player rows and vertical preview stable', () => {
 
 test('defaults the canvas and ratio menu to the 9:16 Douyin preset', () => {
   assert.match(playerPanelSource, /const DEFAULT_ASPECT_RATIO_ID = '9:16'/)
-  assert.match(
-    playerPanelSource,
-    /id: DEFAULT_ASPECT_RATIO_ID,\s*label: '9:16（抖音）'/
-  )
+  assert.match(playerPanelSource, /id: DEFAULT_ASPECT_RATIO_ID,\s*label: '9:16（抖音）'/)
   assert.match(playerPanelSource, /useState<AspectRatioOption>\(DEFAULT_ASPECT_RATIO\)/)
   assert.match(playerPanelSource, /aria-checked={selectedRatio\.id === option\.id}/)
   assert.match(playerPanelSource, /--canvas-aspect-ratio/)
@@ -208,7 +217,16 @@ test('defaults the canvas and ratio menu to the 9:16 Douyin preset', () => {
 })
 
 test('opens an accessible ratio menu and applies preset or custom ratios', () => {
-  for (const label of ['16:9（西瓜视频）', '4:3', '2.35:1', '2:1', '1.85:1', '3:4', '5.8寸', '1:1']) {
+  for (const label of [
+    '16:9（西瓜视频）',
+    '4:3',
+    '2.35:1',
+    '2:1',
+    '1.85:1',
+    '3:4',
+    '5.8寸',
+    '1:1'
+  ]) {
     assert.match(playerPanelSource, new RegExp(label))
   }
 
@@ -246,7 +264,10 @@ test('positions the light ratio popover above the player controls', () => {
     workspaceStyles,
     /\.studio-player__ratio-popover\s*{[^}]*position:\s*absolute;[^}]*right:\s*8px;[^}]*bottom:\s*52px;[^}]*background:\s*#ffffff;/s
   )
-  assert.match(workspaceStyles, /\.studio-player__ratio-option-preview\s*{[^}]*aspect-ratio:\s*var\(--option-ratio\);/s)
+  assert.match(
+    workspaceStyles,
+    /\.studio-player__ratio-option-preview\s*{[^}]*aspect-ratio:\s*var\(--option-ratio\);/s
+  )
 })
 
 test('keeps the nested workspace groups contained by the middle panel', () => {
