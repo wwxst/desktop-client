@@ -1,55 +1,70 @@
 import type { JSX } from 'react'
-import { useRef, useState } from 'react'
-import { Plus, Trash2, Upload } from 'lucide-react'
+import { Plus, Trash2, Upload, Video } from 'lucide-react'
+import type { DraftRow, MediaAsset, TimelineClip } from './editorProject'
 import './Timeline.css'
 
-interface DraftRow {
-  id: number
-  draftName: string
-  fixedStartFileName: string
-  audio: string
-  fixedEndFileName: string
+interface TimelineProps {
+  clips: TimelineClip[]
+  assets: MediaAsset[]
+  activeClipId: string | null
+  rows: DraftRow[]
+  onSelectClip: (clipId: string) => void
+  onUpdateRow: (rowId: string, updates: Partial<Omit<DraftRow, 'id'>>) => void
+  onAddRow: (afterRowId: string) => void
+  onDeleteRow: (rowId: string) => void
 }
 
-const createDraftRow = (id: number): DraftRow => ({
-  id,
-  draftName: '',
-  fixedStartFileName: '选择视频',
-  audio: '',
-  fixedEndFileName: '选择视频'
-})
+const formatDuration = (duration: number | null): string => {
+  if (duration === null || !Number.isFinite(duration)) return '--:--'
 
-function Timeline(): JSX.Element {
-  const [rows, setRows] = useState<DraftRow[]>([createDraftRow(1)])
-  const nextRowIdRef = useRef(2)
+  const totalSeconds = Math.max(0, Math.floor(duration))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const minuteText = String(minutes).padStart(2, '0')
+  const secondText = String(seconds).padStart(2, '0')
 
-  const updateRow = (rowId: number, updates: Partial<Omit<DraftRow, 'id'>>): void => {
-    setRows((currentRows) =>
-      currentRows.map((row) => (row.id === rowId ? { ...row, ...updates } : row))
-    )
-  }
+  return hours > 0 ? `${hours}:${minuteText}:${secondText}` : `${minuteText}:${secondText}`
+}
 
-  const handleAddRow = (index: number): void => {
-    const newRow = createDraftRow(nextRowIdRef.current)
-    nextRowIdRef.current += 1
-
-    setRows((currentRows) => [
-      ...currentRows.slice(0, index + 1),
-      newRow,
-      ...currentRows.slice(index + 1)
-    ])
-  }
-
-  const handleDeleteRow = (rowId: number): void => {
-    setRows((currentRows) => {
-      if (currentRows.length === 1) return currentRows
-
-      return currentRows.filter((row) => row.id !== rowId)
-    })
-  }
+function Timeline({
+  clips,
+  assets,
+  activeClipId,
+  rows,
+  onSelectClip,
+  onUpdateRow,
+  onAddRow,
+  onDeleteRow
+}: TimelineProps): JSX.Element {
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]))
 
   return (
     <section className="studio-timeline" aria-label="时间线">
+      <div className="studio-timeline__clip-lane">
+        <ol aria-label="时间线素材">
+          {clips.map((clip) => {
+            const asset = assetsById.get(clip.assetId)
+            if (!asset) return null
+
+            return (
+              <li key={clip.id}>
+                <button
+                  className="studio-timeline__clip"
+                  type="button"
+                  aria-pressed={activeClipId === clip.id}
+                  onClick={() => onSelectClip(clip.id)}
+                >
+                  <Video size={14} strokeWidth={1.7} aria-hidden="true" />
+                  <span title={asset.name}>{asset.name}</span>
+                  <time>{formatDuration(asset.duration)}</time>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      </div>
+
       <div className="studio-timeline__table-container">
         <form
           className="studio-timeline__table-form"
@@ -82,7 +97,7 @@ function Timeline(): JSX.Element {
                       aria-label="草稿名"
                       placeholder="请输入草稿名"
                       value={row.draftName}
-                      onChange={(event) => updateRow(row.id, { draftName: event.target.value })}
+                      onChange={(event) => onUpdateRow(row.id, { draftName: event.target.value })}
                     />
                   </td>
                   <td>
@@ -95,9 +110,8 @@ function Timeline(): JSX.Element {
                         accept="video/*"
                         aria-label="上传固定开头"
                         onChange={(event) => {
-                          updateRow(row.id, {
-                            fixedStartFileName:
-                              event.currentTarget.files?.[0]?.name ?? '选择视频'
+                          onUpdateRow(row.id, {
+                            fixedStartFileName: event.currentTarget.files?.[0]?.name ?? '选择视频'
                           })
                         }}
                       />
@@ -109,7 +123,7 @@ function Timeline(): JSX.Element {
                       name="audio"
                       aria-label="音频"
                       value={row.audio}
-                      onChange={(event) => updateRow(row.id, { audio: event.target.value })}
+                      onChange={(event) => onUpdateRow(row.id, { audio: event.target.value })}
                     >
                       <option value="" disabled>
                         请选择音频
@@ -128,9 +142,8 @@ function Timeline(): JSX.Element {
                           accept="video/*"
                           aria-label="上传固定结尾"
                           onChange={(event) => {
-                            updateRow(row.id, {
-                              fixedEndFileName:
-                                event.currentTarget.files?.[0]?.name ?? '选择视频'
+                            onUpdateRow(row.id, {
+                              fixedEndFileName: event.currentTarget.files?.[0]?.name ?? '选择视频'
                             })
                           }}
                         />
@@ -145,7 +158,7 @@ function Timeline(): JSX.Element {
                           type="button"
                           title="新增一行"
                           aria-label={`在第 ${index + 1} 行后新增`}
-                          onClick={() => handleAddRow(index)}
+                          onClick={() => onAddRow(row.id)}
                         >
                           <Plus size={14} strokeWidth={1.8} aria-hidden="true" />
                         </button>
@@ -155,7 +168,7 @@ function Timeline(): JSX.Element {
                           title="删除当前行"
                           aria-label={`删除第 ${index + 1} 行`}
                           disabled={rows.length === 1}
-                          onClick={() => handleDeleteRow(row.id)}
+                          onClick={() => onDeleteRow(row.id)}
                         >
                           <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" />
                         </button>

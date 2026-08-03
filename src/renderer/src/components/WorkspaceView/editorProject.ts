@@ -59,9 +59,9 @@ export function createDraftRow(id: string): DraftRow {
   return {
     id,
     draftName: '',
-    fixedStartFileName: '',
+    fixedStartFileName: '选择视频',
     audio: '',
-    fixedEndFileName: ''
+    fixedEndFileName: '选择视频'
   }
 }
 

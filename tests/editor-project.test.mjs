@@ -137,9 +137,9 @@ test('inserts, updates, and deletes draft rows while retaining at least one row'
   assert.deepEqual(state.draftRows[1], {
     id: 'row-2',
     draftName: 'Chapter 2',
-    fixedStartFileName: '',
+    fixedStartFileName: '选择视频',
     audio: 'narration.mp3',
-    fixedEndFileName: ''
+    fixedEndFileName: '选择视频'
   })
   state = project.editorProjectReducer(state, { type: 'draft/rowDeleted', rowId: 'row-1' })
   assert.deepEqual(

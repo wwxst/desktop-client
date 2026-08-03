@@ -52,7 +52,7 @@ test('keeps the function player parameter and timeline regions inside WorkspaceV
   assert.match(workspaceSource, /<FunctionPanel/)
   assert.match(workspaceSource, /<PlayerPanel\s*\/>/)
   assert.match(workspaceSource, /<ParameterPanel\s*\/>/)
-  assert.match(workspaceSource, /<Timeline\s*\/>/)
+  assert.match(workspaceSource, /<Timeline/)
   assert.equal(
     workspaceSource.match(/className="studio-workspace__column-resize-handle"/g)?.length,
     2

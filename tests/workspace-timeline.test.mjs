@@ -54,15 +54,18 @@ test('renders one editable row beneath the draft table headers', () => {
   )
   assert.match(timelineSource, /fixedStartFileName/)
   assert.match(timelineSource, /fixedEndFileName/)
-  assert.match(timelineSource, /updateRow/)
-  assert.doesNotMatch(timelineSource, /name="fixedStart"[^>]*type="checkbox"|name="fixedEnd"[^>]*type="checkbox"/s)
+  assert.match(timelineSource, /onUpdateRow/)
+  assert.doesNotMatch(
+    timelineSource,
+    /name="fixedStart"[^>]*type="checkbox"|name="fixedEnd"[^>]*type="checkbox"/s
+  )
 })
 
 test('adds and deletes rows after the fixed-end upload', () => {
-  assert.match(timelineSource, /const \[rows, setRows\] = useState/)
+  assert.doesNotMatch(timelineSource, /const \[rows, setRows\] = useState/)
   assert.match(timelineSource, /rows\.map\(\(row, index\) =>/)
-  assert.match(timelineSource, /handleAddRow/)
-  assert.match(timelineSource, /handleDeleteRow/)
+  assert.match(timelineSource, /onAddRow\(row\.id\)/)
+  assert.match(timelineSource, /onDeleteRow\(row\.id\)/)
   assert.match(
     timelineSource,
     /<td className="studio-timeline__fixed-end-cell">[\s\S]*studio-timeline__upload[\s\S]*studio-timeline__row-actions[\s\S]*<\/td>/s
@@ -74,19 +77,25 @@ test('adds and deletes rows after the fixed-end upload', () => {
   assert.match(timelineSource, /title="新增一行"/)
   assert.match(timelineSource, /title="删除当前行"/)
   assert.match(timelineSource, /disabled=\{rows\.length === 1\}/)
-  assert.match(timelineStyles, /\.studio-timeline__fixed-end-cell-content\s*{[^}]*display:\s*grid;/s)
+  assert.match(
+    timelineStyles,
+    /\.studio-timeline__fixed-end-cell-content\s*{[^}]*display:\s*grid;/s
+  )
   assert.match(timelineStyles, /\.studio-timeline__row-actions\s*{[^}]*display:\s*flex;/s)
-  assert.match(timelineStyles, /\.studio-timeline__row-action\s*{[^}]*width:\s*24px;[^}]*height:\s*24px;/s)
+  assert.match(
+    timelineStyles,
+    /\.studio-timeline__row-action\s*{[^}]*width:\s*24px;[^}]*height:\s*24px;/s
+  )
 })
 
 test('places the full-width draft table inside the blank timeline area', () => {
   assert.match(
     timelineStyles,
-    /\.studio-timeline\s*{[^}]*display:\s*block;[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*background:\s*#f8f8f8;/s
+    /\.studio-timeline\s*{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*56px minmax\(0, 1fr\);[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*min-width:\s*0;[^}]*min-height:\s*0;[^}]*background:\s*#f8f8f8;/s
   )
   assert.match(
     timelineStyles,
-    /\.studio-timeline__table-container\s*{[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*padding:\s*12px;/s
+    /\.studio-timeline__table-container\s*{[^}]*width:\s*100%;[^}]*height:\s*auto;[^}]*min-height:\s*0;[^}]*padding:\s*12px;/s
   )
   assert.match(
     timelineStyles,
@@ -108,4 +117,29 @@ test('places the full-width draft table inside the blank timeline area', () => {
     /studio-timeline__form|studio-timeline__toolbar|studio-timeline__empty|role="toolbar"/
   )
   assert.match(workspaceSource, /id="workspace-timeline"[^>]*defaultSize="32"[^>]*minSize=\{176\}/s)
+})
+
+test('renders controlled timeline clips above the draft form', () => {
+  assert.match(timelineSource, /interface TimelineProps/)
+  assert.match(timelineSource, /className="studio-timeline__clip-lane"/)
+  assert.match(timelineSource, /aria-label="时间线素材"/)
+  assert.match(timelineSource, /clips\.map\(\(clip\) =>/)
+  assert.match(timelineSource, /aria-pressed=\{activeClipId === clip\.id\}/)
+  assert.match(timelineSource, /onClick=\{\(\) => onSelectClip\(clip\.id\)\}/)
+  assert.match(workspaceSource, /<Timeline[\s\S]*clips=\{project\.clips\}/)
+  assert.match(workspaceSource, /assets=\{project\.assets\}/)
+  assert.match(workspaceSource, /activeClipId=\{project\.activeClipId\}/)
+  assert.match(workspaceSource, /rows=\{project\.draftRows\}/)
+})
+
+test('keeps the compact clip lane horizontally scrollable with a selected state', () => {
+  assert.match(
+    timelineStyles,
+    /\.studio-timeline__clip-lane\s*{[^}]*min-width:\s*0;[^}]*padding:\s*8px 12px;[^}]*overflow-x:\s*auto;[^}]*border-bottom:\s*1px solid #d8d8d8;/s
+  )
+  assert.match(
+    timelineStyles,
+    /\.studio-timeline__clip\s*{[^}]*width:\s*164px;[^}]*height:\s*38px;[^}]*border-radius:\s*4px;/s
+  )
+  assert.match(timelineStyles, /\.studio-timeline__clip\[aria-pressed='true'\]/)
 })

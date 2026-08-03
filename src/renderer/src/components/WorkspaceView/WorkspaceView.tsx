@@ -8,6 +8,7 @@ import Timeline from './Timeline'
 import {
   createInitialEditorProjectState,
   editorProjectReducer,
+  type DraftRow,
   type MediaAsset
 } from './editorProject'
 import './WorkspaceView.css'
@@ -50,6 +51,22 @@ function WorkspaceView(): JSX.Element {
 
   const handleAddMedia = (mediaId: string): void => {
     dispatch({ type: 'timeline/assetAdded', assetId: mediaId })
+  }
+
+  const handleSelectClip = (clipId: string): void => {
+    dispatch({ type: 'timeline/clipSelected', clipId })
+  }
+
+  const handleUpdateRow = (rowId: string, updates: Partial<Omit<DraftRow, 'id'>>): void => {
+    dispatch({ type: 'draft/rowUpdated', rowId, changes: updates })
+  }
+
+  const handleAddRow = (afterRowId: string): void => {
+    dispatch({ type: 'draft/rowAdded', rowId: crypto.randomUUID(), afterRowId })
+  }
+
+  const handleDeleteRow = (rowId: string): void => {
+    dispatch({ type: 'draft/rowDeleted', rowId })
   }
 
   return (
@@ -120,7 +137,16 @@ function WorkspaceView(): JSX.Element {
 
         <Panel id="workspace-timeline" defaultSize="32" minSize={176} maxSize="55">
           <div className="studio-workspace__timeline">
-            <Timeline />
+            <Timeline
+              clips={project.clips}
+              assets={project.assets}
+              activeClipId={project.activeClipId}
+              rows={project.draftRows}
+              onSelectClip={handleSelectClip}
+              onUpdateRow={handleUpdateRow}
+              onAddRow={handleAddRow}
+              onDeleteRow={handleDeleteRow}
+            />
           </div>
         </Panel>
       </Group>
