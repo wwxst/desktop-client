@@ -115,9 +115,7 @@ function WorkspaceView(): JSX.Element {
 
               <Panel id="player-panel" minSize={220}>
                 <PlayerPanel
-                  key={
-                    activeAsset ? `${activeAsset.id}:${activeAsset.status}` : 'empty-player'
-                  }
+                  key={activeAsset ? `${activeAsset.id}:${activeAsset.status}` : 'empty-player'}
                   activeAsset={activeAsset}
                   selectedRatio={project.aspectRatio}
                   onAspectRatioChange={handleAspectRatioChange}
