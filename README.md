@@ -1,34 +1,44 @@
 # desktop-client
 
-An Electron application with React and TypeScript
+基于 Electron、React 和 TypeScript 的桌面端视频编辑客户端。
 
-## Recommended IDE Setup
+## 开发文档
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+- [开发指南与当前代码结构](docs/DEVELOPMENT.md)
+- [历史设计与实施记录](docs/superpowers/)
 
-## Project Setup
+`docs/DEVELOPMENT.md` 描述当前代码；`docs/superpowers/` 下的文档是对应开发阶段的历史快照，路径和组件名称可能已经变化。
 
-### Install
+## 安装依赖
 
 ```bash
-$ npm install
+npm install
 ```
 
-### Development
+## 本地开发
 
 ```bash
-$ npm run dev
+npm run dev
 ```
 
-### Build
+## 质量检查
 
 ```bash
-# For windows
-$ npm run build:win
+npm test
+npm run lint -- --quiet
+npm run typecheck
+npm run build
+```
 
-# For macOS
-$ npm run build:mac
+## 打包
 
-# For Linux
-$ npm run build:linux
+```bash
+# Windows
+npm run build:win
+
+# macOS
+npm run build:mac
+
+# Linux
+npm run build:linux
 ```
