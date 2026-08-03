@@ -112,9 +112,9 @@ test('draft page only provides the create draft entry', () => {
   assert.doesNotMatch(draftViewSource, /草稿列表|最近编辑|删除草稿|重命名/)
 })
 
-test('editor wrapper mounts the existing workspace below its toolbar', () => {
+test('editor wrapper mounts the video editor workspace below its toolbar', () => {
   assert.match(editorViewSource, /aria-label="返回草稿"/)
   assert.match(editorViewSource, /onClick=\{onReturnToDrafts\}/)
-  assert.match(editorViewSource, /<WorkspaceView\s*\/>/)
+  assert.match(editorViewSource, /<VideoEditorWorkspace\s*\/>/)
   assert.match(smartEditStyles, /grid-template-rows:\s*40px minmax\(0, 1fr\)/)
 })

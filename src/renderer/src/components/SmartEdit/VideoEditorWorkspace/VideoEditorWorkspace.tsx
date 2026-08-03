@@ -13,12 +13,12 @@ import {
   type DraftRow,
   type MediaAsset
 } from './editorProject'
-import './WorkspaceView.css'
+import './VideoEditorWorkspace.css'
 
 /**
- * 中间剪辑工作区：上方为功能、播放和参数区域，下方为横跨三块的时间线。
+ * 视频编辑工作区：上方为功能、播放和参数区域，下方为横跨三块的时间线。
  */
-function WorkspaceView(): JSX.Element {
+function VideoEditorWorkspace(): JSX.Element {
   const [project, dispatch] = useReducer(editorProjectReducer, undefined, () =>
     createInitialEditorProjectState(crypto.randomUUID())
   )
@@ -167,4 +167,4 @@ function WorkspaceView(): JSX.Element {
   )
 }
 
-export default WorkspaceView
+export default VideoEditorWorkspace

@@ -4,7 +4,10 @@ import test from 'node:test'
 import ts from 'typescript'
 
 const editorProjectSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/editorProject.ts', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject.ts',
+    import.meta.url
+  ),
   'utf8'
 )
 const editorProjectJavaScript = ts.transpileModule(editorProjectSource, {

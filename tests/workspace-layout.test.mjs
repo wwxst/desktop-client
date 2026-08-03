@@ -2,40 +2,92 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-test('workspace keeps its side regions while App selects the center content', async () => {
-  const [app, sidebar, smartEditEditor, workspace, playerPanel, aiPanel] = await Promise.all([
+test('separates the total workspace from the video editor workspace', async () => {
+  const [app, totalWorkspace, smartEditEditor, videoEditorWorkspace] = await Promise.all([
     readFile(new URL('../src/renderer/src/App.tsx', import.meta.url), 'utf8'),
     readFile(
-      new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url),
+      new URL('../src/renderer/src/components/Workspace/WorkspaceView.tsx', import.meta.url),
       'utf8'
-    ),
+    ).catch(() => ''),
     readFile(
       new URL('../src/renderer/src/components/SmartEdit/SmartEditEditorView.tsx', import.meta.url),
       'utf8'
     ),
     readFile(
-      new URL('../src/renderer/src/components/WorkspaceView/WorkspaceView.tsx', import.meta.url),
+      new URL(
+        '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/VideoEditorWorkspace.tsx',
+        import.meta.url
+      ),
       'utf8'
-    ),
-    readFile(
-      new URL('../src/renderer/src/components/WorkspaceView/PlayerPanel.tsx', import.meta.url),
-      'utf8'
-    ),
-    readFile(new URL('../src/renderer/src/components/AiPanel/AiPanel.tsx', import.meta.url), 'utf8')
+    ).catch(() => '')
   ])
 
-  assert.match(app, /useReducer\(\s*workspaceNavigationReducer/)
-  assert.match(app, /const smartEditEnabled = import\.meta\.env\.DEV/)
-  assert.match(app, /className="workspace-empty-page"/)
-  assert.match(app, /<SmartEditDraftView/)
-  assert.match(app, /<SmartEditEditorView/)
-  assert.match(app, /showSmartEdit=\{smartEditEnabled\}/)
-  assert.match(app, /aiPanel=\{<AiPanel\s*\/>\}/)
-  assert.doesNotMatch(app, /content=\{<WorkspaceView\s*\/>\}/)
+  assert.match(app, /import WorkspaceView from '.\/components\/Workspace\/WorkspaceView'/)
+  assert.match(app, /<WorkspaceView\s*\/>/)
+  assert.doesNotMatch(app, /workspaceNavigationReducer|<Layout\b|<Sidebar\b|<AiPanel\b/)
+
+  assert.match(totalWorkspace, /useReducer\(\s*workspaceNavigationReducer/)
+  assert.match(totalWorkspace, /<Layout\b/)
+  assert.match(totalWorkspace, /<Sidebar\b/)
+  assert.match(totalWorkspace, /aiPanel=\{<AiPanel\s*\/>\}/)
+
+  assert.match(
+    smartEditEditor,
+    /import VideoEditorWorkspace from '.\/VideoEditorWorkspace\/VideoEditorWorkspace'/
+  )
+  assert.match(smartEditEditor, /<VideoEditorWorkspace\s*\/>/)
+  assert.match(videoEditorWorkspace, /function VideoEditorWorkspace\(\): JSX\.Element/)
+  assert.match(videoEditorWorkspace, /className="studio-workspace"/)
+})
+
+test('workspace keeps its side regions while selecting the center content', async () => {
+  const [app, totalWorkspace, sidebar, smartEditEditor, videoEditor, playerPanel, aiPanel] =
+    await Promise.all([
+      readFile(new URL('../src/renderer/src/App.tsx', import.meta.url), 'utf8'),
+      readFile(
+        new URL('../src/renderer/src/components/Workspace/WorkspaceView.tsx', import.meta.url),
+        'utf8'
+      ),
+      readFile(
+        new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url),
+        'utf8'
+      ),
+      readFile(
+        new URL('../src/renderer/src/components/SmartEdit/SmartEditEditorView.tsx', import.meta.url),
+        'utf8'
+      ),
+      readFile(
+        new URL(
+          '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/VideoEditorWorkspace.tsx',
+          import.meta.url
+        ),
+        'utf8'
+      ),
+      readFile(
+        new URL(
+          '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/PlayerPanel.tsx',
+          import.meta.url
+        ),
+        'utf8'
+      ),
+      readFile(
+        new URL('../src/renderer/src/components/AiPanel/AiPanel.tsx', import.meta.url),
+        'utf8'
+      )
+    ])
+
+  assert.match(app, /<WorkspaceView\s*\/>/)
   assert.doesNotMatch(app, /\bTimeline\b/)
+  assert.match(totalWorkspace, /useReducer\(\s*workspaceNavigationReducer/)
+  assert.match(totalWorkspace, /const smartEditEnabled = import\.meta\.env\.DEV/)
+  assert.match(totalWorkspace, /className="workspace-empty-page"/)
+  assert.match(totalWorkspace, /<SmartEditDraftView/)
+  assert.match(totalWorkspace, /<SmartEditEditorView/)
+  assert.match(totalWorkspace, /showSmartEdit=\{smartEditEnabled\}/)
+  assert.match(totalWorkspace, /aiPanel=\{<AiPanel\s*\/>\}/)
   assert.match(sidebar, /className="studio-sidebar"/)
-  assert.match(smartEditEditor, /<WorkspaceView\s*\/>/)
-  assert.match(workspace, /<PlayerPanel\b/)
+  assert.match(smartEditEditor, /<VideoEditorWorkspace\s*\/>/)
+  assert.match(videoEditor, /<PlayerPanel\b/)
   assert.match(playerPanel, /className="studio-player"/)
   assert.match(aiPanel, /return <div className="studio-ai-panel"\s*\/>/)
 })

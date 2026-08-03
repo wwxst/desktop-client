@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import type { JSX } from 'react'
-import WorkspaceView from '../WorkspaceView/WorkspaceView'
+import VideoEditorWorkspace from './VideoEditorWorkspace/VideoEditorWorkspace'
 import './SmartEdit.css'
 
 interface SmartEditEditorViewProps {
@@ -23,7 +23,7 @@ function SmartEditEditorView({ onReturnToDrafts }: SmartEditEditorViewProps): JS
       </header>
 
       <div className="smart-edit-editor__workspace">
-        <WorkspaceView />
+        <VideoEditorWorkspace />
       </div>
     </section>
   )

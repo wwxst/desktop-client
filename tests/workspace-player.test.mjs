@@ -3,23 +3,38 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const workspaceSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/WorkspaceView.tsx', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/VideoEditorWorkspace.tsx',
+    import.meta.url
+  ),
   'utf8'
 )
 const workspaceStyles = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/WorkspaceView.css', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/VideoEditorWorkspace.css',
+    import.meta.url
+  ),
   'utf8'
 )
 const functionPanelSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/FunctionPanel.tsx', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/FunctionPanel.tsx',
+    import.meta.url
+  ),
   'utf8'
 ).catch(() => '')
 const parameterPanelSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/ParameterPanel.tsx', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/ParameterPanel.tsx',
+    import.meta.url
+  ),
   'utf8'
 ).catch(() => '')
 const playerPanelSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/PlayerPanel.tsx', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/PlayerPanel.tsx',
+    import.meta.url
+  ),
   'utf8'
 ).catch(() => '')
 const rendererHtml = await readFile(new URL('../src/renderer/index.html', import.meta.url), 'utf8')
@@ -37,7 +52,7 @@ test('renders the light player with an enabled ratio control', () => {
   assert.doesNotMatch(playerPanelSource, /aria-label="画面比例"[^>]*disabled/s)
 })
 
-test('keeps the function player parameter and timeline regions inside WorkspaceView', () => {
+test('keeps the function player parameter and timeline regions inside VideoEditorWorkspace', () => {
   assert.match(workspaceSource, /from 'react-resizable-panels'/)
   assert.match(workspaceSource, /import Timeline from '.\/Timeline'/)
   assert.match(workspaceSource, /import FunctionPanel from '.\/FunctionPanel'/)
@@ -159,7 +174,7 @@ test('renders an importable light media library in the media category', () => {
   )
 })
 
-test('owns imported media and timeline additions in WorkspaceView', () => {
+test('owns imported media and timeline additions in VideoEditorWorkspace', () => {
   assert.match(workspaceSource, /useReducer\(editorProjectReducer/)
   assert.match(workspaceSource, /createInitialEditorProjectState\(crypto\.randomUUID\(\)\)/)
   assert.match(workspaceSource, /URL\.revokeObjectURL\(url\)/)

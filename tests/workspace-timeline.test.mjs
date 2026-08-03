@@ -3,15 +3,24 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const timelineSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/Timeline.tsx', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/Timeline.tsx',
+    import.meta.url
+  ),
   'utf8'
 ).catch(() => '')
 const timelineStyles = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/Timeline.css', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/Timeline.css',
+    import.meta.url
+  ),
   'utf8'
 ).catch(() => '')
 const workspaceSource = await readFile(
-  new URL('../src/renderer/src/components/WorkspaceView/WorkspaceView.tsx', import.meta.url),
+  new URL(
+    '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/VideoEditorWorkspace.tsx',
+    import.meta.url
+  ),
   'utf8'
 )
 
