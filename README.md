@@ -5,9 +5,6 @@
 ## 开发文档
 
 - [开发指南与当前代码结构](docs/DEVELOPMENT.md)
-- [历史设计与实施记录](docs/superpowers/)
-
-`docs/DEVELOPMENT.md` 描述当前代码；`docs/superpowers/` 下的文档是对应开发阶段的历史快照，路径和组件名称可能已经变化。
 
 ## 安装依赖
 

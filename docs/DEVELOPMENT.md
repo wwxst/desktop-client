@@ -1,6 +1,6 @@
 # 开发指南
 
-本文档描述当前代码结构、组件职责、状态流转和开发约束。历史方案与实施步骤保存在 `docs/superpowers/`，它们是当时的开发快照，不代表当前文件路径。
+本文档描述当前代码结构、组件职责、状态流转和开发约束。
 
 ## 技术栈
 
@@ -284,14 +284,14 @@ React 组件文件和导入路径必须保持完全一致的 PascalCase 大小�
 
 ## 测试现状
 
-- `tests/editor-project.test.mjs` 和 `tests/workspace-navigation.test.mjs` 会实际执行 reducer，验证状态转换。
-- `tests/workspace-layout.test.mjs` 验证总工作区与视频编辑工作区的组件边界。
+- `tests/editor-project.test.ts` 和 `tests/workspace-navigation.test.ts` 直接导入 reducer，验证状态转换。
+- `tests/app.test.tsx`、`tests/sidebar.test.tsx`、`tests/layout.test.tsx` 和 `tests/workspace-view.test.tsx` 验证登录、菜单、三栏布局和智剪页面流转。
 - `tests/function-panel.test.tsx` 验证功能分类、文件选择和素材添加交互。
 - `tests/player-panel.test.tsx` 验证播放控制、预设比例、自定义比例和键盘关闭。
 - `tests/timeline.test.tsx` 验证片段选择、草稿编辑、上传和行操作。
 - `tests/media-library.test.ts` 验证媒体检测状态以及 Object URL 的单次释放。
 
-播放器、素材区和时间线的行为测试使用 Vitest、jsdom 和 Testing Library 真实挂载组件。外层组件边界仍保留少量源码结构测试，但不再用源码正则验证播放器交互或 CSS 文件位置。
+全部测试统一使用 Vitest。组件行为测试通过 jsdom 和 Testing Library 真实挂载组件，不使用源码或 CSS 正则验证实现细节。
 
 ## 开发约束
 
@@ -326,16 +326,7 @@ git diff --check
 
 提交前至少执行 `npm test`、`npm run lint -- --quiet`、`npm run typecheck` 和 `git diff --check`。涉及构建配置、Electron 入口或组件路径调整时，再执行 `npm run build`。
 
-## 结构调整进度
-
-已经完成：
-
-1. 将播放器、素材区和时间线的源码正则测试替换为真实组件交互测试。
-2. 把 `VideoEditorWorkspace.css` 中的子面板样式移回各自组件。
-3. 拆分 `PlayerPanel` 的视频播放逻辑与画布比例菜单。
-4. 集中管理媒体检测和 Object URL 生命周期。
-
-后续继续按以下顺序整理：
+## 后续结构调整
 
 1. 实现真实时间线前扩充 clip 的轨道、起止时间和裁剪区间模型。
 2. 实现草稿持久化时增加项目加载与保存边界。
