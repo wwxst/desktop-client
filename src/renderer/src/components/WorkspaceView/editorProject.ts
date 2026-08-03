@@ -109,12 +109,13 @@ export function editorProjectReducer(
 
     case 'asset/ready':
       return updateAsset(state, action.assetId, (asset) => {
-        const { error: _error, ...readyAsset } = asset
-        return {
-          ...readyAsset,
-        duration: action.duration,
+        const readyAsset: MediaAsset = {
+          ...asset,
+          duration: action.duration,
           status: 'ready'
         }
+        delete readyAsset.error
+        return readyAsset
       })
 
     case 'asset/failed':
@@ -126,7 +127,11 @@ export function editorProjectReducer(
 
     case 'timeline/assetAdded': {
       const asset = state.assets.find((item) => item.id === action.assetId)
-      if (!asset || asset.status !== 'ready' || state.clips.some((clip) => clip.assetId === asset.id)) {
+      if (
+        !asset ||
+        asset.status !== 'ready' ||
+        state.clips.some((clip) => clip.assetId === asset.id)
+      ) {
         return state
       }
 
@@ -136,7 +141,9 @@ export function editorProjectReducer(
 
     case 'timeline/clipSelected':
       if (!state.clips.some((clip) => clip.id === action.clipId)) return state
-      return state.activeClipId === action.clipId ? state : { ...state, activeClipId: action.clipId }
+      return state.activeClipId === action.clipId
+        ? state
+        : { ...state, activeClipId: action.clipId }
 
     case 'aspectRatio/selected':
       if (!isCanvasAspectRatio(action.aspectRatio)) return state
@@ -156,7 +163,9 @@ export function editorProjectReducer(
       if (rowIndex === -1) return state
 
       const changes = Object.fromEntries(
-        Object.entries(action.changes).filter(([key, value]) => key !== 'id' && typeof value === 'string')
+        Object.entries(action.changes).filter(
+          ([key, value]) => key !== 'id' && typeof value === 'string'
+        )
       ) as Partial<Omit<DraftRow, 'id'>>
       if (Object.keys(changes).length === 0) return state
 
@@ -176,5 +185,5 @@ export function editorProjectReducer(
 
 export function selectActiveAsset(state: EditorProjectState): MediaAsset | null {
   const activeClip = state.clips.find((clip) => clip.id === state.activeClipId)
-  return activeClip ? state.assets.find((asset) => asset.id === activeClip.assetId) ?? null : null
+  return activeClip ? (state.assets.find((asset) => asset.id === activeClip.assetId) ?? null) : null
 }
