@@ -35,6 +35,10 @@ const secondAsset = {
 test('adds a ready asset once, creates and activates its clip, and selects it', async () => {
   let state = project.createInitialEditorProjectState('row-1')
   state = project.editorProjectReducer(state, { type: 'assets/imported', asset: firstAsset })
+  assert.deepEqual(state.clips, [])
+  assert.equal(state.activeClipId, null)
+  assert.equal(project.selectActiveAsset(state), null)
+
   state = project.editorProjectReducer(state, {
     type: 'asset/ready',
     assetId: 'asset-1',

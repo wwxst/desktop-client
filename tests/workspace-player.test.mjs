@@ -31,7 +31,7 @@ test('renders the light player with an enabled ratio control', () => {
   assert.match(playerPanelSource, /className="studio-player__canvas"/)
   assert.match(playerPanelSource, /暂无预览内容，画面比例/)
   assert.match(playerPanelSource, /className="studio-player__controls" aria-label="播放控制"/)
-  assert.match(playerPanelSource, /disabled=\{!activeAsset \|\| !isVideoReady\}/)
+  assert.match(playerPanelSource, /disabled=\{!isActiveAssetReady \|\| !isVideoReady\}/)
   assert.match(playerPanelSource, /aria-label="全屏"[^>]*disabled/)
   assert.match(playerPanelSource, /aria-label="画面比例"[^>]*aria-expanded=/s)
   assert.doesNotMatch(playerPanelSource, /aria-label="画面比例"[^>]*disabled/s)
@@ -316,6 +316,8 @@ test('previews and controls the active timeline video without autoplay', () => {
   assert.match(playerPanelSource, /interface PlayerPanelProps/)
   assert.match(playerPanelSource, /activeAsset:\s*MediaAsset \| null/)
   assert.match(playerPanelSource, /selectedRatio:\s*CanvasAspectRatio/)
+  assert.match(playerPanelSource, /onMediaError:\s*\(mediaId:\s*string\) => void/)
+  assert.match(playerPanelSource, /activeAsset\?\.status === 'ready'/)
   assert.match(playerPanelSource, /<video/)
   assert.match(playerPanelSource, /src=\{activeAsset\.url\}/)
   assert.match(playerPanelSource, /preload="auto"/)
@@ -325,12 +327,18 @@ test('previews and controls the active timeline video without autoplay', () => {
   assert.match(playerPanelSource, /currentTime = 0/)
   assert.match(playerPanelSource, /\.play\(\)/)
   assert.match(playerPanelSource, /\.pause\(\)/)
+  assert.match(playerPanelSource, /onMediaError\(activeAsset\.id\)/)
+  assert.match(playerPanelSource, /disabled=\{!isActiveAssetReady \|\| !isVideoReady\}/)
   assert.match(playerPanelSource, /isPlaying \? '暂停' : '播放'/)
   assert.match(playerPanelSource, /formatPlaybackTime/)
   assert.match(workspaceSource, /activeAsset=\{activeAsset\}/)
-  assert.match(workspaceSource, /key=\{activeAsset\?\.id \?\? 'empty-player'\}/)
+  assert.match(
+    workspaceSource,
+    /key=\{\s*activeAsset[\s\S]*activeAsset\.id[\s\S]*activeAsset\.status[\s\S]*'empty-player'/
+  )
   assert.match(workspaceSource, /selectedRatio=\{project\.aspectRatio\}/)
   assert.match(workspaceSource, /onAspectRatioChange=\{handleAspectRatioChange\}/)
+  assert.match(workspaceSource, /<PlayerPanel[\s\S]*onMediaError=\{handleMediaError\}/)
   assert.match(
     workspaceStyles,
     /\.studio-player__canvas video\s*{[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*object-fit:\s*contain;[^}]*background:\s*#111111;/s

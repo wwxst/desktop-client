@@ -18,6 +18,7 @@ interface PlayerPanelProps {
   activeAsset: MediaAsset | null
   selectedRatio: CanvasAspectRatio
   onAspectRatioChange: (ratio: CanvasAspectRatio) => void
+  onMediaError: (mediaId: string) => void
 }
 
 interface CanvasStyle extends CSSProperties {
@@ -75,7 +76,8 @@ const resetVideo = (video: HTMLVideoElement): void => {
 function PlayerPanel({
   activeAsset,
   selectedRatio,
-  onAspectRatioChange
+  onAspectRatioChange,
+  onMediaError
 }: PlayerPanelProps): JSX.Element {
   const ratioButtonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -88,6 +90,7 @@ function PlayerPanel({
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const isActiveAssetReady = activeAsset?.status === 'ready'
 
   const parsedCustomWidth = Number(customWidth)
   const parsedCustomHeight = Number(customHeight)
@@ -167,7 +170,7 @@ function PlayerPanel({
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current
-    if (!video || !activeAsset || !isVideoReady) return
+    if (!video || !activeAsset || !isActiveAssetReady || !isVideoReady) return
 
     if (!video.paused) {
       video.pause()
@@ -282,7 +285,7 @@ function PlayerPanel({
               : `暂无预览内容，画面比例 ${selectedRatio.label}`
           }
         >
-          {activeAsset ? (
+          {activeAsset && isActiveAssetReady ? (
             <video
               key={activeAsset.id}
               ref={videoRef}
@@ -303,6 +306,7 @@ function PlayerPanel({
               onError={() => {
                 setIsVideoReady(false)
                 setIsPlaying(false)
+                onMediaError(activeAsset.id)
               }}
             />
           ) : (
@@ -334,7 +338,7 @@ function PlayerPanel({
           type="button"
           aria-label={isPlaying ? '暂停' : '播放'}
           title={isPlaying ? '暂停' : '播放'}
-          disabled={!activeAsset || !isVideoReady}
+          disabled={!isActiveAssetReady || !isVideoReady}
           onClick={() => void togglePlayback()}
         >
           {isPlaying ? (
