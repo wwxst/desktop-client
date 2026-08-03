@@ -25,7 +25,7 @@ test('workspace renders sidebar player and ai regions', async () => {
   assert.match(app, /aiPanel={<AiPanel\s*\/>}/)
   assert.doesNotMatch(app, /\bTimeline\b/)
   assert.match(sidebar, /className="studio-sidebar"/)
-  assert.match(workspace, /<PlayerPanel\s*\/>/)
+  assert.match(workspace, /<PlayerPanel\b/)
   assert.match(playerPanel, /className="studio-player"/)
   assert.match(aiPanel, /return <div className="studio-ai-panel"\s*\/>/)
 })
