@@ -1,30 +1,41 @@
-import { useState, type JSX } from 'react'
-import { BookOpen, Home, Settings, type LucideIcon } from 'lucide-react'
+import type { JSX } from 'react'
+import { BookOpen, Home, Scissors, Settings, type LucideIcon } from 'lucide-react'
+import type { WorkspaceMenu } from '../../workspaceNavigation'
 import './Sidebar.css'
 
-type SidebarItem = 'home' | 'novel-promotion'
-
 interface SidebarMenuItem {
-  id: SidebarItem
+  id: WorkspaceMenu
   label: string
   icon: LucideIcon
 }
 
-const sidebarMenuItems: SidebarMenuItem[] = [
+interface SidebarProps {
+  activeItem: WorkspaceMenu
+  showSmartEdit: boolean
+  onItemSelect: (item: WorkspaceMenu) => void
+}
+
+const baseMenuItems: SidebarMenuItem[] = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'novel-promotion', label: '小说推文', icon: BookOpen }
 ]
 
+const smartEditMenuItem: SidebarMenuItem = {
+  id: 'smart-edit',
+  label: '智剪',
+  icon: Scissors
+}
+
 /**
  * 工作台左侧的主菜单。
  */
-function Sidebar(): JSX.Element {
-  const [activeItem, setActiveItem] = useState<SidebarItem>('home')
+function Sidebar({ activeItem, showSmartEdit, onItemSelect }: SidebarProps): JSX.Element {
+  const menuItems = showSmartEdit ? [...baseMenuItems, smartEditMenuItem] : baseMenuItems
 
   return (
     <nav className="studio-sidebar" aria-label="主菜单">
       <ul className="studio-sidebar__menu">
-        {sidebarMenuItems.map((item) => {
+        {menuItems.map((item) => {
           const Icon = item.icon
 
           return (
@@ -33,7 +44,7 @@ function Sidebar(): JSX.Element {
                 className="studio-sidebar__menu-item"
                 type="button"
                 aria-current={activeItem === item.id ? 'page' : undefined}
-                onClick={() => setActiveItem(item.id)}
+                onClick={() => onItemSelect(item.id)}
               >
                 <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
                 <span>{item.label}</span>

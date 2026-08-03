@@ -2,11 +2,15 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-test('workspace renders sidebar player and ai regions', async () => {
-  const [app, sidebar, workspace, playerPanel, aiPanel] = await Promise.all([
+test('workspace keeps its side regions while App selects the center content', async () => {
+  const [app, sidebar, smartEditEditor, workspace, playerPanel, aiPanel] = await Promise.all([
     readFile(new URL('../src/renderer/src/App.tsx', import.meta.url), 'utf8'),
     readFile(
       new URL('../src/renderer/src/components/Sidebar/Sidebar.tsx', import.meta.url),
+      'utf8'
+    ),
+    readFile(
+      new URL('../src/renderer/src/components/SmartEdit/SmartEditEditorView.tsx', import.meta.url),
       'utf8'
     ),
     readFile(
@@ -20,17 +24,23 @@ test('workspace renders sidebar player and ai regions', async () => {
     readFile(new URL('../src/renderer/src/components/AiPanel/AiPanel.tsx', import.meta.url), 'utf8')
   ])
 
-  assert.match(app, /sidebar={<Sidebar\s*\/>}/)
-  assert.match(app, /content={<WorkspaceView\s*\/>}/)
-  assert.match(app, /aiPanel={<AiPanel\s*\/>}/)
+  assert.match(app, /useReducer\(\s*workspaceNavigationReducer/)
+  assert.match(app, /const smartEditEnabled = import\.meta\.env\.DEV/)
+  assert.match(app, /className="workspace-empty-page"/)
+  assert.match(app, /<SmartEditDraftView/)
+  assert.match(app, /<SmartEditEditorView/)
+  assert.match(app, /showSmartEdit=\{smartEditEnabled\}/)
+  assert.match(app, /aiPanel=\{<AiPanel\s*\/>\}/)
+  assert.doesNotMatch(app, /content=\{<WorkspaceView\s*\/>\}/)
   assert.doesNotMatch(app, /\bTimeline\b/)
   assert.match(sidebar, /className="studio-sidebar"/)
+  assert.match(smartEditEditor, /<WorkspaceView\s*\/>/)
   assert.match(workspace, /<PlayerPanel\b/)
   assert.match(playerPanel, /className="studio-player"/)
   assert.match(aiPanel, /return <div className="studio-ai-panel"\s*\/>/)
 })
 
-test('sidebar shows home above novel promotion with an active menu state', async () => {
+test('sidebar is controlled and only includes smart edit when enabled', async () => {
   const [packageJson, sidebar, sidebarCss] = await Promise.all([
     readFile(new URL('../package.json', import.meta.url), 'utf8'),
     readFile(
@@ -42,9 +52,19 @@ test('sidebar shows home above novel promotion with an active menu state', async
   const packageData = JSON.parse(packageJson)
 
   assert.equal(typeof packageData.dependencies?.['lucide-react'], 'string')
-  assert.match(sidebar, /import\s*{[^}]*BookOpen[^}]*Home[^}]*}\s*from 'lucide-react'/s)
+  assert.match(
+    sidebar,
+    /import\s*{[^}]*BookOpen[^}]*Home[^}]*Scissors[^}]*}\s*from 'lucide-react'/s
+  )
+  assert.match(sidebar, /interface SidebarProps/)
+  assert.match(sidebar, /activeItem:\s*WorkspaceMenu/)
+  assert.match(sidebar, /showSmartEdit:\s*boolean/)
+  assert.match(sidebar, /onItemSelect:\s*\(item: WorkspaceMenu\) => void/)
+  assert.match(sidebar, /showSmartEdit\s*\?\s*\[\.\.\.baseMenuItems, smartEditMenuItem\]/)
+  assert.match(sidebar, /onClick=\{\(\) => onItemSelect\(item\.id\)\}/)
+  assert.doesNotMatch(sidebar, /useState/)
   assert.ok(sidebar.indexOf('首页') < sidebar.indexOf('小说推文'))
-  assert.match(sidebar, /useState<SidebarItem>\('home'\)/)
+  assert.ok(sidebar.indexOf('小说推文') < sidebar.indexOf('智剪'))
   assert.match(sidebar, /aria-current={activeItem === item\.id \? 'page' : undefined}/)
   assert.match(sidebarCss, /\.studio-sidebar__menu-item\[aria-current='page'\]/)
 })

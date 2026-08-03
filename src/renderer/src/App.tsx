@@ -1,9 +1,15 @@
-import { useEffect, useState, type JSX, type SubmitEvent } from 'react'
+import { useEffect, useReducer, useState, type JSX, type SubmitEvent } from 'react'
 import AiPanel from './components/AiPanel/AiPanel'
 import Sidebar from './components/Sidebar/Sidebar'
+import SmartEditDraftView from './components/SmartEdit/SmartEditDraftView'
+import SmartEditEditorView from './components/SmartEdit/SmartEditEditorView'
 import TitleBar from './components/TitleBar/TitleBar'
-import WorkspaceView from './components/WorkspaceView/WorkspaceView'
 import Layout from './layouts/Layout'
+import {
+  initialWorkspaceNavigationState,
+  workspaceNavigationReducer,
+  type WorkspaceMenu
+} from './workspaceNavigation'
 import './App.css'
 
 type AppView = 'login' | 'workspace'
@@ -24,6 +30,11 @@ function App(): JSX.Element {
 
   // 当前显示的页面
   const [currentView, setCurrentView] = useState<AppView>('login')
+  const [navigation, dispatchNavigation] = useReducer(
+    workspaceNavigationReducer,
+    initialWorkspaceNavigationState
+  )
+  const smartEditEnabled = import.meta.env.DEV
 
   /**
    * Toast 显示2.5秒后自动关闭。
@@ -120,6 +131,29 @@ function App(): JSX.Element {
 
   const handleContactAdmin = (): void => {
     window.alert('请联系管理员')
+  }
+
+  const handleSidebarItemSelect = (menu: WorkspaceMenu): void => {
+    dispatchNavigation({
+      type: 'menu/selected',
+      menu: menu === 'smart-edit' && !smartEditEnabled ? 'home' : menu
+    })
+  }
+
+  const activeSidebarItem =
+    navigation.activeMenu === 'smart-edit' && !smartEditEnabled ? 'home' : navigation.activeMenu
+
+  let workspaceContent: JSX.Element = <div className="workspace-empty-page" aria-hidden="true" />
+
+  if (smartEditEnabled && navigation.activeMenu === 'smart-edit') {
+    workspaceContent =
+      navigation.smartEditPage === 'editor' ? (
+        <SmartEditEditorView
+          onReturnToDrafts={() => dispatchNavigation({ type: 'draft/closed' })}
+        />
+      ) : (
+        <SmartEditDraftView onCreateDraft={() => dispatchNavigation({ type: 'draft/created' })} />
+      )
   }
 
   return (
@@ -296,7 +330,17 @@ function App(): JSX.Element {
 
       {/* ==================== 工作台页面 ==================== */}
       {currentView === 'workspace' && (
-        <Layout sidebar={<Sidebar />} content={<WorkspaceView />} aiPanel={<AiPanel />} />
+        <Layout
+          sidebar={
+            <Sidebar
+              activeItem={activeSidebarItem}
+              showSmartEdit={smartEditEnabled}
+              onItemSelect={handleSidebarItemSelect}
+            />
+          }
+          content={workspaceContent}
+          aiPanel={<AiPanel />}
+        />
       )}
     </>
   )
