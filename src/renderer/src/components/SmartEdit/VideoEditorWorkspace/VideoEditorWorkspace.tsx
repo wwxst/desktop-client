@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { useEffect, useMemo, useReducer, useRef } from 'react'
+import { useMemo, useReducer } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import FunctionPanel from './FunctionPanel'
 import ParameterPanel from './ParameterPanel'
@@ -10,9 +10,9 @@ import {
   editorProjectReducer,
   selectActiveAsset,
   type CanvasAspectRatio,
-  type DraftRow,
-  type MediaAsset
+  type DraftRow
 } from './editorProject'
+import { useMediaLibrary } from './useMediaLibrary'
 import './VideoEditorWorkspace.css'
 
 /**
@@ -22,35 +22,12 @@ function VideoEditorWorkspace(): JSX.Element {
   const [project, dispatch] = useReducer(editorProjectReducer, undefined, () =>
     createInitialEditorProjectState(crypto.randomUUID())
   )
-  const mediaUrlsRef = useRef(new Set<string>())
+  const { importMediaFiles, reportMediaError } = useMediaLibrary(dispatch)
   const addedMediaIds = useMemo(
     () => new Set(project.clips.map((clip) => clip.assetId)),
     [project.clips]
   )
   const activeAsset = selectActiveAsset(project)
-
-  useEffect(() => {
-    const mediaUrls = mediaUrlsRef.current
-
-    return () => {
-      mediaUrls.forEach((url) => URL.revokeObjectURL(url))
-    }
-  }, [])
-
-  const handleImportMedia = (assets: MediaAsset[]): void => {
-    assets.forEach((asset) => {
-      mediaUrlsRef.current.add(asset.url)
-      dispatch({ type: 'assets/imported', asset })
-    })
-  }
-
-  const handleMediaReady = (mediaId: string, duration: number): void => {
-    dispatch({ type: 'asset/ready', assetId: mediaId, duration })
-  }
-
-  const handleMediaError = (mediaId: string): void => {
-    dispatch({ type: 'asset/failed', assetId: mediaId, error: '无法预览该视频' })
-  }
 
   const handleAddMedia = (mediaId: string): void => {
     dispatch({ type: 'timeline/assetAdded', assetId: mediaId })
@@ -100,9 +77,7 @@ function VideoEditorWorkspace(): JSX.Element {
                 <FunctionPanel
                   mediaItems={project.assets}
                   addedMediaIds={addedMediaIds}
-                  onImportMedia={handleImportMedia}
-                  onMediaReady={handleMediaReady}
-                  onMediaError={handleMediaError}
+                  onImportMedia={importMediaFiles}
                   onAddMedia={handleAddMedia}
                 />
               </Panel>
@@ -119,7 +94,7 @@ function VideoEditorWorkspace(): JSX.Element {
                   activeAsset={activeAsset}
                   selectedRatio={project.aspectRatio}
                   onAspectRatioChange={handleAspectRatioChange}
-                  onMediaError={handleMediaError}
+                  onMediaError={reportMediaError}
                 />
               </Panel>
 

@@ -1,4 +1,5 @@
 import type { JSX } from 'react'
+import './ParameterPanel.css'
 
 function ParameterPanel(): JSX.Element {
   return (

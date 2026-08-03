@@ -23,6 +23,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { MediaAsset } from './editorProject'
+import './FunctionPanel.css'
 
 interface FunctionTool {
   label: string
@@ -32,9 +33,7 @@ interface FunctionTool {
 interface FunctionPanelProps {
   mediaItems: MediaAsset[]
   addedMediaIds: ReadonlySet<string>
-  onImportMedia: (assets: MediaAsset[]) => void
-  onMediaReady: (mediaId: string, duration: number) => void
-  onMediaError: (mediaId: string) => void
+  onImportMedia: (files: readonly File[]) => void
   onAddMedia: (mediaId: string) => void
 }
 
@@ -67,8 +66,6 @@ function FunctionPanel({
   mediaItems,
   addedMediaIds,
   onImportMedia,
-  onMediaReady,
-  onMediaError,
   onAddMedia
 }: FunctionPanelProps): JSX.Element {
   const [selectedCategory, setSelectedCategory] = useState('媒体')
@@ -84,15 +81,7 @@ function FunctionPanel({
     const files = Array.from(event.currentTarget.files ?? [])
     if (files.length === 0) return
 
-    const importedItems: MediaAsset[] = files.map((file) => ({
-      id: crypto.randomUUID(),
-      name: file.name,
-      url: URL.createObjectURL(file),
-      duration: null,
-      status: 'loading'
-    }))
-
-    onImportMedia(importedItems)
+    onImportMedia(files)
     event.currentTarget.value = ''
   }
 
@@ -247,15 +236,6 @@ function FunctionPanel({
                         preload="auto"
                         data-ready={isPreviewReady}
                         aria-label={`${mediaItem.name}预览`}
-                        onLoadedMetadata={(event) => {
-                          if (event.currentTarget.readyState >= 2) {
-                            onMediaReady(mediaItem.id, event.currentTarget.duration)
-                          }
-                        }}
-                        onLoadedData={(event) =>
-                          onMediaReady(mediaItem.id, event.currentTarget.duration)
-                        }
-                        onError={() => onMediaError(mediaItem.id)}
                       />
                       <button
                         className="studio-function-panel__media-add"

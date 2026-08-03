@@ -1,0 +1,347 @@
+/* 播放器使用固定头尾和可伸缩预览区，避免控制内容改变整体布局。 */
+.studio-player {
+  position: relative;
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr) 44px;
+  container-type: inline-size;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: #262626;
+  background: #ffffff;
+}
+
+.studio-player__header {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 10px 0 12px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #e2e2e2;
+}
+
+.studio-player__header h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-player__header button,
+.studio-player__controls button {
+  display: grid;
+  flex: 0 0 28px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #555555;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.studio-player__header button {
+  margin-left: auto;
+}
+
+.studio-player__header button:disabled,
+.studio-player__controls button:disabled {
+  color: #777777;
+  cursor: default;
+  opacity: 0.72;
+}
+
+.studio-player__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  container-type: size;
+  overflow: hidden;
+  background: #f4f4f4;
+}
+
+.studio-player__canvas {
+  display: grid;
+  place-items: center;
+  width: min(88cqw, calc(88cqh * var(--canvas-ratio-value)));
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: var(--canvas-aspect-ratio);
+  overflow: hidden;
+  color: #9a9a9a;
+  background: #e8eaec;
+  border: 1px solid #d5d8da;
+}
+
+.studio-player__canvas video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #111111;
+}
+
+.studio-player__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 8px;
+  background: #ffffff;
+  border-top: 1px solid #e2e2e2;
+}
+
+.studio-player__controls-left,
+.studio-player__controls-right {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.studio-player__controls-left {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 10px;
+  color: #555555;
+  white-space: nowrap;
+}
+
+.studio-player__controls-left button {
+  margin-left: 2px;
+}
+
+.studio-player__current-time {
+  color: #0b8793;
+}
+
+.studio-player__time-divider {
+  color: #a0a0a0;
+}
+
+.studio-player__play {
+  justify-self: center;
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.studio-player__play svg {
+  transform: translateX(1px);
+}
+
+.studio-player__controls-right {
+  justify-self: end;
+}
+
+.studio-player__controls-right button[aria-expanded='true'] {
+  color: #202020;
+  background: #e7e7e7;
+}
+
+.studio-player__ratio-popover {
+  position: absolute;
+  right: 8px;
+  bottom: 52px;
+  z-index: 10;
+  width: min(216px, calc(100% - 16px));
+  max-height: calc(100% - 100px);
+  padding: 5px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #333333;
+  background: #ffffff;
+  border: 1px solid #d8d8d8;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 14%);
+}
+
+.studio-player__ratio-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 36px;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  padding: 0 7px;
+  overflow: hidden;
+  font-size: 11px;
+  color: #3f3f3f;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.studio-player__ratio-option:hover:not(:disabled),
+.studio-player__ratio-option:focus-visible {
+  background: #eeeeee;
+  outline: none;
+}
+
+.studio-player__ratio-option:disabled {
+  color: #969696;
+  cursor: default;
+  opacity: 0.68;
+}
+
+.studio-player__ratio-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: #0b8793;
+}
+
+.studio-player__ratio-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-player__ratio-preview-frame {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 22px;
+}
+
+.studio-player__ratio-option-preview {
+  width: min(26px, calc(16px * var(--option-ratio-value)));
+  aspect-ratio: var(--option-ratio);
+  border: 1px solid #777777;
+}
+
+.studio-player__ratio-source-preview {
+  justify-self: center;
+  width: 25px;
+  height: 15px;
+  border: 1px dashed #a0a0a0;
+}
+
+.studio-player__ratio-custom-symbol {
+  justify-self: center;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 9px;
+  color: #777777;
+}
+
+.studio-player__ratio-separator {
+  height: 1px;
+  margin: 4px 5px;
+  background: #e3e3e3;
+}
+
+.studio-player__ratio-popover--custom {
+  overflow: hidden;
+}
+
+.studio-player__ratio-custom {
+  display: grid;
+  gap: 10px;
+}
+
+.studio-player__ratio-custom-header {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+  min-width: 0;
+}
+
+.studio-player__ratio-custom-header button,
+.studio-player__ratio-custom-apply {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #555555;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.studio-player__ratio-custom-header button:hover,
+.studio-player__ratio-custom-header button:focus-visible,
+.studio-player__ratio-custom-apply:hover:not(:disabled),
+.studio-player__ratio-custom-apply:focus-visible {
+  background: #eeeeee;
+  outline: none;
+}
+
+.studio-player__ratio-custom-header strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-player__ratio-custom-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: end;
+  min-width: 0;
+  padding: 0 5px;
+}
+
+.studio-player__ratio-custom-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10px;
+  color: #666666;
+}
+
+.studio-player__ratio-custom-fields input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  color: #333333;
+  background: #f5f5f5;
+  border: 1px solid #d8d8d8;
+  border-radius: 4px;
+}
+
+.studio-player__ratio-custom-fields input:focus {
+  border-color: #7c7c7c;
+  outline: none;
+}
+
+.studio-player__ratio-custom-apply {
+  justify-self: end;
+  margin-right: 5px;
+  color: #0b8793;
+}
+
+.studio-player__ratio-custom-apply:disabled {
+  color: #a5a5a5;
+  cursor: default;
+}
+
+/* 最窄工作区保留当前时间、播放和全屏，避免次要控制互相遮挡。 */
+@container (max-width: 300px) {
+  .studio-player__time-divider,
+  .studio-player__controls-left time:not(.studio-player__current-time),
+  .studio-player__controls-left button {
+    display: none;
+  }
+
+  .studio-player__controls-right button:first-child {
+    display: none;
+  }
+}

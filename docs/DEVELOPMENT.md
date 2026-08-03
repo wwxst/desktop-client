@@ -35,20 +35,20 @@ Java 后端（当前为 http://localhost:8080）
 
 各层边界如下：
 
-| 层级 | 主要文件 | 职责 |
-| --- | --- | --- |
-| 主进程 | `src/main/index.ts` | 创建窗口、管理 Electron 生命周期、注册 IPC、请求 Java 后端和保存登录会话 |
-| preload | `src/preload/index.ts`、`index.d.ts` | 通过 `contextBridge` 暴露经过允许的业务 API，并为 renderer 提供类型 |
-| renderer | `src/renderer/src/` | React 页面、总工作区、视频编辑工作区和界面状态 |
-| 共享契约 | `src/shared/auth.ts` | 主进程、preload 共用的登录和订阅 TypeScript 类型 |
-| Java 后端 | 独立服务 | 处理用户登录和订阅查询，当前开发地址为 `http://localhost:8080` |
+| 层级      | 主要文件                             | 职责                                                                     |
+| --------- | ------------------------------------ | ------------------------------------------------------------------------ |
+| 主进程    | `src/main/index.ts`                  | 创建窗口、管理 Electron 生命周期、注册 IPC、请求 Java 后端和保存登录会话 |
+| preload   | `src/preload/index.ts`、`index.d.ts` | 通过 `contextBridge` 暴露经过允许的业务 API，并为 renderer 提供类型      |
+| renderer  | `src/renderer/src/`                  | React 页面、总工作区、视频编辑工作区和界面状态                           |
+| 共享契约  | `src/shared/auth.ts`                 | 主进程、preload 共用的登录和订阅 TypeScript 类型                         |
+| Java 后端 | 独立服务                             | 处理用户登录和订阅查询，当前开发地址为 `http://localhost:8080`           |
 
 当前业务 IPC 只有两项：
 
-| Renderer API | IPC 通道 | 主进程行为 |
-| --- | --- | --- |
-| `window.api.login(request)` | `auth:login` | 调用登录接口；成功后将 Token 保存在主进程内存中，只向 renderer 返回成功状态和消息 |
-| `window.api.getSubscription()` | `subscription:get-current` | 由主进程携带 Token 查询订阅；后端返回 `401` 时清空登录会话 |
+| Renderer API                   | IPC 通道                   | 主进程行为                                                                        |
+| ------------------------------ | -------------------------- | --------------------------------------------------------------------------------- |
+| `window.api.login(request)`    | `auth:login`               | 调用登录接口；成功后将 Token 保存在主进程内存中，只向 renderer 返回成功状态和消息 |
+| `window.api.getSubscription()` | `subscription:get-current` | 由主进程携带 Token 查询订阅；后端返回 `401` 时清空登录会话                        |
 
 renderer 不直接持有 Token，也不直接请求 Java 后端。preload 不向页面直接暴露完整的 `ipcRenderer`；业务功能只能通过 `window.api` 中明确声明的方法调用。`window.electron` 是 electron-toolkit 提供的基础桥接对象，不承载本项目的登录与订阅业务。
 
@@ -58,13 +58,13 @@ renderer 不直接持有 Token，也不直接请求 Java 后端。preload 不向
 
 当前 renderer 采用五层结构，依赖只能从上层指向下层：
 
-| 层级 | 主要文件 | 职责 |
-| --- | --- | --- |
-| 应用入口层 | `App.tsx` | 登录、全局提示、标题栏以及登录页与工作台的切换 |
-| 总工作区层 | `WorkspaceView.tsx`、`Layout.tsx` | 一级菜单导航以及左、中、右三块区域的组合 |
-| 智剪页面层 | `SmartEditDraftView.tsx`、`SmartEditEditorView.tsx` | 草稿入口、编辑器页面工具栏以及进入和退出编辑器 |
-| 视频编辑层 | `VideoEditorWorkspace.tsx` 与四个内部面板 | 编辑器布局、媒体导入、播放、画布比例、时间线和草稿表格 |
-| 状态模型层 | `workspaceNavigation.ts`、`editorProject.ts` | 纯类型、初始状态、reducer 和 selector，不渲染界面 |
+| 层级       | 主要文件                                            | 职责                                                   |
+| ---------- | --------------------------------------------------- | ------------------------------------------------------ |
+| 应用入口层 | `App.tsx`                                           | 登录、全局提示、标题栏以及登录页与工作台的切换         |
+| 总工作区层 | `WorkspaceView.tsx`、`Layout.tsx`                   | 一级菜单导航以及左、中、右三块区域的组合               |
+| 智剪页面层 | `SmartEditDraftView.tsx`、`SmartEditEditorView.tsx` | 草稿入口、编辑器页面工具栏以及进入和退出编辑器         |
+| 视频编辑层 | `VideoEditorWorkspace.tsx` 与四个内部面板           | 编辑器布局、媒体导入、播放、画布比例、时间线和草稿表格 |
+| 状态模型层 | `workspaceNavigation.ts`、`editorProject.ts`        | 纯类型、初始状态、reducer 和 selector，不渲染界面      |
 
 依赖方向如下：
 
@@ -158,8 +158,15 @@ src/renderer/src/
          ├─ VideoEditorWorkspace.css
          ├─ editorProject.ts
          ├─ FunctionPanel.tsx
+         ├─ FunctionPanel.css
          ├─ PlayerPanel.tsx
+         ├─ PlayerPanel.css
+         ├─ VideoPlayback.tsx
+         ├─ CanvasRatioMenu.tsx
          ├─ ParameterPanel.tsx
+         ├─ ParameterPanel.css
+         ├─ mediaLibrary.ts
+         ├─ useMediaLibrary.ts
          ├─ Timeline.tsx
          └─ Timeline.css
 ```
@@ -193,17 +200,21 @@ src/renderer/src/
 `components/SmartEdit/VideoEditorWorkspace/VideoEditorWorkspace.tsx` 是视频编辑工作区的数据和布局容器：
 
 - 使用 `editorProjectReducer` 持有媒体、时间线片段、画布比例和草稿表格状态。
+- 使用 `useMediaLibrary` 统一创建、检测和释放导入媒体。
 - 上半部分依次为 `FunctionPanel`、`PlayerPanel` 和 `ParameterPanel`。
 - 下半部分为横跨三个上方区域的 `Timeline`。
-- 统一记录并在卸载时释放导入媒体产生的 `blob:` URL。
 
 内部组件职责：
 
-- `FunctionPanel`：功能分类、媒体导入、素材预览和“添加到时间线”。
-- `PlayerPanel`：当前片段预览、播放控制和画布比例切换。
+- `FunctionPanel`：功能分类、选择本地文件、素材预览和“添加到时间线”。
+- `PlayerPanel`：组合播放器头部、视频播放区域和画布比例菜单。
+- `VideoPlayback`：当前片段预览、播放控制、时间显示和播放错误上报。
+- `CanvasRatioMenu`：预设比例、自定义比例、焦点和键盘交互。
 - `ParameterPanel`：参数区占位，当前内容保持空白。
 - `Timeline`：时间线片段选择和草稿表格编辑。
 - `editorProject.ts`：编辑项目类型、初始状态、纯 reducer 和活动素材选择器。
+- `mediaLibrary.ts`：媒体检测、Object URL 注册、状态派发和释放。
+- `useMediaLibrary.ts`：把媒体库控制器接入 React 生命周期。
 
 ## 数据流与生命周期
 
@@ -240,11 +251,13 @@ FunctionPanel / PlayerPanel / Timeline 触发事件
 
 典型媒体链路：
 
-1. `FunctionPanel` 选择本地视频并创建预览 URL。
-2. `VideoEditorWorkspace` 记录 URL，并派发 `assets/imported`。
-3. 视频元数据可读时派发 `asset/ready`；解码或预览失败时派发 `asset/failed`。
+1. `FunctionPanel` 将用户选择的本地视频文件交给 `useMediaLibrary`。
+2. 媒体库创建预览 URL、派发 `assets/imported`，并集中启动视频检测。
+3. 视频可以解码时派发 `asset/ready`；检测或播放器失败时统一派发 `asset/failed`。
 4. 用户点击“添加”后派发 `timeline/assetAdded`，素材才会生成片段并成为播放器活动素材。
 5. 用户选择其他片段时派发 `timeline/clipSelected`，播放器根据 `selectActiveAsset` 切换视频。
+
+媒体库会在工作区卸载时取消未完成的检测，并且每个导入媒体的 `blob:` URL 只释放一次。
 
 ### 页面生命周期
 
@@ -264,9 +277,8 @@ FunctionPanel / PlayerPanel / Timeline 触发事件
 - `Layout.css`：登录后左、中、右三栏布局。
 - 各顶层组件目录中的同名 CSS：对应组件样式。
 - `Timeline.css`：时间线与草稿表格样式。
-- `VideoEditorWorkspace.css`：当前仍包含视频编辑工作区布局以及功能区、播放器、参数区的内部样式。
-
-`VideoEditorWorkspace.css` 的内部样式拆分尚未进行。后续拆分时应分别建立 `FunctionPanel.css`、`PlayerPanel.css` 和 `ParameterPanel.css`，但不能借机改变现有视觉效果。
+- `VideoEditorWorkspace.css`：只包含视频编辑工作区布局和伸缩手柄。
+- `FunctionPanel.css`、`PlayerPanel.css` 和 `ParameterPanel.css`：各自组件的内部样式。
 
 React 组件文件和导入路径必须保持完全一致的 PascalCase 大小写；CSS 选择器继续使用小写 kebab-case。大小写不一致会在 TypeScript 中触发 `TS1261`。
 
@@ -274,10 +286,12 @@ React 组件文件和导入路径必须保持完全一致的 PascalCase 大小�
 
 - `tests/editor-project.test.mjs` 和 `tests/workspace-navigation.test.mjs` 会实际执行 reducer，验证状态转换。
 - `tests/workspace-layout.test.mjs` 验证总工作区与视频编辑工作区的组件边界。
-- `tests/workspace-player.test.mjs` 验证功能区、播放器、比例菜单和媒体链路的源码契约。
-- `tests/workspace-timeline.test.mjs` 验证时间线和草稿表格的源码契约。
+- `tests/function-panel.test.tsx` 验证功能分类、文件选择和素材添加交互。
+- `tests/player-panel.test.tsx` 验证播放控制、预设比例、自定义比例和键盘关闭。
+- `tests/timeline.test.tsx` 验证片段选择、草稿编辑、上传和行操作。
+- `tests/media-library.test.ts` 验证媒体检测状态以及 Object URL 的单次释放。
 
-当前部分界面测试通过正则匹配源码和 CSS，能够保护既定结构，但不能代替真实挂载、点击、播放和卸载测试。拆组件或移动 CSS 前，应先调整对应测试，避免把文件位置误当成用户行为。
+播放器、素材区和时间线的行为测试使用 Vitest、jsdom 和 Testing Library 真实挂载组件。外层组件边界仍保留少量源码结构测试，但不再用源码正则验证播放器交互或 CSS 文件位置。
 
 ## 开发约束
 
@@ -312,13 +326,16 @@ git diff --check
 
 提交前至少执行 `npm test`、`npm run lint -- --quiet`、`npm run typecheck` 和 `git diff --check`。涉及构建配置、Electron 入口或组件路径调整时，再执行 `npm run build`。
 
-## 后续结构调整顺序
+## 结构调整进度
 
-当前建议按以下顺序继续整理，避免同时改变结构和行为：
+已经完成：
 
-1. 将源码正则测试逐步替换为真实组件交互测试。
+1. 将播放器、素材区和时间线的源码正则测试替换为真实组件交互测试。
 2. 把 `VideoEditorWorkspace.css` 中的子面板样式移回各自组件。
 3. 拆分 `PlayerPanel` 的视频播放逻辑与画布比例菜单。
 4. 集中管理媒体检测和 Object URL 生命周期。
-5. 实现真实时间线前扩充 clip 的轨道、起止时间和裁剪区间模型。
-6. 实现草稿持久化时增加项目加载与保存边界。
+
+后续继续按以下顺序整理：
+
+1. 实现真实时间线前扩充 clip 的轨道、起止时间和裁剪区间模型。
+2. 实现草稿持久化时增加项目加载与保存边界。
