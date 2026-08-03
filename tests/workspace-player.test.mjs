@@ -22,6 +22,10 @@ const playerPanelSource = await readFile(
   new URL('../src/renderer/src/components/WorkspaceView/PlayerPanel.tsx', import.meta.url),
   'utf8'
 ).catch(() => '')
+const rendererHtml = await readFile(
+  new URL('../src/renderer/index.html', import.meta.url),
+  'utf8'
+)
 
 test('renders the light player with an enabled ratio control', () => {
   assert.match(playerPanelSource, /<section[^>]*className="studio-player"[^>]*aria-label="播放器"/s)
@@ -162,6 +166,12 @@ test('renders an importable light media library in the media category', () => {
     workspaceStyles,
     /\.studio-function-panel__media-thumbnail video\[data-ready='true'\]\s*{[^}]*opacity:\s*1;/s
   )
+})
+
+test('allows imported blob videos through the renderer content security policy', () => {
+  assert.match(functionPanelSource, /URL\.createObjectURL\(file\)/)
+  assert.match(rendererHtml, /Content-Security-Policy/)
+  assert.match(rendererHtml, /media-src\s+'self'\s+blob:/)
 })
 
 test('keeps the parameter header and leaves its content empty', () => {
