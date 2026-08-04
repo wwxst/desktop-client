@@ -8,35 +8,35 @@ import type {
 } from '../../../../shared/tts'
 import PluginDetailView from './PluginDetailView'
 import PluginListView from './PluginListView'
-import { getPluginResourcePresentation } from './pluginResources'
+import { getPluginPresentation } from './pluginPresentation'
 import './Plugins.css'
 
-const DEFAULT_TTS_RESOURCE_ID = 'kokoro-multi-lang-v1_1'
-
-const RESOURCE_ORDER = [
+const PLUGIN_ORDER = [
   'kokoro-multi-lang-v1_1',
   'kokoro-multi-lang-v1_0',
   'supertonic-3-int8-2026-05-11'
 ]
 
 type ExtensionTab = 'plugins' | 'skills'
-type SelectedPlugin = 'local-tts' | null
 
 interface PluginsNotice {
   type: 'success' | 'error' | 'info'
   text: string
 }
 
-function PluginsView(): JSX.Element {
+interface PluginsViewProps {
+  onOpenTts?: () => void
+}
+
+function PluginsView({ onOpenTts = () => undefined }: PluginsViewProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<ExtensionTab>('plugins')
-  const [selectedPlugin, setSelectedPlugin] = useState<SelectedPlugin>(null)
+  const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
   const [catalog, setCatalog] = useState<TtsCatalogResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [notice, setNotice] = useState<PluginsNotice | null>(null)
   const [activeActionId, setActiveActionId] = useState<string | null>(null)
-  const [pluginActionRunning, setPluginActionRunning] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<TtsModelDownloadProgress | null>(null)
 
   const refreshCatalog = useCallback(async (): Promise<void> => {
@@ -99,64 +99,60 @@ function PluginsView(): JSX.Element {
     }
   }, [])
 
+  // 目录中的每条模型记录都作为一个可独立安装、卸载和查看详情的插件。
   const models = useMemo(() => {
     const catalogModels = catalog?.models ?? []
     return [...catalogModels].sort((first, second) => {
-      const firstIndex = RESOURCE_ORDER.indexOf(first.id)
-      const secondIndex = RESOURCE_ORDER.indexOf(second.id)
+      const firstIndex = PLUGIN_ORDER.indexOf(first.id)
+      const secondIndex = PLUGIN_ORDER.indexOf(second.id)
       return (
-        (firstIndex === -1 ? RESOURCE_ORDER.length : firstIndex) -
-        (secondIndex === -1 ? RESOURCE_ORDER.length : secondIndex)
+        (firstIndex === -1 ? PLUGIN_ORDER.length : firstIndex) -
+        (secondIndex === -1 ? PLUGIN_ORDER.length : secondIndex)
       )
     })
   }, [catalog])
 
-  const installed = models.some((model) => model.status === 'installed')
-  const failed = models.some((model) => model.status === 'failed')
-  const catalogBusyResource = models.find(
+  const catalogBusyPlugin = models.find(
     (model) => model.status === 'downloading' || model.status === 'extracting'
   )
-  const busyResourceId = activeActionId ?? catalogBusyResource?.id ?? null
-  const busy = busyResourceId !== null || pluginActionRunning
+  const busyPluginId = activeActionId ?? catalogBusyPlugin?.id ?? null
+  const selectedModel = models.find((model) => model.id === selectedPluginId) ?? null
   const normalizedSearch = searchText.trim().toLowerCase()
-  const pluginMatchesSearch =
-    !normalizedSearch ||
-    '本地 tts 配音'.includes(normalizedSearch) ||
-    '在电脑本地完成文本配音，内容无需上传服务器'.includes(normalizedSearch)
-  const defaultResource = models.find((model) => model.id === DEFAULT_TTS_RESOURCE_ID) ?? null
-  const pluginStatus = busyResourceId
-    ? '处理中'
-    : installed
-      ? '已安装'
-      : failed
-        ? '安装失败'
-        : '未安装'
+  const visibleModels = models.filter((model) => {
+    if (!normalizedSearch) {
+      return true
+    }
 
-  const handleInstall = async (modelId: string): Promise<void> => {
-    const resource = models.find((model) => model.id === modelId)
-    const resourceName = resource ? getPluginResourcePresentation(resource).name : '语音资源'
+    const presentation = getPluginPresentation(model)
+    return `${presentation.name} ${presentation.description}`
+      .toLowerCase()
+      .includes(normalizedSearch)
+  })
+
+  const handleInstall = async (model: TtsModelInfo): Promise<void> => {
+    const pluginName = getPluginPresentation(model).name
     setDownloadProgress(null)
-    setActiveActionId(modelId)
-    setNotice({ type: 'info', text: '正在下载语音资源，请保持网络连接' })
+    setActiveActionId(model.id)
+    setNotice({ type: 'info', text: `正在下载${pluginName}，请保持网络连接` })
 
     try {
-      const response = await window.api.installTtsModel(modelId)
+      const response = await window.api.installTtsModel(model.id)
       setNotice({
         type: response.success ? 'success' : 'error',
-        text: response.success ? `${resourceName}安装完成` : `${resourceName}安装失败，请重试`
+        text: response.success ? `${pluginName}安装完成` : `${pluginName}安装失败，请重试`
       })
       await refreshCatalog()
     } catch {
-      setNotice({ type: 'error', text: '语音资源安装失败，请重试' })
+      setNotice({ type: 'error', text: `${pluginName}安装失败，请重试` })
       await refreshCatalog()
     } finally {
       setActiveActionId(null)
     }
   }
 
-  const handleRemoveResource = async (model: TtsModelInfo): Promise<void> => {
-    const resourceName = getPluginResourcePresentation(model).name
-    if (!window.confirm(`确定卸载“${resourceName}”吗？`)) {
+  const handleRemove = async (model: TtsModelInfo): Promise<void> => {
+    const pluginName = getPluginPresentation(model).name
+    if (!window.confirm(`确定卸载“${pluginName}”吗？`)) {
       return
     }
 
@@ -166,52 +162,28 @@ function PluginsView(): JSX.Element {
       const response = await window.api.removeTtsModel(model.id)
       setNotice({
         type: response.success ? 'success' : 'error',
-        text: response.success ? `${resourceName}已卸载` : `${resourceName}卸载失败，请重试`
+        text: response.success ? `${pluginName}已卸载` : `${pluginName}卸载失败，请重试`
       })
     } catch {
-      setNotice({ type: 'error', text: `${resourceName}卸载失败，请重试` })
+      setNotice({ type: 'error', text: `${pluginName}卸载失败，请重试` })
     } finally {
       await refreshCatalog()
       setActiveActionId(null)
     }
   }
 
-  const handleRemovePlugin = async (): Promise<void> => {
-    const installedResources = models.filter((model) => model.status === 'installed')
-    if (
-      installedResources.length === 0 ||
-      !window.confirm('确定卸载“本地 TTS 配音”吗？已下载的语音资源将一并删除。')
-    ) {
-      return
-    }
-
-    setPluginActionRunning(true)
-
+  const handleOpenModelDirectory = async (): Promise<void> => {
     try {
-      const results: boolean[] = []
-      for (const resource of installedResources) {
-        try {
-          const response = await window.api.removeTtsModel(resource.id)
-          results.push(response.success)
-        } catch {
-          results.push(false)
-        }
+      const response = await window.api.openTtsModelDirectory()
+      if (!response.success) {
+        setNotice({ type: 'error', text: '插件目录打开失败，请重试' })
       }
-
-      const removedAll = results.every(Boolean)
-      setNotice({
-        type: removedAll ? 'success' : 'error',
-        text: removedAll ? '本地 TTS 配音已卸载' : '部分语音资源卸载失败，请重试'
-      })
     } catch {
-      setNotice({ type: 'error', text: '部分语音资源卸载失败，请重试' })
-    } finally {
-      await refreshCatalog()
-      setPluginActionRunning(false)
+      setNotice({ type: 'error', text: '插件目录打开失败，请重试' })
     }
   }
 
-  if (selectedPlugin === 'local-tts') {
+  if (selectedModel) {
     return (
       <section className="plugins-page" aria-label="插件中心">
         <div className="plugins-page__shell">
@@ -221,17 +193,14 @@ function PluginsView(): JSX.Element {
             </div>
           )}
           <PluginDetailView
-            models={models}
-            installed={installed}
-            failed={failed}
-            busyResourceId={busyResourceId}
-            pluginActionRunning={pluginActionRunning}
-            defaultResource={defaultResource}
+            model={selectedModel}
+            busyPluginId={busyPluginId}
             downloadProgress={downloadProgress}
-            onBack={() => setSelectedPlugin(null)}
-            onInstall={(modelId) => void handleInstall(modelId)}
-            onRemoveResource={(model) => void handleRemoveResource(model)}
-            onRemovePlugin={() => void handleRemovePlugin()}
+            onBack={() => setSelectedPluginId(null)}
+            onInstall={(model) => void handleInstall(model)}
+            onRemove={(model) => void handleRemove(model)}
+            onOpenTts={onOpenTts}
+            onOpenDirectory={() => void handleOpenModelDirectory()}
           />
         </div>
       </section>
@@ -257,7 +226,7 @@ function PluginsView(): JSX.Element {
             aria-selected={activeTab === 'skills'}
             className={activeTab === 'skills' ? 'is-active' : undefined}
             onClick={() => {
-              setSelectedPlugin(null)
+              setSelectedPluginId(null)
               setActiveTab('skills')
             }}
           >
@@ -306,20 +275,18 @@ function PluginsView(): JSX.Element {
                   重新加载
                 </button>
               </div>
-            ) : !pluginMatchesSearch ? (
+            ) : visibleModels.length === 0 ? (
               <div className="plugins-empty-state">
                 <span>没有找到相关插件</span>
               </div>
             ) : (
               <PluginListView
-                installed={installed}
-                failed={failed}
-                busy={busy}
-                canInstall={defaultResource !== null}
-                statusLabel={pluginStatus}
-                onOpenDetail={() => setSelectedPlugin('local-tts')}
-                onInstall={() => defaultResource && void handleInstall(defaultResource.id)}
-                onRemove={() => void handleRemovePlugin()}
+                models={visibleModels}
+                busyPluginId={busyPluginId}
+                downloadProgress={downloadProgress}
+                onOpenDetail={(model) => setSelectedPluginId(model.id)}
+                onInstall={(model) => void handleInstall(model)}
+                onRemove={(model) => void handleRemove(model)}
               />
             )}
           </>

@@ -54,7 +54,11 @@ function WorkspaceView(): JSX.Element {
   }
 
   if (navigation.activeMenu === 'plugins') {
-    workspaceContent = <PluginsView />
+    workspaceContent = (
+      <PluginsView
+        onOpenTts={() => dispatchNavigation({ type: 'menu/selected', menu: 'tts-voiceover' })}
+      />
+    )
   }
 
   return (

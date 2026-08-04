@@ -1,0 +1,112 @@
+.ui-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.ui-button--md {
+  height: 32px;
+}
+
+.ui-button--sm {
+  height: 30px;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.ui-button--primary {
+  color: #ffffff;
+  background: #0052d9;
+  border-color: #0052d9;
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background: #266fe8;
+  border-color: #266fe8;
+}
+
+.ui-button--secondary {
+  color: #34506f;
+  background: #ffffff;
+  border-color: #b9c6d4;
+}
+
+.ui-button--secondary:hover:not(:disabled) {
+  background: #f1f5fa;
+}
+
+.ui-button--ghost {
+  color: #4c5a6d;
+  background: transparent;
+  border-color: transparent;
+}
+
+.ui-button--ghost:hover:not(:disabled) {
+  background: #f0f2f5;
+}
+
+.ui-button--danger {
+  color: #a33d39;
+  background: #fff4f3;
+  border-color: #edcfcc;
+}
+
+.ui-button--danger:hover:not(:disabled) {
+  background: #ffe9e7;
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid rgba(41, 112, 198, 0.35);
+  outline-offset: 2px;
+}
+
+.ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ui-button__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+}
+
+.ui-button__icon:empty {
+  display: none;
+}
+
+.ui-button__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ui-button--sm .ui-button__icon,
+.ui-button--sm .ui-button__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ui-button__spinner {
+  animation: ui-button-spin 800ms linear infinite;
+}
+
+@keyframes ui-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
