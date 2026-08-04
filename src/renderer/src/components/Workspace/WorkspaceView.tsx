@@ -3,6 +3,7 @@ import AiPanel from '../AiPanel/AiPanel'
 import Sidebar from '../Sidebar/Sidebar'
 import SmartEditDraftView from '../SmartEdit/SmartEditDraftView'
 import SmartEditEditorView from '../SmartEdit/SmartEditEditorView'
+import TtsVoiceoverView from '../TtsVoiceover/TtsVoiceoverView'
 import Layout from '../../layouts/Layout'
 import {
   initialWorkspaceNavigationState,
@@ -41,6 +42,10 @@ function WorkspaceView(): JSX.Element {
       ) : (
         <SmartEditDraftView onCreateDraft={() => dispatchNavigation({ type: 'draft/created' })} />
       )
+  }
+
+  if (navigation.activeMenu === 'tts-voiceover') {
+    workspaceContent = <TtsVoiceoverView />
   }
 
   return (
