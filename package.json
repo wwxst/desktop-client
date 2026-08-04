@@ -25,7 +25,10 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "lucide-react": "^1.27.0",
-    "react-resizable-panels": "^4.12.2"
+    "react-resizable-panels": "^4.12.2",
+    "sherpa-onnx-node": "^1.13.4",
+    "tar-stream": "^3.1.7",
+    "unbzip2-stream": "^1.4.3"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

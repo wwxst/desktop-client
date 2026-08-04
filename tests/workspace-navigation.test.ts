@@ -57,6 +57,17 @@ describe('workspace navigation reducer', () => {
     ).toEqual({ activeMenu: 'smart-edit', smartEditPage: 'draft-list' })
   })
 
+  it('opens plugins and resets an active editor session', () => {
+    const editingState: WorkspaceNavigationState = {
+      activeMenu: 'smart-edit',
+      smartEditPage: 'editor'
+    }
+
+    expect(
+      workspaceNavigationReducer(editingState, { type: 'menu/selected', menu: 'plugins' })
+    ).toEqual({ activeMenu: 'plugins', smartEditPage: 'draft-list' })
+  })
+
   it('ignores draft actions outside smart edit', () => {
     const initial = initialWorkspaceNavigationState
     expect(workspaceNavigationReducer(initial, { type: 'draft/created' })).toBe(initial)

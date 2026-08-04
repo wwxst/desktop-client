@@ -1,5 +1,6 @@
 import { useReducer, type JSX } from 'react'
 import AiPanel from '../AiPanel/AiPanel'
+import PluginsView from '../Plugins/PluginsView'
 import Sidebar from '../Sidebar/Sidebar'
 import SmartEditDraftView from '../SmartEdit/SmartEditDraftView'
 import SmartEditEditorView from '../SmartEdit/SmartEditEditorView'
@@ -45,7 +46,15 @@ function WorkspaceView(): JSX.Element {
   }
 
   if (navigation.activeMenu === 'tts-voiceover') {
-    workspaceContent = <TtsVoiceoverView />
+    workspaceContent = (
+      <TtsVoiceoverView
+        onOpenPlugins={() => dispatchNavigation({ type: 'menu/selected', menu: 'plugins' })}
+      />
+    )
+  }
+
+  if (navigation.activeMenu === 'plugins') {
+    workspaceContent = <PluginsView />
   }
 
   return (

@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { BookOpen, Home, Mic2, Scissors, Settings, type LucideIcon } from 'lucide-react'
+import { BookOpen, Home, Mic2, Plug, Scissors, Settings, type LucideIcon } from 'lucide-react'
 import type { WorkspaceMenu } from '../../workspaceNavigation'
 import './Sidebar.css'
 
@@ -18,7 +18,8 @@ interface SidebarProps {
 const baseMenuItems: SidebarMenuItem[] = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'novel-promotion', label: '小说推文', icon: BookOpen },
-  { id: 'tts-voiceover', label: 'TTS 配音', icon: Mic2 }
+  { id: 'tts-voiceover', label: 'TTS 配音', icon: Mic2 },
+  { id: 'plugins', label: '插件', icon: Plug }
 ]
 
 const smartEditMenuItem: SidebarMenuItem = {

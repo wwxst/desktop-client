@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { registerTtsIpc } from './tts/registerTtsIpc'
 
 import type {
   ApiResult,
@@ -234,6 +235,7 @@ app.whenReady().then(() => {
 
   registerAuthIpc()
   registerSubscriptionIpc()
+  registerTtsIpc()
 
   createWindow()
 

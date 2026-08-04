@@ -12,6 +12,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('navigation', { name: '主菜单' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '首页' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: '小说推文' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '插件' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '智剪' })).not.toBeInTheDocument()
     expect(screen.getByText('kasixmb')).toBeInTheDocument()
     expect(screen.getByText('Plus')).toBeInTheDocument()
@@ -27,9 +28,11 @@ describe('Sidebar', () => {
     render(<Sidebar activeItem="home" showSmartEdit onItemSelect={onItemSelect} />)
 
     await user.click(screen.getByRole('button', { name: '小说推文' }))
+    await user.click(screen.getByRole('button', { name: '插件' }))
     await user.click(screen.getByRole('button', { name: '智剪' }))
 
     expect(onItemSelect).toHaveBeenNthCalledWith(1, 'novel-promotion')
-    expect(onItemSelect).toHaveBeenNthCalledWith(2, 'smart-edit')
+    expect(onItemSelect).toHaveBeenNthCalledWith(2, 'plugins')
+    expect(onItemSelect).toHaveBeenNthCalledWith(3, 'smart-edit')
   })
 })

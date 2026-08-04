@@ -2,19 +2,37 @@ import type { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   LoginRequest,
   LoginResponse,
-  SubscriptionCheckResponse,
+  SubscriptionCheckResponse
 } from '../shared/auth'
+import type {
+  TtsCatalogResponse,
+  TtsCreateJobResponse,
+  TtsGenerateRequest,
+  TtsJobActionResponse,
+  TtsJobProgress,
+  TtsModelActionResponse,
+  TtsModelDownloadProgress,
+  TtsPreviewResponse
+} from '../shared/tts'
 
 interface DesktopApi {
-  /**
-   * 用户登录。
-   */
   login(loginRequest: LoginRequest): Promise<LoginResponse>
-
-  /**
-   * 查询当前用户订阅。
-   */
   getSubscription(): Promise<SubscriptionCheckResponse>
+
+  listTtsCatalog(): Promise<TtsCatalogResponse>
+  installTtsModel(modelId: string): Promise<TtsModelActionResponse>
+  removeTtsModel(modelId: string): Promise<TtsModelActionResponse>
+  openTtsModelDirectory(): Promise<TtsModelActionResponse>
+
+  previewTts(request: TtsGenerateRequest): Promise<TtsPreviewResponse>
+  createTtsJob(request: TtsGenerateRequest): Promise<TtsCreateJobResponse>
+  cancelTtsJob(jobId: string): Promise<TtsJobActionResponse>
+  saveTtsJob(jobId: string): Promise<TtsJobActionResponse>
+
+  onTtsModelDownloadProgress(
+    callback: (progress: TtsModelDownloadProgress) => void
+  ): () => void
+  onTtsJobProgress(callback: (progress: TtsJobProgress) => void): () => void
 }
 
 declare global {
