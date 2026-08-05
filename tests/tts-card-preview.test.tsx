@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -168,6 +168,40 @@ describe('TTS card preview playback', () => {
     )
   })
 
+  it('returns the active voice card to idle when playback ends', async () => {
+    setWindowApi()
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+    await screen.findByRole('button', { name: '播放中：第一音色' })
+    const audio = play.mock.contexts[0] as HTMLAudioElement
+
+    act(() => {
+      audio.onended?.call(audio, new Event('ended'))
+    })
+
+    expect(screen.getByRole('button', { name: '试听音色：第一音色' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '播放中：第一音色' })).not.toBeInTheDocument()
+  })
+
+  it('returns the active voice card to idle when playback errors', async () => {
+    setWindowApi()
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '试听音色：第二音色' }))
+    await screen.findByRole('button', { name: '播放中：第二音色' })
+    const audio = play.mock.contexts[0] as HTMLAudioElement
+
+    act(() => {
+      audio.onerror?.call(audio, new Event('error'))
+    })
+
+    expect(screen.getByRole('button', { name: '试听音色：第二音色' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '播放中：第二音色' })).not.toBeInTheDocument()
+  })
+
   it('stops and replays a cached URL when the same request is previewed again', async () => {
     const previewTts = vi.fn().mockResolvedValue(successfulPreview)
     setWindowApi(previewTts)
@@ -292,6 +326,55 @@ describe('TTS card preview playback', () => {
     await user.click(previewButton)
     await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
     expect(previewTts).toHaveBeenLastCalledWith(expect.objectContaining({ text: '已更新的文案' }))
+  })
+
+  it('discards a pending response after language change and regenerates for the new language', async () => {
+    const pending = deferred<TtsPreviewResponse>()
+    const previewTts = vi
+      .fn()
+      .mockImplementationOnce(() => pending.promise)
+      .mockResolvedValueOnce(successfulPreview)
+    setWindowApi(previewTts)
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '文本语言' }), 'en-US')
+    pending.resolve(successfulPreview)
+
+    const previewButton = await screen.findByRole('button', { name: '试听音色：第一音色' })
+    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(play).not.toHaveBeenCalled()
+
+    await user.click(previewButton)
+    await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
+    expect(previewTts).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'en-US' }))
+    await screen.findByRole('button', { name: '播放中：第一音色' })
+  })
+
+  it('discards a pending response after speed change and regenerates at the new speed', async () => {
+    const pending = deferred<TtsPreviewResponse>()
+    const previewTts = vi
+      .fn()
+      .mockImplementationOnce(() => pending.promise)
+      .mockResolvedValueOnce(successfulPreview)
+    setWindowApi(previewTts)
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '高级设置' }))
+    await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '语速' }), '1.2')
+    pending.resolve(successfulPreview)
+
+    const previewButton = await screen.findByRole('button', { name: '试听音色：第一音色' })
+    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(play).not.toHaveBeenCalled()
+
+    await user.click(previewButton)
+    await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
+    expect(previewTts).toHaveBeenLastCalledWith(expect.objectContaining({ speed: 1.2 }))
+    await screen.findByRole('button', { name: '播放中：第一音色' })
   })
 
   it('restores idle state and keeps the response notice after generation failure', async () => {
