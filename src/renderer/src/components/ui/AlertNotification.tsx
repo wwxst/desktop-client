@@ -58,26 +58,39 @@ function NotificationContent({
   const pendingSignatureRef = useRef<AnnouncementSignature | null>(null)
   const clearTimerRef = useRef<number | null>(null)
   const stageTimerRef = useRef<number | null>(null)
+  const generationRef = useRef(0)
   const [announcement, setAnnouncement] = useState<AnnouncementSignature | null>(null)
 
   useEffect(() => {
     const nextText = visualContentRef.current?.textContent ?? ''
     const nextSignature: AnnouncementSignature = { role, live, text: nextText }
-    if (
-      !nextText ||
-      signaturesMatch(announcedSignatureRef.current, nextSignature) ||
-      signaturesMatch(pendingSignatureRef.current, nextSignature)
-    ) {
+    if (!nextText) return
+
+    if (signaturesMatch(announcedSignatureRef.current, nextSignature)) {
+      if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current)
+      if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
+      clearTimerRef.current = null
+      stageTimerRef.current = null
+      pendingSignatureRef.current = null
+      generationRef.current += 1
       return
     }
+
+    if (signaturesMatch(pendingSignatureRef.current, nextSignature)) return
 
     if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current)
     if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
     clearTimerRef.current = null
     stageTimerRef.current = null
     pendingSignatureRef.current = nextSignature
+    const generation = ++generationRef.current
+
+    const pendingWorkIsCurrent = (): boolean =>
+      generationRef.current === generation &&
+      signaturesMatch(pendingSignatureRef.current, nextSignature)
 
     const publish = (): void => {
+      if (!pendingWorkIsCurrent()) return
       stageTimerRef.current = null
       pendingSignatureRef.current = null
       announcedSignatureRef.current = nextSignature
@@ -86,6 +99,7 @@ function NotificationContent({
 
     if (announcedSignatureRef.current) {
       clearTimerRef.current = window.setTimeout(() => {
+        if (!pendingWorkIsCurrent()) return
         clearTimerRef.current = null
         announcedSignatureRef.current = null
         setAnnouncement(null)
@@ -99,6 +113,7 @@ function NotificationContent({
 
   useEffect(() => {
     return () => {
+      generationRef.current += 1
       if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current)
       if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
       clearTimerRef.current = null

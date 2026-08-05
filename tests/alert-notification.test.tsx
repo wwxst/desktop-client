@@ -251,6 +251,41 @@ describe('AlertNotification', () => {
     await waitFor(() => expect(assertiveAlert.textContent).toBe(visualContent.textContent))
   })
 
+  it('cancels a pending announcement when props revert to the announced signature', () => {
+    vi.useFakeTimers()
+    const onClose = vi.fn()
+    const { rerender } = render(
+      <AlertNotification open variant="info" title="固定标题" message="内容 A" onClose={onClose} />
+    )
+    const liveRegion = screen.getByRole('status')
+    const visualContent = getVisualContent()
+
+    act(() => vi.runAllTimers())
+    expect(liveRegion).toHaveTextContent('内容 A')
+
+    rerender(
+      <AlertNotification open variant="info" title="固定标题" message="内容 B" onClose={onClose} />
+    )
+    expect(within(visualContent).getByText('内容 B')).toBeInTheDocument()
+    expect(liveRegion).toHaveTextContent('内容 A')
+
+    rerender(
+      <AlertNotification open variant="info" title="固定标题" message="内容 A" onClose={onClose} />
+    )
+    expect(within(visualContent).getByText('内容 A')).toBeInTheDocument()
+    expect(within(visualContent).queryByText('内容 B')).not.toBeInTheDocument()
+    expect(liveRegion).toHaveTextContent('内容 A')
+
+    act(() => vi.runAllTimers())
+    expect(liveRegion).toHaveTextContent('内容 A')
+    expect(liveRegion).not.toHaveTextContent('内容 B')
+    expect(within(visualContent).getByText('内容 A')).toBeInTheDocument()
+
+    act(() => vi.runAllTimers())
+    expect(liveRegion).toHaveTextContent('内容 A')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('cancels pending announcement timers on replacement and close', () => {
     vi.useFakeTimers()
     const onClose = vi.fn()
