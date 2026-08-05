@@ -1,5 +1,5 @@
 import { CircleCheck, CircleX, Info, TriangleAlert, X, type LucideIcon } from 'lucide-react'
-import type { JSX, ReactNode } from 'react'
+import { useEffect, useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 import Button from './Button'
@@ -26,6 +26,53 @@ const variantDetails: Record<
   error: { title: '操作失败', icon: CircleX, role: 'alert', live: 'assertive' }
 }
 
+interface AnnouncementRegionProps {
+  variant: AlertNotificationVariant
+  title: string
+  message: ReactNode
+  role: 'status' | 'alert'
+  live: 'polite' | 'assertive'
+}
+
+interface StagedAnnouncement {
+  variant: AlertNotificationVariant
+  title: string
+  message: ReactNode
+}
+
+function AnnouncementRegion({
+  variant,
+  title,
+  message,
+  role,
+  live
+}: AnnouncementRegionProps): JSX.Element {
+  const [announcement, setAnnouncement] = useState<StagedAnnouncement | null>(null)
+  const isCurrent =
+    announcement?.variant === variant &&
+    announcement.title === title &&
+    announcement.message === message
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAnnouncement({ variant, title, message })
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [message, title, variant])
+
+  return (
+    <div className="ui-alert-notification__content" role={role} aria-live={live} aria-atomic="true">
+      {isCurrent && (
+        <>
+          <div className="ui-alert-notification__title">{announcement.title}</div>
+          <div className="ui-alert-notification__message">{announcement.message}</div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function AlertNotification({
   open,
   variant,
@@ -40,19 +87,17 @@ function AlertNotification({
   const StatusIcon = details.icon
 
   return createPortal(
-    <div
-      className={`ui-alert-notification ui-alert-notification--${variant}`}
-      role={details.role}
-      aria-live={details.live}
-      aria-atomic="true"
-    >
+    <div className={`ui-alert-notification ui-alert-notification--${variant}`}>
       <span className="ui-alert-notification__status-icon" aria-hidden="true">
         <StatusIcon />
       </span>
-      <div className="ui-alert-notification__content">
-        <div className="ui-alert-notification__title">{title ?? details.title}</div>
-        <div className="ui-alert-notification__message">{message}</div>
-      </div>
+      <AnnouncementRegion
+        variant={variant}
+        title={title ?? details.title}
+        message={message}
+        role={details.role}
+        live={details.live}
+      />
       <button
         className="ui-alert-notification__close"
         type="button"
