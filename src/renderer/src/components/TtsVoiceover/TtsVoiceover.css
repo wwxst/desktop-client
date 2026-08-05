@@ -64,34 +64,6 @@
   line-height: 1.65;
 }
 
-.tts-notice {
-  width: min(100%, 1380px);
-  padding: 10px 13px;
-  margin: 18px auto 0;
-  font-size: 12px;
-  line-height: 1.5;
-  border: 1px solid transparent;
-  border-radius: 7px;
-}
-
-.tts-notice--success {
-  color: #24613f;
-  background: #eef9f2;
-  border-color: #cfe9d8;
-}
-
-.tts-notice--error {
-  color: #9a3434;
-  background: #fff3f2;
-  border-color: #f0cfcc;
-}
-
-.tts-notice--info {
-  color: #315f96;
-  background: #f0f6ff;
-  border-color: #cfdef3;
-}
-
 .tts-voiceover__content {
   display: grid;
   flex: 1 1 auto;

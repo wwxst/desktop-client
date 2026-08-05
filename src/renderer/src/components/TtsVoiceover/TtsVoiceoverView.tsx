@@ -19,10 +19,10 @@ import type {
   TtsVoice,
   TtsVoiceGender
 } from '../../../../shared/tts'
+import AlertNotification, { type AlertNotificationVariant } from '../ui/AlertNotification'
 import './TtsVoiceover.css'
 
 const MAX_TEXT_LENGTH = 100_000
-const PREVIEW_GENERATING_NOTICE = '正在使用本机 CPU 生成试听音频'
 const speedOptions = [
   { value: '0.8', label: '0.8x（较慢）' },
   { value: '1', label: '1.0x（正常）' },
@@ -107,9 +107,8 @@ const previewSamples: Record<string, string> = {
 }
 
 interface NoticeState {
-  type: 'success' | 'error' | 'info'
+  type: AlertNotificationVariant
   text: string
-  previewEpoch?: number
   previewPlaybackUrl?: string
 }
 
@@ -420,11 +419,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     }
 
     setPreviewingVoiceId(voice.id)
-    setNotice({
-      type: 'info',
-      text: PREVIEW_GENERATING_NOTICE,
-      previewEpoch: requestEpoch
-    })
 
     try {
       const response = await window.api.previewTts(request)
@@ -457,9 +451,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     } finally {
       if (mountedRef.current) {
         setPreviewingVoiceId(null)
-        setNotice((currentNotice) =>
-          currentNotice?.previewEpoch === requestEpoch ? null : currentNotice
-        )
       }
     }
   }
@@ -540,9 +531,12 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
       </header>
 
       {notice && (
-        <div className={`tts-notice tts-notice--${notice.type}`} role="status">
-          {notice.text}
-        </div>
+        <AlertNotification
+          open
+          variant={notice.type}
+          message={notice.text}
+          onClose={() => setNotice(null)}
+        />
       )}
 
       <div className="tts-voiceover__content">

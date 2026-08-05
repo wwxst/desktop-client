@@ -95,8 +95,12 @@ function deferred<T>(): {
 
 function setWindowApi(
   previewTts: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(successfulPreview)
-): { emitJobProgress: (progress: TtsJobProgress) => void } {
+): {
+  emitJobProgress: (progress: TtsJobProgress) => void
+  saveTtsJob: ReturnType<typeof vi.fn>
+} {
   const removeListener = vi.fn()
+  const saveTtsJob = vi.fn()
   let jobProgressListener: ((progress: TtsJobProgress) => void) | null = null
 
   Object.defineProperty(window, 'api', {
@@ -111,7 +115,7 @@ function setWindowApi(
       previewTts,
       createTtsJob: vi.fn(),
       cancelTtsJob: vi.fn(),
-      saveTtsJob: vi.fn(),
+      saveTtsJob,
       onTtsModelDownloadProgress: vi.fn(() => removeListener),
       onTtsJobProgress: vi.fn((listener) => {
         jobProgressListener = listener
@@ -121,8 +125,21 @@ function setWindowApi(
   })
 
   return {
-    emitJobProgress: (progress) => jobProgressListener?.(progress)
+    emitJobProgress: (progress) => jobProgressListener?.(progress),
+    saveTtsJob
   }
+}
+
+function getNotificationRoot(liveRegion: HTMLElement): HTMLElement {
+  const notification = liveRegion.closest<HTMLElement>('.ui-alert-notification')
+  expect(notification).toBeInTheDocument()
+  return notification as HTMLElement
+}
+
+function getNotificationContent(notification: HTMLElement): HTMLElement {
+  const content = notification.querySelector<HTMLElement>('.ui-alert-notification__content')
+  expect(content).toBeInTheDocument()
+  return content as HTMLElement
 }
 
 describe('TTS card preview playback', () => {
@@ -227,12 +244,21 @@ describe('TTS card preview playback', () => {
       audio.onerror?.call(audio, new Event('error'))
     })
 
-    expect(screen.getByText('试听播放失败')).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    const notification = getNotificationRoot(alert)
+    const content = getNotificationContent(notification)
+    expect(notification).toHaveClass('ui-alert-notification--error')
+    expect(within(content).getByText('操作失败')).toBeInTheDocument()
+    expect(within(content).getByText('试听播放失败')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '试听音色：第二音色' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: '播放中：第二音色' })).not.toBeInTheDocument()
+    expect(document.querySelector('audio')).not.toBeInTheDocument()
     expect(audio).not.toHaveAttribute('src')
     expect(load).toHaveBeenCalled()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1')
+
+    await user.click(within(notification).getByRole('button', { name: '知道了' }))
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '试听音色：第二音色' }))
     await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
@@ -361,10 +387,14 @@ describe('TTS card preview playback', () => {
 
     const generatingButton = screen.getByRole('button', { name: '生成中：第二音色' })
     expect(generatingButton).toHaveTextContent('生成中')
+    expect(generatingButton).toBeDisabled()
     expect(screen.queryByRole('button', { name: '生成中：第一音色' })).not.toBeInTheDocument()
     const previewButtons = screen.getAllByRole('button', { name: /(?:试听音色|生成中)：/ })
     expect(previewButtons).toHaveLength(2)
     previewButtons.forEach((button) => expect(button).toBeDisabled())
+    expect(screen.queryByText('正在使用本机 CPU 生成试听音频')).not.toBeInTheDocument()
+    expect(document.querySelector('.tts-notice')).not.toBeInTheDocument()
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '试听音色：第一音色' }))
     expect(previewTts).toHaveBeenCalledTimes(1)
 
@@ -498,7 +528,12 @@ describe('TTS card preview playback', () => {
     pending.resolve(successfulPreview)
 
     await screen.findByRole('button', { name: '试听音色：第一音色' })
-    expect(screen.getByRole('status')).toHaveTextContent('正式任务已取消')
+    const status = screen.getByRole('status')
+    const notification = getNotificationRoot(status)
+    const content = getNotificationContent(notification)
+    expect(notification).toHaveClass('ui-alert-notification--info')
+    expect(within(content).getByText('提示')).toBeInTheDocument()
+    expect(within(content).getByText('正式任务已取消')).toBeInTheDocument()
   })
 
   it('restores idle state and keeps the response notice after generation failure', async () => {
@@ -513,7 +548,10 @@ describe('TTS card preview playback', () => {
     render(<TtsVoiceoverView />)
     await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
 
-    expect(await screen.findByText('试听服务不可用')).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    expect(
+      within(getNotificationContent(getNotificationRoot(alert))).getByText('试听服务不可用')
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '试听音色：第一音色' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: /播放中：/ })).not.toBeInTheDocument()
   })
@@ -526,9 +564,18 @@ describe('TTS card preview playback', () => {
     render(<TtsVoiceoverView />)
     await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
 
-    expect(await screen.findByText('试听播放失败')).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    const notification = getNotificationRoot(alert)
+    const content = getNotificationContent(notification)
+    expect(notification).toHaveClass('ui-alert-notification--error')
+    expect(within(content).getByText('操作失败')).toBeInTheDocument()
+    expect(within(content).getByText('试听播放失败')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '试听音色：第一音色' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '播放中：第一音色' })).not.toBeInTheDocument()
     expect(document.querySelector('audio')).not.toBeInTheDocument()
+
+    await user.click(within(notification).getByRole('button', { name: '知道了' }))
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
   })
 
   it('clears a playback failure after cached retry succeeds', async () => {
@@ -539,14 +586,61 @@ describe('TTS card preview playback', () => {
 
     render(<TtsVoiceoverView />)
     await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
-    expect(await screen.findByText('试听播放失败')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '试听音色：第一音色' }))
 
     expect(await screen.findByRole('button', { name: '播放中：第一音色' })).toBeInTheDocument()
     expect(previewTts).toHaveBeenCalledTimes(1)
     expect(play).toHaveBeenCalledTimes(2)
-    expect(screen.queryByText('试听播放失败')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps a completed job savable after closing its notice and reports a successful save', async () => {
+    const { emitJobProgress, saveTtsJob } = setWindowApi()
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await screen.findByRole('button', { name: '试听音色：第一音色' })
+    act(() => {
+      emitJobProgress({
+        jobId: 'completed-job',
+        modelId: 'resource-one',
+        status: 'completed',
+        currentSegment: 1,
+        totalSegments: 1,
+        percent: 100,
+        message: '配音生成完成'
+      })
+    })
+
+    const completionStatus = screen.getByRole('status')
+    const completionNotification = getNotificationRoot(completionStatus)
+    const completionContent = getNotificationContent(completionNotification)
+    expect(completionNotification).toHaveClass('ui-alert-notification--success')
+    expect(within(completionContent).getByText('操作成功')).toBeInTheDocument()
+    expect(
+      within(completionContent).getByText('配音生成完成，可以试听并保存 WAV 文件')
+    ).toBeInTheDocument()
+
+    await user.click(within(completionNotification).getByRole('button', { name: '知道了' }))
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
+    const saveButton = screen.getByRole('button', { name: '保存 WAV' })
+    expect(saveButton).toBeEnabled()
+
+    saveTtsJob.mockResolvedValue({
+      success: true,
+      canceled: false,
+      message: 'WAV 文件已保存'
+    })
+    await user.click(saveButton)
+
+    const savedStatus = await screen.findByRole('status')
+    const savedNotification = getNotificationRoot(savedStatus)
+    expect(savedNotification).toHaveClass('ui-alert-notification--success')
+    expect(
+      within(getNotificationContent(savedNotification)).getByText('WAV 文件已保存')
+    ).toBeInTheDocument()
   })
 
   it('stops audio and revokes its URL on unmount', async () => {
