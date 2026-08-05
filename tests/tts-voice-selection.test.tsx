@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import TtsVoiceoverView from '../src/renderer/src/components/TtsVoiceover/TtsVoiceoverView'
 
 describe('TTS voice selection', () => {
-  it('combines installed voices and uses the selected voice resource for preview', async () => {
+  it('previews the clicked voice without changing the selected voice', async () => {
     const previewTts = vi.fn().mockResolvedValue({
       success: false,
       message: '试听请求已记录'
@@ -82,9 +82,16 @@ describe('TTS voice selection', () => {
     const user = userEvent.setup()
     render(<TtsVoiceoverView />)
 
-    expect(await screen.findAllByRole('radio')).toHaveLength(2)
-    await user.click(screen.getByRole('radio', { name: /第二音色/ }))
-    await user.click(screen.getByRole('button', { name: '试听' }))
+    const radios = await screen.findAllByRole('radio')
+
+    expect(radios).toHaveLength(2)
+    const secondVoiceCard = radios[1].closest('.tts-voice-card')
+
+    expect(radios[0]).toBeChecked()
+    expect(secondVoiceCard).not.toBeNull()
+    await user.click(within(secondVoiceCard!).getByRole('button', { name: '试听音色' }))
+    expect(radios[0]).toBeChecked()
+    expect(radios[1]).not.toBeChecked()
 
     await waitFor(() => {
       expect(previewTts).toHaveBeenCalledWith(

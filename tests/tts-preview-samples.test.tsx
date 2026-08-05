@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { TTS_LANGUAGES } from '../src/main/tts/catalog'
@@ -129,8 +129,10 @@ describe('TTS preview samples', () => {
     render(<TtsVoiceoverView />)
 
     const languageSelect = await screen.findByRole('combobox', { name: '文本语言' })
-    const previewButton = await screen.findByRole('button', { name: '试听' })
-    await screen.findByRole('radio')
+    const voiceCard = (await screen.findByRole('radio')).closest('.tts-voice-card')
+
+    expect(voiceCard).not.toBeNull()
+    const previewButton = within(voiceCard!).getByRole('button', { name: '试听音色' })
 
     for (const language of TTS_LANGUAGES) {
       fireEvent.change(languageSelect, { target: { value: language.code } })

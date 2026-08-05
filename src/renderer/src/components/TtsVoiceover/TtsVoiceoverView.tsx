@@ -274,8 +274,11 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     script.trim() && selectedVoice && !controlsDisabled && script.length <= MAX_TEXT_LENGTH
   )
 
-  const buildRequest = (text: string): TtsGenerateRequest | null => {
-    if (!selectedVoice) {
+  const buildRequest = (
+    text: string,
+    requestVoice: TtsVoice | null = selectedVoice
+  ): TtsGenerateRequest | null => {
+    if (!requestVoice) {
       setNotice({ type: 'error', text: '请先安装配音插件并选择音色' })
       return null
     }
@@ -283,15 +286,15 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     return {
       text,
       language,
-      modelId: selectedVoice.modelId,
-      voiceId: selectedVoice.id,
+      modelId: requestVoice.modelId,
+      voiceId: requestVoice.id,
       speed: Number(speed)
     }
   }
 
-  const handlePreview = async (): Promise<void> => {
+  const handlePreview = async (voice: TtsVoice): Promise<void> => {
     const previewText = script.trim() || previewSamples[language] || previewSamples['en-US']
-    const request = buildRequest(previewText)
+    const request = buildRequest(previewText, voice)
 
     if (!request) {
       return
@@ -561,29 +564,46 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
                   const isSelected = voice.id === selectedVoice?.id
 
                   return (
-                    <label
+                    <article
                       className={`tts-voice-card ${isSelected ? 'tts-voice-card--selected' : ''}`}
                       key={voice.id}
                     >
-                      <input
-                        type="radio"
-                        name="tts-voice"
-                        value={voice.id}
-                        checked={isSelected}
-                        disabled={controlsDisabled}
-                        onChange={() => setVoiceId(voice.id)}
-                      />
-                      <span
-                        className={`tts-voice-card__avatar tts-voice-card__avatar--${voice.gender}`}
-                      >
-                        {getVoiceInitial(voice)}
-                      </span>
-                      <span className="tts-voice-card__copy">
-                        <strong>{voice.name}</strong>
-                        <small>{voice.description}</small>
-                      </span>
-                      <span className="tts-voice-card__sid">SID {voice.speakerId}</span>
-                    </label>
+                      <label className="tts-voice-card__main">
+                        <input
+                          type="radio"
+                          name="tts-voice"
+                          value={voice.id}
+                          checked={isSelected}
+                          disabled={controlsDisabled}
+                          onChange={() => setVoiceId(voice.id)}
+                        />
+                        <span
+                          className={`tts-voice-card__avatar tts-voice-card__avatar--${voice.gender}`}
+                        >
+                          {getVoiceInitial(voice)}
+                        </span>
+                        <span className="tts-voice-card__copy">
+                          <strong>{voice.name}</strong>
+                          <small>{voice.description}</small>
+                        </span>
+                        <span className="tts-voice-card__sid">SID {voice.speakerId}</span>
+                      </label>
+                      <div className="tts-voice-card__actions">
+                        <button
+                          className="tts-voice-card__preview"
+                          type="button"
+                          disabled={controlsDisabled || isPreviewing}
+                          onClick={() => void handlePreview(voice)}
+                        >
+                          {isPreviewing ? (
+                            <LoaderCircle className="tts-spin" size={15} aria-hidden="true" />
+                          ) : (
+                            <CirclePlay size={15} strokeWidth={1.8} aria-hidden="true" />
+                          )}
+                          <span>{isPreviewing ? '生成中' : '试听音色'}</span>
+                        </button>
+                      </div>
+                    </article>
                   )
                 })}
 
@@ -649,20 +669,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
             >
               <SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" />
               <span>高级设置</span>
-            </button>
-
-            <button
-              className="tts-voiceover__preview-button"
-              type="button"
-              disabled={!selectedVoice || controlsDisabled || isPreviewing}
-              onClick={() => void handlePreview()}
-            >
-              {isPreviewing ? (
-                <LoaderCircle className="tts-spin" size={15} aria-hidden="true" />
-              ) : (
-                <CirclePlay size={15} strokeWidth={1.8} aria-hidden="true" />
-              )}
-              <span>{isPreviewing ? '生成中' : '试听'}</span>
             </button>
 
             <button
