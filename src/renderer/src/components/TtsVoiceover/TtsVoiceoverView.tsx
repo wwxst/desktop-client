@@ -110,6 +110,7 @@ interface NoticeState {
   type: 'success' | 'error' | 'info'
   text: string
   previewEpoch?: number
+  previewPlaybackUrl?: string
 }
 
 function isJobRunning(progress: TtsJobProgress | null): boolean {
@@ -252,17 +253,22 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
 
         stopAndDetachPreviewAudio(true)
         releasePreviewCache(url)
-        setNotice({ type: 'error', text: '试听播放失败' })
+        setNotice({ type: 'error', text: '试听播放失败', previewPlaybackUrl: url })
       }
       audio.setAttribute('src', url)
       setPlayingVoiceId(voiceIdToPlay)
 
       try {
         await audio.play()
+        if (isCurrentPlayback()) {
+          setNotice((currentNotice) =>
+            currentNotice?.previewPlaybackUrl === url ? null : currentNotice
+          )
+        }
       } catch {
         if (isCurrentPlayback()) {
           setPlayingVoiceId(null)
-          setNotice({ type: 'error', text: '试听播放失败' })
+          setNotice({ type: 'error', text: '试听播放失败', previewPlaybackUrl: url })
         }
       }
     },

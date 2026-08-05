@@ -529,6 +529,24 @@ describe('TTS card preview playback', () => {
     expect(document.querySelector('audio')).not.toBeInTheDocument()
   })
 
+  it('clears a playback failure after cached retry succeeds', async () => {
+    const previewTts = vi.fn().mockResolvedValue(successfulPreview)
+    play.mockRejectedValueOnce(new Error('autoplay blocked')).mockResolvedValueOnce(undefined)
+    setWindowApi(previewTts)
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+    expect(await screen.findByText('试听播放失败')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '试听音色：第一音色' }))
+
+    expect(await screen.findByRole('button', { name: '播放中：第一音色' })).toBeInTheDocument()
+    expect(previewTts).toHaveBeenCalledTimes(1)
+    expect(play).toHaveBeenCalledTimes(2)
+    expect(screen.queryByText('试听播放失败')).not.toBeInTheDocument()
+  })
+
   it('stops audio and revokes its URL on unmount', async () => {
     setWindowApi()
     const user = userEvent.setup()
