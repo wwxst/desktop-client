@@ -13,7 +13,7 @@ describe('WorkspaceView', () => {
     expect(screen.getByRole('button', { name: '媒体库' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('region', { name: '媒体库' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '媒体库' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '导入媒体' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '导入媒体' })).toBeDisabled()
     expect(screen.getByRole('status')).toHaveTextContent('媒体库还是空的')
     expect(screen.getByRole('status')).toHaveTextContent('导入图片、视频或音频后，会集中显示在这里。')
   })

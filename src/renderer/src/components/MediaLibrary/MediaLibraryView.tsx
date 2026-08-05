@@ -12,7 +12,12 @@ function MediaLibraryView(): JSX.Element {
         </header>
 
         <div className="media-library__actions">
-          <button type="button" className="media-library__import">
+          <button
+            type="button"
+            className="media-library__import"
+            disabled
+            title="媒体导入功能即将支持"
+          >
             <Upload size={18} strokeWidth={1.8} aria-hidden="true" />
             <span>导入媒体</span>
           </button>

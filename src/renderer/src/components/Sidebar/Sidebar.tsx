@@ -24,32 +24,25 @@ interface SidebarProps {
   onItemSelect: (item: WorkspaceMenu) => void
 }
 
-const baseMenuItems: SidebarMenuItem[] = [
+const menuItems: SidebarMenuItem[] = [
   { id: 'home', label: '首页', icon: Home },
   { id: 'plugins', label: '插件', icon: Plug },
   { id: 'media-library', label: '媒体库', icon: FolderOpen },
+  { id: 'smart-edit', label: '智剪', icon: Scissors },
   { id: 'novel-promotion', label: '小说推文', icon: BookOpen },
   { id: 'tts-voiceover', label: 'TTS 配音', icon: Mic2 }
 ]
-
-const smartEditMenuItem: SidebarMenuItem = {
-  id: 'smart-edit',
-  label: '智剪',
-  icon: Scissors
-}
 
 /**
  * 工作台左侧的主菜单。
  */
 function Sidebar({ activeItem, showSmartEdit, onItemSelect }: SidebarProps): JSX.Element {
-  const menuItems = showSmartEdit
-    ? [baseMenuItems[0], baseMenuItems[1], baseMenuItems[2], smartEditMenuItem, baseMenuItems[3], baseMenuItems[4]]
-    : baseMenuItems
+  const visibleMenuItems = menuItems.filter((item) => item.id !== 'smart-edit' || showSmartEdit)
 
   return (
     <nav className="studio-sidebar" aria-label="主菜单">
       <ul className="studio-sidebar__menu">
-        {menuItems.map((item) => {
+        {visibleMenuItems.map((item) => {
           const Icon = item.icon
 
           return (
