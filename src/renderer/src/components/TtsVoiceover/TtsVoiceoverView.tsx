@@ -445,10 +445,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
 
       releasePreviewCache()
       previewCacheRef.current = { signature, url: nextPreviewUrl }
-      setNotice({
-        type: 'success',
-        text: `试听生成完成，音频时长约 ${formatDuration(response.durationSeconds)}`
-      })
 
       await playPreviewUrl(nextPreviewUrl, voice.id, requestEpoch)
     } catch (error) {

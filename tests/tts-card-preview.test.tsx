@@ -172,10 +172,13 @@ describe('TTS card preview playback', () => {
     render(<TtsVoiceoverView />)
     await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
 
+    await screen.findByRole('button', { name: '播放中：第一音色' })
     await waitFor(() => expect(play).toHaveBeenCalledTimes(1))
     expect(previewTts).toHaveBeenCalledTimes(1)
     expect(createObjectURL).toHaveBeenCalledTimes(1)
     expect(document.querySelector('audio')).not.toBeInTheDocument()
+    expect(screen.queryByText(/试听生成完成/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/音频时长/)).not.toBeInTheDocument()
   })
 
   it('shows playing state only on the active voice card', async () => {
