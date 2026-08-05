@@ -213,6 +213,22 @@ describe('TTS card preview playback', () => {
     expect(voiceSection).toContain('padding-top: 8px')
   })
 
+  it('renders compact voice preview actions', async () => {
+    setWindowApi()
+
+    render(<TtsVoiceoverView />)
+
+    const previewButton = await screen.findByRole('button', { name: '试听音色：第一音色' })
+    expect(previewButton.querySelector('svg')).toHaveAttribute('width', '13')
+    expect(previewButton.querySelector('svg')).toHaveAttribute('height', '13')
+
+    const css = readTtsCss()
+    const previewButtonStyles = css.match(/\.tts-voice-card__preview\s*\{([^}]*)\}/)?.[1]
+    expect(previewButtonStyles).toContain('gap: 4px')
+    expect(previewButtonStyles).toContain('min-height: 22px')
+    expect(previewButtonStyles).toContain('font-size: 9px')
+  })
+
   it('automatically plays a successful preview without rendering audio controls', async () => {
     const previewTts = vi.fn().mockResolvedValue(successfulPreview)
     setWindowApi(previewTts)

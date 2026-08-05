@@ -374,12 +374,12 @@
 
 .tts-voice-card__preview {
   display: inline-flex;
-  gap: 5px;
+  gap: 4px;
   align-items: center;
-  min-height: 26px;
+  min-height: 22px;
   padding: 0;
   color: #1477d4;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;

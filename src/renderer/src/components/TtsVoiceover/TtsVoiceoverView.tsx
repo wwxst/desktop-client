@@ -722,9 +722,9 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
                           onClick={() => void handlePreview(voice)}
                         >
                           {isVoicePreviewing ? (
-                            <LoaderCircle className="tts-spin" size={15} aria-hidden="true" />
+                            <LoaderCircle className="tts-spin" size={13} aria-hidden="true" />
                           ) : (
-                            <CirclePlay size={15} strokeWidth={1.8} aria-hidden="true" />
+                            <CirclePlay size={13} strokeWidth={1.8} aria-hidden="true" />
                           )}
                           <span>{previewStateLabel}</span>
                         </button>
