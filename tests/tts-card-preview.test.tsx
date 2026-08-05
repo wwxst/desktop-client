@@ -208,6 +208,9 @@ describe('TTS card preview playback', () => {
     const css = readTtsCss()
     expect(css).toContain('The script editor intentionally has no visual focus treatment.')
     expect(css).not.toMatch(/\.tts-voiceover__field textarea:focus\s*\{/)
+
+    const voiceSection = css.match(/\.tts-voice-section\s*\{([^}]*)\}/)?.[1]
+    expect(voiceSection).toContain('padding-top: 8px')
   })
 
   it('automatically plays a successful preview without rendering audio controls', async () => {
