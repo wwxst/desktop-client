@@ -1,5 +1,6 @@
 import { useReducer, type JSX } from 'react'
 import AiPanel from '../AiPanel/AiPanel'
+import MediaLibraryView from '../MediaLibrary/MediaLibraryView'
 import PluginsView from '../Plugins/PluginsView'
 import Sidebar from '../Sidebar/Sidebar'
 import SmartEditDraftView from '../SmartEdit/SmartEditDraftView'
@@ -59,6 +60,10 @@ function WorkspaceView(): JSX.Element {
         onOpenTts={() => dispatchNavigation({ type: 'menu/selected', menu: 'tts-voiceover' })}
       />
     )
+  }
+
+  if (navigation.activeMenu === 'media-library') {
+    workspaceContent = <MediaLibraryView />
   }
 
   return (

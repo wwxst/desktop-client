@@ -4,6 +4,20 @@ import { describe, expect, it, vi } from 'vitest'
 import WorkspaceView from '../src/renderer/src/components/Workspace/WorkspaceView'
 
 describe('WorkspaceView', () => {
+  it('opens the media library with its empty state and import entry point', async () => {
+    const user = userEvent.setup()
+    render(<WorkspaceView />)
+
+    await user.click(screen.getByRole('button', { name: '媒体库' }))
+
+    expect(screen.getByRole('button', { name: '媒体库' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: '媒体库' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '媒体库' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '导入媒体' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('媒体库还是空的')
+    expect(screen.getByRole('status')).toHaveTextContent('导入图片、视频或音频后，会集中显示在这里。')
+  })
+
   it('opens smart edit, creates a draft, and returns to the draft list', async () => {
     const user = userEvent.setup()
     render(<WorkspaceView />)

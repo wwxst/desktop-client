@@ -1,5 +1,14 @@
 import type { JSX } from 'react'
-import { BookOpen, Home, Mic2, Plug, Scissors, Settings, type LucideIcon } from 'lucide-react'
+import {
+  BookOpen,
+  FolderOpen,
+  Home,
+  Mic2,
+  Plug,
+  Scissors,
+  Settings,
+  type LucideIcon
+} from 'lucide-react'
 import type { WorkspaceMenu } from '../../workspaceNavigation'
 import './Sidebar.css'
 
@@ -17,9 +26,10 @@ interface SidebarProps {
 
 const baseMenuItems: SidebarMenuItem[] = [
   { id: 'home', label: '首页', icon: Home },
+  { id: 'plugins', label: '插件', icon: Plug },
+  { id: 'media-library', label: '媒体库', icon: FolderOpen },
   { id: 'novel-promotion', label: '小说推文', icon: BookOpen },
-  { id: 'tts-voiceover', label: 'TTS 配音', icon: Mic2 },
-  { id: 'plugins', label: '插件', icon: Plug }
+  { id: 'tts-voiceover', label: 'TTS 配音', icon: Mic2 }
 ]
 
 const smartEditMenuItem: SidebarMenuItem = {
@@ -32,7 +42,9 @@ const smartEditMenuItem: SidebarMenuItem = {
  * 工作台左侧的主菜单。
  */
 function Sidebar({ activeItem, showSmartEdit, onItemSelect }: SidebarProps): JSX.Element {
-  const menuItems = showSmartEdit ? [...baseMenuItems, smartEditMenuItem] : baseMenuItems
+  const menuItems = showSmartEdit
+    ? [baseMenuItems[0], baseMenuItems[1], baseMenuItems[2], smartEditMenuItem, baseMenuItems[3], baseMenuItems[4]]
+    : baseMenuItems
 
   return (
     <nav className="studio-sidebar" aria-label="主菜单">

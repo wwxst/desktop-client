@@ -1,9 +1,28 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import Sidebar from '../src/renderer/src/components/Sidebar/Sidebar'
 
 describe('Sidebar', () => {
+  it('renders the workspace menu in the required order', () => {
+    render(<Sidebar activeItem="home" showSmartEdit onItemSelect={vi.fn()} />)
+
+    const navigation = screen.getByRole('navigation', { name: '主菜单' })
+    expect(
+      within(navigation)
+        .getAllByRole('button')
+        .filter((button) => button.classList.contains('studio-sidebar__menu-item'))
+        .map((button) => button.textContent)
+    ).toEqual([
+      '首页',
+      '插件',
+      '媒体库',
+      '智剪',
+      '小说推文',
+      'TTS 配音'
+    ])
+  })
+
   it('renders the account and only shows smart edit when enabled', () => {
     const { rerender } = render(
       <Sidebar activeItem="home" showSmartEdit={false} onItemSelect={vi.fn()} />

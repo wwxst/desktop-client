@@ -1,4 +1,10 @@
-export type WorkspaceMenu = 'home' | 'novel-promotion' | 'tts-voiceover' | 'plugins' | 'smart-edit'
+export type WorkspaceMenu =
+  | 'home'
+  | 'plugins'
+  | 'media-library'
+  | 'smart-edit'
+  | 'novel-promotion'
+  | 'tts-voiceover'
 export type SmartEditPage = 'draft-list' | 'editor'
 
 export interface WorkspaceNavigationState {
