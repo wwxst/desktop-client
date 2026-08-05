@@ -177,8 +177,7 @@ describe('TTS card preview playback', () => {
     expect(previewTts).toHaveBeenCalledTimes(1)
     expect(createObjectURL).toHaveBeenCalledTimes(1)
     expect(document.querySelector('audio')).not.toBeInTheDocument()
-    expect(screen.queryByText(/试听生成完成/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/音频时长/)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
   })
 
   it('shows playing state only on the active voice card', async () => {
