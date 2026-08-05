@@ -1,5 +1,5 @@
 import { CircleCheck, CircleX, Info, TriangleAlert, X, type LucideIcon } from 'lucide-react'
-import { useEffect, useState, type JSX, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 import Button from './Button'
@@ -11,6 +11,7 @@ export interface AlertNotificationProps {
   open: boolean
   variant: AlertNotificationVariant
   title?: string
+  /** Rich display content only. Interactive controls must not be included. */
   message: ReactNode
   confirmLabel?: string
   onClose: () => void
@@ -26,50 +27,83 @@ const variantDetails: Record<
   error: { title: '操作失败', icon: CircleX, role: 'alert', live: 'assertive' }
 }
 
-interface AnnouncementRegionProps {
-  variant: AlertNotificationVariant
+interface NotificationContentProps {
   title: string
   message: ReactNode
   role: 'status' | 'alert'
   live: 'polite' | 'assertive'
 }
 
-interface StagedAnnouncement {
-  variant: AlertNotificationVariant
-  title: string
-  message: ReactNode
-}
-
-function AnnouncementRegion({
-  variant,
+function NotificationContent({
   title,
   message,
   role,
   live
-}: AnnouncementRegionProps): JSX.Element {
-  const [announcement, setAnnouncement] = useState<StagedAnnouncement | null>(null)
-  const isCurrent =
-    announcement?.variant === variant &&
-    announcement.title === title &&
-    announcement.message === message
+}: NotificationContentProps): JSX.Element {
+  const visualContentRef = useRef<HTMLDivElement>(null)
+  const announcedTextRef = useRef('')
+  const pendingTextRef = useRef<string | null>(null)
+  const clearTimerRef = useRef<number | null>(null)
+  const stageTimerRef = useRef<number | null>(null)
+  const [announcementText, setAnnouncementText] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setAnnouncement({ variant, title, message })
-    }, 0)
+    const nextText = visualContentRef.current?.textContent ?? ''
+    if (!nextText || nextText === announcedTextRef.current || nextText === pendingTextRef.current) {
+      return
+    }
 
-    return () => window.clearTimeout(timer)
-  }, [message, title, variant])
+    if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current)
+    if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
+    clearTimerRef.current = null
+    stageTimerRef.current = null
+    pendingTextRef.current = nextText
+
+    const publish = (): void => {
+      stageTimerRef.current = null
+      pendingTextRef.current = null
+      announcedTextRef.current = nextText
+      setAnnouncementText(nextText)
+    }
+
+    if (announcedTextRef.current) {
+      clearTimerRef.current = window.setTimeout(() => {
+        clearTimerRef.current = null
+        announcedTextRef.current = ''
+        setAnnouncementText('')
+        stageTimerRef.current = window.setTimeout(publish, 0)
+      }, 0)
+      return
+    }
+
+    stageTimerRef.current = window.setTimeout(publish, 0)
+  })
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current)
+      if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
+      clearTimerRef.current = null
+      stageTimerRef.current = null
+      pendingTextRef.current = null
+    }
+  }, [])
 
   return (
-    <div className="ui-alert-notification__content" role={role} aria-live={live} aria-atomic="true">
-      {isCurrent && (
-        <>
-          <div className="ui-alert-notification__title">{announcement.title}</div>
-          <div className="ui-alert-notification__message">{announcement.message}</div>
-        </>
-      )}
-    </div>
+    <>
+      <div ref={visualContentRef} className="ui-alert-notification__content">
+        <div className="ui-alert-notification__title">{title}</div>
+        <div className="ui-alert-notification__message">{message}</div>
+      </div>
+      <div
+        className="ui-alert-notification__announcer"
+        role={role}
+        aria-live={live}
+        aria-atomic="true"
+      >
+        {announcementText}
+      </div>
+    </>
   )
 }
 
@@ -91,8 +125,7 @@ function AlertNotification({
       <span className="ui-alert-notification__status-icon" aria-hidden="true">
         <StatusIcon />
       </span>
-      <AnnouncementRegion
-        variant={variant}
+      <NotificationContent
         title={title ?? details.title}
         message={message}
         role={details.role}

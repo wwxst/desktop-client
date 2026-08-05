@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen, within, type RenderResult } from '@testing-library/react'
+import { act, render, screen, waitFor, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import AlertNotification, {
   type AlertNotificationVariant
@@ -48,6 +48,8 @@ const variantCases: VariantCase[] = [
   }
 ]
 
+afterEach(() => vi.useRealTimers())
+
 function renderAlert(
   overrides: {
     open?: boolean
@@ -85,6 +87,12 @@ function getCssBlock(css: string, selector: string): string {
   return block ?? ''
 }
 
+function getVisualContent(): HTMLElement {
+  const content = document.querySelector<HTMLElement>('.ui-alert-notification__content')
+  expect(content).toBeInTheDocument()
+  return content as HTMLElement
+}
+
 describe('AlertNotification', () => {
   it.each(variantCases)(
     'renders the $variant variant with its default title, icon, and live-region semantics',
@@ -96,7 +104,10 @@ describe('AlertNotification', () => {
       expect(notification).toHaveClass('ui-alert-notification', `ui-alert-notification--${variant}`)
       expect(liveRegion).toHaveAttribute('aria-live', live)
       expect(liveRegion).toHaveAttribute('aria-atomic', 'true')
-      expect(await screen.findByText(title)).toHaveClass('ui-alert-notification__title')
+      expect(within(getVisualContent()).getByText(title)).toHaveClass(
+        'ui-alert-notification__title'
+      )
+      await waitFor(() => expect(liveRegion.textContent).toBe(getVisualContent().textContent))
 
       const icon = notification?.querySelector('.ui-alert-notification__status-icon')
       expect(icon).toHaveAttribute('aria-hidden', 'true')
@@ -139,25 +150,96 @@ describe('AlertNotification', () => {
     const liveRegion = screen.getByRole('status')
     expect(liveRegion).toBeEmptyDOMElement()
     expect(within(liveRegion).queryAllByRole('button')).toHaveLength(0)
+    expect(within(getVisualContent()).getByText('延迟播报内容')).toBeInTheDocument()
 
-    expect(await within(liveRegion).findByText('延迟播报内容')).toBeInTheDocument()
+    await waitFor(() => expect(liveRegion.textContent).toBe(getVisualContent().textContent))
     expect(within(liveRegion).queryAllByRole('button')).toHaveLength(0)
     expect(screen.getAllByRole('button')).toHaveLength(2)
   })
 
-  it('stages subsequent announcement updates through the existing live region', async () => {
+  it('keeps visual rich content stable and does not reannounce equivalent JSX', async () => {
     const onClose = vi.fn()
     const { rerender } = render(
-      <AlertNotification open variant="info" message="第一条通知" onClose={onClose} />
+      <AlertNotification
+        open
+        variant="info"
+        message={<strong>等价富内容</strong>}
+        onClose={onClose}
+      />
     )
     const liveRegion = screen.getByRole('status')
-    expect(await within(liveRegion).findByText('第一条通知')).toBeInTheDocument()
+    const visualContent = getVisualContent()
+    expect(within(visualContent).getByText('等价富内容').tagName).toBe('STRONG')
+    await waitFor(() => expect(liveRegion.textContent).toBe(visualContent.textContent))
+    const announcedText = liveRegion.textContent
 
-    rerender(<AlertNotification open variant="info" message="第二条通知" onClose={onClose} />)
+    rerender(
+      <AlertNotification
+        open
+        variant="info"
+        message={<strong>等价富内容</strong>}
+        onClose={onClose}
+      />
+    )
 
+    expect(within(visualContent).getByText('等价富内容').tagName).toBe('STRONG')
+    expect(liveRegion.textContent).toBe(announcedText)
+    await new Promise((resolveTimer) => window.setTimeout(resolveTimer, 10))
+    expect(within(visualContent).getByText('等价富内容')).toBeInTheDocument()
+    expect(liveRegion.textContent).toBe(announcedText)
+  })
+
+  it('updates visual rich content immediately and stages changed plain text', async () => {
+    const onClose = vi.fn()
+    const { rerender } = render(
+      <AlertNotification
+        open
+        variant="info"
+        message={<strong>旧富内容</strong>}
+        onClose={onClose}
+      />
+    )
+    const liveRegion = screen.getByRole('status')
+    const visualContent = getVisualContent()
+    await waitFor(() => expect(liveRegion.textContent).toBe(visualContent.textContent))
+    const previousAnnouncement = liveRegion.textContent
+
+    rerender(
+      <AlertNotification open variant="info" message={<em>新富内容</em>} onClose={onClose} />
+    )
+
+    expect(within(visualContent).getByText('新富内容').tagName).toBe('EM')
+    expect(within(visualContent).queryByText('旧富内容')).not.toBeInTheDocument()
+    expect(liveRegion.textContent).toBe(previousAnnouncement)
+    await waitFor(() => expect(liveRegion.textContent).toBe(visualContent.textContent))
+    expect(liveRegion).toHaveTextContent('新富内容')
+    expect(liveRegion.querySelector('*')).not.toBeInTheDocument()
+  })
+
+  it('cancels pending announcement timers on replacement and close', () => {
+    vi.useFakeTimers()
+    const onClose = vi.fn()
+    const { rerender } = render(
+      <AlertNotification open variant="info" message="过期播报" onClose={onClose} />
+    )
+
+    rerender(<AlertNotification open variant="info" message="最新播报" onClose={onClose} />)
+    const liveRegion = screen.getByRole('status')
     expect(liveRegion).toBeEmptyDOMElement()
-    expect(await within(liveRegion).findByText('第二条通知')).toBeInTheDocument()
-    expect(within(liveRegion).queryByText('第一条通知')).not.toBeInTheDocument()
+
+    act(() => vi.runAllTimers())
+    expect(liveRegion).toHaveTextContent('最新播报')
+    expect(liveRegion).not.toHaveTextContent('过期播报')
+
+    rerender(<AlertNotification open variant="info" message="关闭前播报" onClose={onClose} />)
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    rerender(
+      <AlertNotification open={false} variant="info" message="关闭前播报" onClose={onClose} />
+    )
+    expect(vi.getTimerCount()).toBe(0)
+
+    act(() => vi.runAllTimers())
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
   })
 
   it('renders custom title, message, and confirmation label', async () => {
@@ -167,8 +249,8 @@ describe('AlertNotification', () => {
       confirmLabel: '确认'
     })
 
-    expect(await screen.findByText('自定义标题')).toBeInTheDocument()
-    expect(screen.getByText('自定义内容').tagName).toBe('STRONG')
+    expect(within(getVisualContent()).getByText('自定义标题')).toBeInTheDocument()
+    expect(within(getVisualContent()).getByText('自定义内容').tagName).toBe('STRONG')
     expect(screen.getByRole('button', { name: '确认' })).toHaveClass('ui-button--sm')
   })
 
