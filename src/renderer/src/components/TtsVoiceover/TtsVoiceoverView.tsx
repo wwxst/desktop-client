@@ -10,7 +10,7 @@ import {
   Sparkles,
   Square
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type JSX } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 
 import type {
   TtsCatalogResponse,
@@ -165,6 +165,11 @@ interface TtsVoiceoverViewProps {
   onOpenPlugins?: () => void
 }
 
+interface PreviewCache {
+  signature: string
+  url: string
+}
+
 function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element {
   const [catalog, setCatalog] = useState<TtsCatalogResponse | null>(null)
   const [isCatalogLoading, setIsCatalogLoading] = useState(true)
@@ -175,12 +180,92 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
   const [voiceSearch, setVoiceSearch] = useState('')
   const [voiceFilter, setVoiceFilter] = useState<'all' | TtsVoiceGender>('all')
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
-  const [isPreviewing, setIsPreviewing] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null)
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobProgress, setJobProgress] = useState<TtsJobProgress | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [notice, setNotice] = useState<NoticeState | null>(null)
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const previewCacheRef = useRef<PreviewCache | null>(null)
+  const previewEpochRef = useRef(0)
+  const mountedRef = useRef(true)
+
+  const stopPreviewAudio = useCallback((): void => {
+    const audio = previewAudioRef.current
+
+    if (audio) {
+      audio.pause()
+      audio.currentTime = 0
+    }
+
+    if (mountedRef.current) {
+      setPlayingVoiceId(null)
+    }
+  }, [])
+
+  const releasePreviewCache = useCallback((): void => {
+    const cache = previewCacheRef.current
+
+    if (cache) {
+      URL.revokeObjectURL(cache.url)
+      previewCacheRef.current = null
+    }
+  }, [])
+
+  const playPreviewUrl = useCallback(
+    async (url: string, voiceIdToPlay: string, epoch: number): Promise<void> => {
+      let audio = previewAudioRef.current
+
+      if (!audio) {
+        audio = new Audio()
+        audio.onended = () => {
+          if (mountedRef.current) {
+            setPlayingVoiceId(null)
+          }
+        }
+        audio.onerror = () => {
+          if (mountedRef.current) {
+            setPlayingVoiceId(null)
+          }
+        }
+        previewAudioRef.current = audio
+      }
+
+      audio.setAttribute('src', url)
+      setPlayingVoiceId(voiceIdToPlay)
+
+      try {
+        await audio.play()
+      } catch {
+        if (mountedRef.current && previewEpochRef.current === epoch) {
+          setPlayingVoiceId(null)
+          setNotice({ type: 'error', text: '试听播放失败' })
+        }
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+      previewEpochRef.current += 1
+
+      const audio = previewAudioRef.current
+      if (audio) {
+        audio.pause()
+        audio.currentTime = 0
+        audio.onended = null
+        audio.onerror = null
+        previewAudioRef.current = null
+      }
+
+      releasePreviewCache()
+    }
+  }, [releasePreviewCache])
 
   useEffect(() => {
     let isMounted = true
@@ -232,12 +317,10 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
   }, [])
 
   useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
-    }
-  }, [previewUrl])
+    previewEpochRef.current += 1
+    stopPreviewAudio()
+    releasePreviewCache()
+  }, [language, releasePreviewCache, script, speed, stopPreviewAudio])
 
   const languageModels = useMemo(() => {
     return catalog?.models.filter((model) => model.languages.includes(language)) ?? []
@@ -293,6 +376,10 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
   }
 
   const handlePreview = async (voice: TtsVoice): Promise<void> => {
+    if (previewingVoiceId) {
+      return
+    }
+
     const previewText = script.trim() || previewSamples[language] || previewSamples['en-US']
     const request = buildRequest(previewText, voice)
 
@@ -300,11 +387,26 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
       return
     }
 
-    setIsPreviewing(true)
+    previewEpochRef.current += 1
+    const requestEpoch = previewEpochRef.current
+    const signature = JSON.stringify(request)
+
+    stopPreviewAudio()
+
+    if (previewCacheRef.current?.signature === signature) {
+      await playPreviewUrl(previewCacheRef.current.url, voice.id, requestEpoch)
+      return
+    }
+
+    setPreviewingVoiceId(voice.id)
     setNotice({ type: 'info', text: '正在使用本机 CPU 生成试听音频' })
 
     try {
       const response = await window.api.previewTts(request)
+
+      if (!mountedRef.current || previewEpochRef.current !== requestEpoch) {
+        return
+      }
 
       if (!response.success || !response.audioBytes) {
         setNotice({ type: 'error', text: response.message })
@@ -316,23 +418,25 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
         new Blob([audioBuffer], { type: response.mimeType ?? 'audio/wav' })
       )
 
-      setPreviewUrl((currentUrl) => {
-        if (currentUrl) {
-          URL.revokeObjectURL(currentUrl)
-        }
-        return nextPreviewUrl
-      })
+      releasePreviewCache()
+      previewCacheRef.current = { signature, url: nextPreviewUrl }
       setNotice({
         type: 'success',
         text: `试听生成完成，音频时长约 ${formatDuration(response.durationSeconds)}`
       })
+
+      await playPreviewUrl(nextPreviewUrl, voice.id, requestEpoch)
     } catch (error) {
-      setNotice({
-        type: 'error',
-        text: error instanceof Error ? error.message : '试听生成失败'
-      })
+      if (mountedRef.current && previewEpochRef.current === requestEpoch) {
+        setNotice({
+          type: 'error',
+          text: error instanceof Error ? error.message : '试听生成失败'
+        })
+      }
     } finally {
-      setIsPreviewing(false)
+      if (mountedRef.current) {
+        setPreviewingVoiceId(null)
+      }
     }
   }
 
@@ -562,6 +666,13 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
               <div className="tts-voiceover__voice-list" role="radiogroup" aria-label="选择音色">
                 {visibleVoices.map((voice) => {
                   const isSelected = voice.id === selectedVoice?.id
+                  const isVoicePreviewing = voice.id === previewingVoiceId
+                  const isVoicePlaying = voice.id === playingVoiceId
+                  const previewStateLabel = isVoicePreviewing
+                    ? '生成中'
+                    : isVoicePlaying
+                      ? '播放中'
+                      : '试听音色'
 
                   return (
                     <article
@@ -592,16 +703,17 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
                         <button
                           className="tts-voice-card__preview"
                           type="button"
-                          aria-label={`${isPreviewing ? '生成中' : '试听音色'}：${voice.name}`}
-                          disabled={controlsDisabled || isPreviewing}
+                          aria-label={`${previewStateLabel}：${voice.name}`}
+                          data-playing={isVoicePlaying}
+                          disabled={controlsDisabled || previewingVoiceId !== null}
                           onClick={() => void handlePreview(voice)}
                         >
-                          {isPreviewing ? (
+                          {isVoicePreviewing ? (
                             <LoaderCircle className="tts-spin" size={15} aria-hidden="true" />
                           ) : (
                             <CirclePlay size={15} strokeWidth={1.8} aria-hidden="true" />
                           )}
-                          <span>{isPreviewing ? '生成中' : '试听音色'}</span>
+                          <span>{previewStateLabel}</span>
                         </button>
                       </div>
                     </article>
@@ -652,13 +764,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
                 试听最多读取开头 220 个字符；正式生成最多支持 100,000 个字符。
               </p>
             </section>
-          )}
-
-          {previewUrl && (
-            <div className="tts-preview-player">
-              <span>试听结果</span>
-              <audio controls src={previewUrl} />
-            </div>
           )}
 
           <footer className="tts-voiceover__actions">
