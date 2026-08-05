@@ -200,6 +200,10 @@ describe('TTS card preview playback', () => {
     expect(
       screen.queryByText('长文本会按自然段和标点自动切分，再合并为一个 WAV 文件。')
     ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('文字和语音均在用户电脑本地处理，正式生成支持长文本自动分段。')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('当前语言可用 2 个音色。')).not.toBeInTheDocument()
 
     const css = readTtsCss()
     expect(css).toContain('The script editor intentionally has no visual focus treatment.')

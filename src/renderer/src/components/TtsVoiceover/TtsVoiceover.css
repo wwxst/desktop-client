@@ -56,14 +56,6 @@
   line-height: 1.25;
 }
 
-.tts-voiceover__subtitle {
-  max-width: 680px;
-  margin: 8px 0 0;
-  color: #748094;
-  font-size: 13px;
-  line-height: 1.65;
-}
-
 .tts-voiceover__content {
   display: grid;
   flex: 1 1 auto;
@@ -120,14 +112,6 @@
   color: #263349;
   font-size: 15px;
   font-weight: 650;
-}
-
-.tts-voiceover__section-heading p,
-.tts-voiceover__preview-heading p {
-  margin: 6px 0 0;
-  color: #8a94a4;
-  font-size: 11px;
-  line-height: 1.55;
 }
 
 .tts-voiceover__section-heading > span {

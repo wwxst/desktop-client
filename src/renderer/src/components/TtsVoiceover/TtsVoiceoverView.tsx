@@ -524,9 +524,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
         <div>
           <p className="tts-voiceover__eyebrow">LOCAL AI AUDIO</p>
           <h1>TTS 配音</h1>
-          <p className="tts-voiceover__subtitle">
-            文字和语音均在用户电脑本地处理，正式生成支持长文本自动分段。
-          </p>
         </div>
       </header>
 
@@ -649,7 +646,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
               <div className="tts-voiceover__preview-heading">
                 <div>
                   <h2>选择音色</h2>
-                  <p>当前语言可用 {availableVoices.length} 个音色。</p>
                 </div>
               </div>
 
