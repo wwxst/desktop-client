@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -142,6 +144,14 @@ function getNotificationContent(notification: HTMLElement): HTMLElement {
   return content as HTMLElement
 }
 
+function readTtsCss(): string {
+  const cssUrl = new URL('../src/renderer/src/components/TtsVoiceover/TtsVoiceover.css', import.meta.url)
+  return readFileSync(
+    cssUrl.protocol === 'file:' ? cssUrl : resolve(process.cwd(), cssUrl.pathname.slice(1)),
+    'utf8'
+  )
+}
+
 describe('TTS card preview playback', () => {
   const createObjectURL = vi.fn(() => 'blob:preview-1')
   const revokeObjectURL = vi.fn()
@@ -179,6 +189,21 @@ describe('TTS card preview playback', () => {
     expect(actionFooter).toHaveTextContent('开始生成')
     expect(actionFooter.querySelectorAll('button')).toHaveLength(2)
     expect(within(actionFooter).queryByRole('button', { name: /试听/ })).not.toBeInTheDocument()
+  })
+
+  it('removes the long-text hint and does not add a focus treatment to the script editor', async () => {
+    setWindowApi()
+
+    render(<TtsVoiceoverView />)
+
+    await screen.findByRole('textbox', { name: '配音文案' })
+    expect(
+      screen.queryByText('长文本会按自然段和标点自动切分，再合并为一个 WAV 文件。')
+    ).not.toBeInTheDocument()
+
+    const css = readTtsCss()
+    expect(css).toContain('The script editor intentionally has no visual focus treatment.')
+    expect(css).not.toMatch(/\.tts-voiceover__field textarea:focus\s*\{/)
   })
 
   it('automatically plays a successful preview without rendering audio controls', async () => {

@@ -544,7 +544,6 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
           <div className="tts-voiceover__section-heading">
             <div>
               <h2>配音文本</h2>
-              <p>长文本会按自然段和标点自动切分，再合并为一个 WAV 文件。</p>
             </div>
             <span className={script.length >= MAX_TEXT_LENGTH ? 'is-limit' : ''}>
               {script.length.toLocaleString()} / {MAX_TEXT_LENGTH.toLocaleString()}

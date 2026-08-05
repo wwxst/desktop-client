@@ -149,6 +149,7 @@
 }
 
 .tts-voiceover__field textarea {
+  /* The script editor intentionally has no visual focus treatment. */
   display: block;
   width: 100%;
   height: 100%;
@@ -162,12 +163,6 @@
   border: 1px solid #dce1e8;
   border-radius: 8px;
   outline: none;
-}
-
-.tts-voiceover__field textarea:focus {
-  background: #ffffff;
-  border-color: #82a7d6;
-  box-shadow: 0 0 0 3px rgba(41, 112, 198, 0.08);
 }
 
 .tts-voiceover__field textarea::placeholder {
