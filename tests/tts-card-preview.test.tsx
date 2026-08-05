@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -150,6 +150,18 @@ describe('TTS card preview playback', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('keeps voice preview controls outside the voiceover action footer', async () => {
+    setWindowApi()
+
+    render(<TtsVoiceoverView />)
+
+    const actionFooter = await screen.findByRole('group', { name: '配音操作' })
+    expect(actionFooter).toHaveTextContent('高级设置')
+    expect(actionFooter).toHaveTextContent('开始生成')
+    expect(actionFooter.querySelectorAll('button')).toHaveLength(2)
+    expect(within(actionFooter).queryByRole('button', { name: /试听/ })).not.toBeInTheDocument()
   })
 
   it('automatically plays a successful preview without rendering audio controls', async () => {

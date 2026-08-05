@@ -788,7 +788,7 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
             </section>
           )}
 
-          <footer className="tts-voiceover__actions">
+          <footer className="tts-voiceover__actions" role="group" aria-label="配音操作">
             <button
               className="tts-voiceover__advanced-toggle"
               type="button"
