@@ -22,6 +22,7 @@ import type {
 import './TtsVoiceover.css'
 
 const MAX_TEXT_LENGTH = 100_000
+const PREVIEW_GENERATING_NOTICE = '正在使用本机 CPU 生成试听音频'
 const speedOptions = [
   { value: '0.8', label: '0.8x（较慢）' },
   { value: '1', label: '1.0x（正常）' },
@@ -108,6 +109,7 @@ const previewSamples: Record<string, string> = {
 interface NoticeState {
   type: 'success' | 'error' | 'info'
   text: string
+  previewEpoch?: number
 }
 
 function isJobRunning(progress: TtsJobProgress | null): boolean {
@@ -191,12 +193,19 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
   const previewEpochRef = useRef(0)
   const mountedRef = useRef(true)
 
-  const stopPreviewAudio = useCallback((): void => {
+  const stopAndDetachPreviewAudio = useCallback((detachHandlers = false): void => {
     const audio = previewAudioRef.current
 
     if (audio) {
       audio.pause()
       audio.currentTime = 0
+      audio.removeAttribute('src')
+      audio.load()
+
+      if (detachHandlers) {
+        audio.onended = null
+        audio.onerror = null
+      }
     }
 
     if (mountedRef.current) {
@@ -204,10 +213,10 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     }
   }, [])
 
-  const releasePreviewCache = useCallback((): void => {
+  const releasePreviewCache = useCallback((matchingUrl?: string): void => {
     const cache = previewCacheRef.current
 
-    if (cache) {
+    if (cache && (!matchingUrl || cache.url === matchingUrl)) {
       URL.revokeObjectURL(cache.url)
       previewCacheRef.current = null
     }
@@ -219,32 +228,45 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
 
       if (!audio) {
         audio = new Audio()
-        audio.onended = () => {
-          if (mountedRef.current) {
-            setPlayingVoiceId(null)
-          }
-        }
-        audio.onerror = () => {
-          if (mountedRef.current) {
-            setPlayingVoiceId(null)
-          }
-        }
         previewAudioRef.current = audio
       }
 
+      const isCurrentPlayback = (): boolean => {
+        return Boolean(
+          mountedRef.current &&
+          previewEpochRef.current === epoch &&
+          previewAudioRef.current === audio &&
+          audio.getAttribute('src') === url
+        )
+      }
+
+      audio.onended = () => {
+        if (isCurrentPlayback()) {
+          setPlayingVoiceId(null)
+        }
+      }
+      audio.onerror = () => {
+        if (!isCurrentPlayback() || previewCacheRef.current?.url !== url) {
+          return
+        }
+
+        stopAndDetachPreviewAudio(true)
+        releasePreviewCache(url)
+        setNotice({ type: 'error', text: '试听播放失败' })
+      }
       audio.setAttribute('src', url)
       setPlayingVoiceId(voiceIdToPlay)
 
       try {
         await audio.play()
       } catch {
-        if (mountedRef.current && previewEpochRef.current === epoch) {
+        if (isCurrentPlayback()) {
           setPlayingVoiceId(null)
           setNotice({ type: 'error', text: '试听播放失败' })
         }
       }
     },
-    []
+    [releasePreviewCache, stopAndDetachPreviewAudio]
   )
 
   useEffect(() => {
@@ -254,18 +276,11 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
       mountedRef.current = false
       previewEpochRef.current += 1
 
-      const audio = previewAudioRef.current
-      if (audio) {
-        audio.pause()
-        audio.currentTime = 0
-        audio.onended = null
-        audio.onerror = null
-        previewAudioRef.current = null
-      }
-
+      stopAndDetachPreviewAudio(true)
       releasePreviewCache()
+      previewAudioRef.current = null
     }
-  }, [releasePreviewCache])
+  }, [releasePreviewCache, stopAndDetachPreviewAudio])
 
   useEffect(() => {
     let isMounted = true
@@ -318,9 +333,9 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
 
   useEffect(() => {
     previewEpochRef.current += 1
-    stopPreviewAudio()
+    stopAndDetachPreviewAudio()
     releasePreviewCache()
-  }, [language, releasePreviewCache, script, speed, stopPreviewAudio])
+  }, [language, releasePreviewCache, script, speed, stopAndDetachPreviewAudio])
 
   const languageModels = useMemo(() => {
     return catalog?.models.filter((model) => model.languages.includes(language)) ?? []
@@ -391,7 +406,7 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     const requestEpoch = previewEpochRef.current
     const signature = JSON.stringify(request)
 
-    stopPreviewAudio()
+    stopAndDetachPreviewAudio()
 
     if (previewCacheRef.current?.signature === signature) {
       await playPreviewUrl(previewCacheRef.current.url, voice.id, requestEpoch)
@@ -399,7 +414,11 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     }
 
     setPreviewingVoiceId(voice.id)
-    setNotice({ type: 'info', text: '正在使用本机 CPU 生成试听音频' })
+    setNotice({
+      type: 'info',
+      text: PREVIEW_GENERATING_NOTICE,
+      previewEpoch: requestEpoch
+    })
 
     try {
       const response = await window.api.previewTts(request)
@@ -436,6 +455,9 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
     } finally {
       if (mountedRef.current) {
         setPreviewingVoiceId(null)
+        setNotice((currentNotice) =>
+          currentNotice?.previewEpoch === requestEpoch ? null : currentNotice
+        )
       }
     }
   }

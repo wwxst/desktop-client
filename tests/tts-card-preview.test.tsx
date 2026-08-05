@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { TtsCatalogResponse, TtsPreviewResponse } from '../src/shared/tts'
+import type { TtsCatalogResponse, TtsJobProgress, TtsPreviewResponse } from '../src/shared/tts'
 import TtsVoiceoverView from '../src/renderer/src/components/TtsVoiceover/TtsVoiceoverView'
 
 const NativeUrl = URL
@@ -81,19 +81,23 @@ const successfulPreview: TtsPreviewResponse = {
 function deferred<T>(): {
   promise: Promise<T>
   resolve: (value: T) => void
+  reject: (reason: unknown) => void
 } {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise
+    reject = rejectPromise
   })
 
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 function setWindowApi(
   previewTts: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(successfulPreview)
-): void {
+): { emitJobProgress: (progress: TtsJobProgress) => void } {
   const removeListener = vi.fn()
+  let jobProgressListener: ((progress: TtsJobProgress) => void) | null = null
 
   Object.defineProperty(window, 'api', {
     configurable: true,
@@ -109,9 +113,16 @@ function setWindowApi(
       cancelTtsJob: vi.fn(),
       saveTtsJob: vi.fn(),
       onTtsModelDownloadProgress: vi.fn(() => removeListener),
-      onTtsJobProgress: vi.fn(() => removeListener)
+      onTtsJobProgress: vi.fn((listener) => {
+        jobProgressListener = listener
+        return removeListener
+      })
     }
   })
+
+  return {
+    emitJobProgress: (progress) => jobProgressListener?.(progress)
+  }
 }
 
 describe('TTS card preview playback', () => {
@@ -119,12 +130,14 @@ describe('TTS card preview playback', () => {
   const revokeObjectURL = vi.fn()
   const play = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
   const pause = vi.fn()
+  const load = vi.fn()
 
   beforeEach(() => {
     createObjectURL.mockReset().mockReturnValue('blob:preview-1')
     revokeObjectURL.mockReset()
     play.mockReset().mockResolvedValue(undefined)
     pause.mockReset()
+    load.mockReset()
     class PreviewUrl extends NativeUrl {
       static createObjectURL = createObjectURL
       static revokeObjectURL = revokeObjectURL
@@ -132,6 +145,7 @@ describe('TTS card preview playback', () => {
     vi.stubGlobal('URL', PreviewUrl)
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(play)
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(pause)
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(load)
   })
 
   afterEach(() => {
@@ -185,8 +199,9 @@ describe('TTS card preview playback', () => {
     expect(screen.queryByRole('button', { name: '播放中：第一音色' })).not.toBeInTheDocument()
   })
 
-  it('returns the active voice card to idle when playback errors', async () => {
-    setWindowApi()
+  it('reports media errors, releases the bad cache, and regenerates on the next click', async () => {
+    const previewTts = vi.fn().mockResolvedValue(successfulPreview)
+    setWindowApi(previewTts)
     const user = userEvent.setup()
 
     render(<TtsVoiceoverView />)
@@ -198,8 +213,38 @@ describe('TTS card preview playback', () => {
       audio.onerror?.call(audio, new Event('error'))
     })
 
+    expect(screen.getByText('试听播放失败')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '试听音色：第二音色' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: '播放中：第二音色' })).not.toBeInTheDocument()
+    expect(audio).not.toHaveAttribute('src')
+    expect(load).toHaveBeenCalled()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1')
+
+    await user.click(screen.getByRole('button', { name: '试听音色：第二音色' }))
+    await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
+  })
+
+  it('ignores a stale media error after a newer preview starts', async () => {
+    const previewTts = vi.fn().mockResolvedValue(successfulPreview)
+    createObjectURL.mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:second')
+    setWindowApi(previewTts)
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+    await screen.findByRole('button', { name: '播放中：第一音色' })
+    const audio = play.mock.contexts[0] as HTMLAudioElement
+    const staleErrorHandler = audio.onerror
+    await user.click(screen.getByRole('button', { name: '试听音色：第二音色' }))
+    await screen.findByRole('button', { name: '播放中：第二音色' })
+
+    act(() => {
+      staleErrorHandler?.call(audio, new Event('error'))
+    })
+
+    expect(screen.getByRole('button', { name: '播放中：第二音色' })).toBeInTheDocument()
+    expect(screen.queryByText('试听播放失败')).not.toBeInTheDocument()
+    expect(revokeObjectURL).not.toHaveBeenCalledWith('blob:second')
   })
 
   it('stops and replays a cached URL when the same request is previewed again', async () => {
@@ -253,11 +298,19 @@ describe('TTS card preview playback', () => {
     const script = screen.getByRole('textbox', { name: '配音文案' })
     await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
     await screen.findByRole('button', { name: '播放中：第一音色' })
-    await user.type(script, '新的试听文案')
+    const audio = play.mock.contexts[0] as HTMLAudioElement
+    await user.type(script, '新')
+
+    expect(audio).not.toHaveAttribute('src')
+    expect(load).toHaveBeenCalled()
+    expect(load.mock.invocationCallOrder[0]).toBeLessThan(
+      revokeObjectURL.mock.invocationCallOrder[0]
+    )
+
     await user.click(screen.getByRole('button', { name: '试听音色：第一音色' }))
 
     await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
-    expect(previewTts).toHaveBeenLastCalledWith(expect.objectContaining({ text: '新的试听文案' }))
+    expect(previewTts).toHaveBeenLastCalledWith(expect.objectContaining({ text: '新' }))
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1')
   })
 
@@ -322,6 +375,7 @@ describe('TTS card preview playback', () => {
     const previewButton = await screen.findByRole('button', { name: '试听音色：第一音色' })
     expect(createObjectURL).not.toHaveBeenCalled()
     expect(play).not.toHaveBeenCalled()
+    expect(screen.queryByText('正在使用本机 CPU 生成试听音频')).not.toBeInTheDocument()
 
     await user.click(previewButton)
     await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
@@ -345,6 +399,7 @@ describe('TTS card preview playback', () => {
     const previewButton = await screen.findByRole('button', { name: '试听音色：第一音色' })
     expect(createObjectURL).not.toHaveBeenCalled()
     expect(play).not.toHaveBeenCalled()
+    expect(screen.queryByText('正在使用本机 CPU 生成试听音频')).not.toBeInTheDocument()
 
     await user.click(previewButton)
     await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
@@ -370,11 +425,66 @@ describe('TTS card preview playback', () => {
     const previewButton = await screen.findByRole('button', { name: '试听音色：第一音色' })
     expect(createObjectURL).not.toHaveBeenCalled()
     expect(play).not.toHaveBeenCalled()
+    expect(screen.queryByText('正在使用本机 CPU 生成试听音频')).not.toBeInTheDocument()
 
     await user.click(previewButton)
     await waitFor(() => expect(previewTts).toHaveBeenCalledTimes(2))
     expect(previewTts).toHaveBeenLastCalledWith(expect.objectContaining({ speed: 1.2 }))
     await screen.findByRole('button', { name: '播放中：第一音色' })
+  })
+
+  it.each(['script', 'language', 'speed'] as const)(
+    'does not retain a stale rejection notice after %s invalidates a pending preview',
+    async (setting) => {
+      const pending = deferred<TtsPreviewResponse>()
+      setWindowApi(vi.fn(() => pending.promise))
+      const user = userEvent.setup()
+
+      render(<TtsVoiceoverView />)
+      if (setting === 'speed') {
+        await user.click(await screen.findByRole('button', { name: '高级设置' }))
+      }
+      await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+
+      if (setting === 'script') {
+        await user.type(screen.getByRole('textbox', { name: '配音文案' }), '失效文案')
+      } else if (setting === 'language') {
+        await user.selectOptions(screen.getByRole('combobox', { name: '文本语言' }), 'en-US')
+      } else {
+        await user.selectOptions(screen.getByRole('combobox', { name: '语速' }), '1.2')
+      }
+
+      pending.reject(new Error('过期试听失败'))
+
+      await screen.findByRole('button', { name: '试听音色：第一音色' })
+      expect(screen.queryByText('正在使用本机 CPU 生成试听音频')).not.toBeInTheDocument()
+      expect(screen.queryByText('过期试听失败')).not.toBeInTheDocument()
+    }
+  )
+
+  it('preserves an unrelated notice when a stale preview settles', async () => {
+    const pending = deferred<TtsPreviewResponse>()
+    const { emitJobProgress } = setWindowApi(vi.fn(() => pending.promise))
+    const user = userEvent.setup()
+
+    render(<TtsVoiceoverView />)
+    await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
+    await user.type(screen.getByRole('textbox', { name: '配音文案' }), '失效文案')
+    act(() => {
+      emitJobProgress({
+        jobId: 'formal-job',
+        modelId: 'resource-one',
+        status: 'cancelled',
+        currentSegment: 0,
+        totalSegments: 1,
+        percent: 0,
+        message: '正式任务已取消'
+      })
+    })
+    pending.resolve(successfulPreview)
+
+    await screen.findByRole('button', { name: '试听音色：第一音色' })
+    expect(screen.getByRole('status')).toHaveTextContent('正式任务已取消')
   })
 
   it('restores idle state and keeps the response notice after generation failure', async () => {
@@ -414,11 +524,18 @@ describe('TTS card preview playback', () => {
     const { unmount } = render(<TtsVoiceoverView />)
     await user.click(await screen.findByRole('button', { name: '试听音色：第一音色' }))
     await screen.findByRole('button', { name: '播放中：第一音色' })
+    const audio = play.mock.contexts[0] as HTMLAudioElement
     pause.mockClear()
+    load.mockClear()
 
     unmount()
 
     expect(pause).toHaveBeenCalledTimes(1)
+    expect(audio).not.toHaveAttribute('src')
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(load.mock.invocationCallOrder[0]).toBeLessThan(
+      revokeObjectURL.mock.invocationCallOrder[0]
+    )
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1')
   })
 
