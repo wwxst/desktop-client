@@ -437,18 +437,19 @@
 }
 
 .tts-voice-card__preview:hover:not(:disabled),
+.tts-voice-card__preview:focus-visible,
 .tts-voice-card__preview[data-playing='true'] {
-  color: #0d5fab;
+  color: #0f5fae;
 }
 
 .tts-voice-card__preview:focus-visible {
-  outline: 2px solid #1477d4;
+  outline: 2px solid #9bc4eb;
   outline-offset: 2px;
 }
 
 .tts-voice-card__preview:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+  cursor: default;
+  opacity: 0.55;
 }
 
 .tts-empty-state {
