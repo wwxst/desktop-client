@@ -666,5 +666,3 @@ git log -5 --oneline
 ~~~
 
 Expected: the worktree is clean and implementation commits follow the design and plan commits.
-
-
