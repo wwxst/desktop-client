@@ -592,6 +592,7 @@ function TtsVoiceoverView({ onOpenPlugins }: TtsVoiceoverViewProps): JSX.Element
                         <button
                           className="tts-voice-card__preview"
                           type="button"
+                          aria-label={`${isPreviewing ? '生成中' : '试听音色'}：${voice.name}`}
                           disabled={controlsDisabled || isPreviewing}
                           onClick={() => void handlePreview(voice)}
                         >

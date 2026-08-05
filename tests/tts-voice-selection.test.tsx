@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +9,12 @@ describe('TTS voice selection', () => {
     const previewTts = vi.fn().mockResolvedValue({
       success: false,
       message: '试听请求已记录'
+    })
+    const createTtsJob = vi.fn().mockResolvedValue({
+      success: true,
+      message: '配音任务已创建',
+      jobId: 'job-one',
+      totalSegments: 1
     })
     const removeListener = vi.fn()
 
@@ -74,6 +80,7 @@ describe('TTS voice selection', () => {
           modelDirectory: 'C:\\tts-models'
         }),
         previewTts,
+        createTtsJob,
         onTtsModelDownloadProgress: vi.fn(() => removeListener),
         onTtsJobProgress: vi.fn(() => removeListener)
       }
@@ -85,11 +92,9 @@ describe('TTS voice selection', () => {
     const radios = await screen.findAllByRole('radio')
 
     expect(radios).toHaveLength(2)
-    const secondVoiceCard = radios[1].closest('.tts-voice-card')
-
+    expect(screen.getAllByRole('button', { name: /试听音色：/ })).toHaveLength(radios.length)
     expect(radios[0]).toBeChecked()
-    expect(secondVoiceCard).not.toBeNull()
-    await user.click(within(secondVoiceCard!).getByRole('button', { name: '试听音色' }))
+    await user.click(screen.getByRole('button', { name: '试听音色：第二音色' }))
     expect(radios[0]).toBeChecked()
     expect(radios[1]).not.toBeChecked()
 
@@ -98,6 +103,18 @@ describe('TTS voice selection', () => {
         expect.objectContaining({
           modelId: 'resource-two',
           voiceId: 'resource-two:voice-two'
+        })
+      )
+    })
+
+    await user.type(screen.getByRole('textbox', { name: '配音文案' }), '正式生成文案')
+    await user.click(screen.getByRole('button', { name: '开始生成' }))
+
+    await waitFor(() => {
+      expect(createTtsJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelId: 'resource-one',
+          voiceId: 'resource-one:voice-one'
         })
       )
     })
