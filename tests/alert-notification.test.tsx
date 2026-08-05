@@ -216,6 +216,41 @@ describe('AlertNotification', () => {
     expect(liveRegion.querySelector('*')).not.toBeInTheDocument()
   })
 
+  it('restages identical text when live-region severity changes', async () => {
+    const onClose = vi.fn()
+    const { rerender } = render(
+      <AlertNotification
+        open
+        variant="info"
+        title="固定标题"
+        message={<strong>固定内容</strong>}
+        onClose={onClose}
+      />
+    )
+    const visualContent = getVisualContent()
+    const politeStatus = screen.getByRole('status')
+    await waitFor(() => expect(politeStatus.textContent).toBe(visualContent.textContent))
+
+    rerender(
+      <AlertNotification
+        open
+        variant="error"
+        title="固定标题"
+        message={<strong>固定内容</strong>}
+        onClose={onClose}
+      />
+    )
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    const assertiveAlert = screen.getByRole('alert')
+    expect(assertiveAlert).toHaveAttribute('aria-live', 'assertive')
+    expect(assertiveAlert).toBeEmptyDOMElement()
+    expect(within(visualContent).getByText('固定标题')).toBeInTheDocument()
+    expect(within(visualContent).getByText('固定内容').tagName).toBe('STRONG')
+
+    await waitFor(() => expect(assertiveAlert.textContent).toBe(visualContent.textContent))
+  })
+
   it('cancels pending announcement timers on replacement and close', () => {
     vi.useFakeTimers()
     const onClose = vi.fn()

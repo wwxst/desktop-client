@@ -34,6 +34,19 @@ interface NotificationContentProps {
   live: 'polite' | 'assertive'
 }
 
+interface AnnouncementSignature {
+  role: 'status' | 'alert'
+  live: 'polite' | 'assertive'
+  text: string
+}
+
+function signaturesMatch(
+  left: AnnouncementSignature | null,
+  right: AnnouncementSignature
+): boolean {
+  return left?.role === right.role && left.live === right.live && left.text === right.text
+}
+
 function NotificationContent({
   title,
   message,
@@ -41,15 +54,20 @@ function NotificationContent({
   live
 }: NotificationContentProps): JSX.Element {
   const visualContentRef = useRef<HTMLDivElement>(null)
-  const announcedTextRef = useRef('')
-  const pendingTextRef = useRef<string | null>(null)
+  const announcedSignatureRef = useRef<AnnouncementSignature | null>(null)
+  const pendingSignatureRef = useRef<AnnouncementSignature | null>(null)
   const clearTimerRef = useRef<number | null>(null)
   const stageTimerRef = useRef<number | null>(null)
-  const [announcementText, setAnnouncementText] = useState('')
+  const [announcement, setAnnouncement] = useState<AnnouncementSignature | null>(null)
 
   useEffect(() => {
     const nextText = visualContentRef.current?.textContent ?? ''
-    if (!nextText || nextText === announcedTextRef.current || nextText === pendingTextRef.current) {
+    const nextSignature: AnnouncementSignature = { role, live, text: nextText }
+    if (
+      !nextText ||
+      signaturesMatch(announcedSignatureRef.current, nextSignature) ||
+      signaturesMatch(pendingSignatureRef.current, nextSignature)
+    ) {
       return
     }
 
@@ -57,20 +75,20 @@ function NotificationContent({
     if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
     clearTimerRef.current = null
     stageTimerRef.current = null
-    pendingTextRef.current = nextText
+    pendingSignatureRef.current = nextSignature
 
     const publish = (): void => {
       stageTimerRef.current = null
-      pendingTextRef.current = null
-      announcedTextRef.current = nextText
-      setAnnouncementText(nextText)
+      pendingSignatureRef.current = null
+      announcedSignatureRef.current = nextSignature
+      setAnnouncement(nextSignature)
     }
 
-    if (announcedTextRef.current) {
+    if (announcedSignatureRef.current) {
       clearTimerRef.current = window.setTimeout(() => {
         clearTimerRef.current = null
-        announcedTextRef.current = ''
-        setAnnouncementText('')
+        announcedSignatureRef.current = null
+        setAnnouncement(null)
         stageTimerRef.current = window.setTimeout(publish, 0)
       }, 0)
       return
@@ -85,9 +103,12 @@ function NotificationContent({
       if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
       clearTimerRef.current = null
       stageTimerRef.current = null
-      pendingTextRef.current = null
+      pendingSignatureRef.current = null
     }
   }, [])
+
+  const announcementText =
+    announcement?.role === role && announcement.live === live ? announcement.text : ''
 
   return (
     <>
