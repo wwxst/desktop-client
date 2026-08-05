@@ -443,11 +443,11 @@
 }
 
 .tts-voice-card__preview:focus-visible {
-  outline: 2px solid #9bc4eb;
+  outline: 2px solid #1477d4;
   outline-offset: 2px;
 }
 
-.tts-voice-card__preview:disabled {
+.tts-voiceover .tts-voice-card__preview:disabled {
   cursor: default;
   opacity: 0.55;
 }

@@ -587,7 +587,7 @@ Add the complete interaction states while keeping the existing selected-card col
 }
 
 .tts-voice-card__preview:focus-visible {
-  outline: 2px solid #9bc4eb;
+  outline: 2px solid #1477d4;
   outline-offset: 2px;
 }
 
@@ -666,6 +666,5 @@ git log -5 --oneline
 ~~~
 
 Expected: the worktree is clean and implementation commits follow the design and plan commits.
-
 
 
