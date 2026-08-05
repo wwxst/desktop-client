@@ -59,6 +59,14 @@ function createCatalog(
   }
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve
+  })
+  return { promise, resolve }
+}
+
 function setWindowApi(catalog: TtsCatalogResponse): {
   listTtsCatalog: ReturnType<typeof vi.fn>
   installTtsModel: ReturnType<typeof vi.fn>
@@ -141,6 +149,52 @@ describe('PluginsView', () => {
     })
   })
 
+  it('keeps install progress on the card and shows a dismissible success notification', async () => {
+    const { installTtsModel } = setWindowApi(createCatalog())
+    const installation = deferred<{ success: boolean; message: string }>()
+    installTtsModel.mockReturnValueOnce(installation.promise)
+    const user = userEvent.setup()
+
+    render(<PluginsView />)
+
+    const installButton = await screen.findByRole('button', {
+      name: '安装中文高品质音色'
+    })
+    const pluginCard = installButton.closest('.plugin-list-item')
+    expect(pluginCard).not.toBeNull()
+    await user.click(installButton)
+
+    expect(screen.queryByText('正在下载中文高品质音色，请保持网络连接')).not.toBeInTheDocument()
+    expect(document.querySelector('.plugins-notice')).not.toBeInTheDocument()
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
+    expect(installButton).toBeDisabled()
+    expect(within(pluginCard as HTMLElement).getByText('处理中')).toBeInTheDocument()
+    expect(within(pluginCard as HTMLElement).getByText('准备中')).toBeInTheDocument()
+
+    installation.resolve({ success: true, message: '安装完成' })
+
+    const liveRegion = await waitFor(() => {
+      const notificationRegion = screen
+        .getAllByRole('status')
+        .find((region) => region.closest('.ui-alert-notification'))
+      expect(notificationRegion).toBeDefined()
+      return notificationRegion as HTMLElement
+    })
+    const notification = liveRegion.closest('.ui-alert-notification')
+    expect(notification).toHaveClass('ui-alert-notification--success')
+    expect(
+      notification?.querySelector('.ui-alert-notification__title')
+    ).toHaveTextContent('操作成功')
+    expect(
+      notification?.querySelector('.ui-alert-notification__message')
+    ).toHaveTextContent('中文高品质音色安装完成')
+
+    await user.click(
+      within(notification as HTMLElement).getByRole('button', { name: '知道了' })
+    )
+    expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
+  })
+
   it('removes only the plugin selected from its card menu', async () => {
     const { removeTtsModel } = setWindowApi(
       createCatalog([
@@ -160,6 +214,16 @@ describe('PluginsView', () => {
     await waitFor(() => expect(removeTtsModel).toHaveBeenCalledOnce())
     expect(removeTtsModel).toHaveBeenCalledWith('kokoro-multi-lang-v1_0')
     expect(window.confirm).toHaveBeenCalledWith('确定卸载“中英通用音色”吗？')
+
+    const liveRegion = await screen.findByRole('status')
+    const notification = liveRegion.closest('.ui-alert-notification')
+    expect(notification).toHaveClass('ui-alert-notification--success')
+    expect(
+      notification?.querySelector('.ui-alert-notification__title')
+    ).toHaveTextContent('操作成功')
+    expect(
+      notification?.querySelector('.ui-alert-notification__message')
+    ).toHaveTextContent('中英通用音色已卸载')
   })
 
   it('splits installed and available plugins without merging their states', async () => {
@@ -249,6 +313,33 @@ describe('PluginsView', () => {
 
     await user.click(within(detail).getByRole('button', { name: '返回插件列表' }))
     expect(screen.getByRole('button', { name: '查看中英通用音色详情' })).toBeInTheDocument()
+  })
+
+  it('shows an error notification when opening the plugin directory fails in detail', async () => {
+    const { openTtsModelDirectory } = setWindowApi(
+      createCatalog([
+        createModel(0, { status: 'installed', statusMessage: '已安装' }),
+        createModel(1),
+        createModel(2)
+      ])
+    )
+    openTtsModelDirectory.mockResolvedValue({ success: false, message: '打开失败' })
+    const user = userEvent.setup()
+
+    render(<PluginsView />)
+
+    await user.click(await screen.findByRole('button', { name: '查看中文高品质音色详情' }))
+    await user.click(screen.getByRole('button', { name: '打开中文高品质音色目录' }))
+
+    const liveRegion = await screen.findByRole('alert')
+    const notification = liveRegion.closest('.ui-alert-notification')
+    expect(notification).toHaveClass('ui-alert-notification--error')
+    expect(
+      notification?.querySelector('.ui-alert-notification__title')
+    ).toHaveTextContent('操作失败')
+    expect(
+      notification?.querySelector('.ui-alert-notification__message')
+    ).toHaveTextContent('插件目录打开失败，请重试')
   })
 
   it('installs and removes only the selected plugin from its detail page', async () => {

@@ -114,33 +114,6 @@
   color: #9aa1ab;
 }
 
-.plugins-notice {
-  padding: 9px 11px;
-  margin-top: 14px;
-  font-size: 12px;
-  line-height: 1.5;
-  border: 1px solid transparent;
-  border-radius: 7px;
-}
-
-.plugins-notice--success {
-  color: #24613f;
-  background: #eef9f2;
-  border-color: #cfe9d8;
-}
-
-.plugins-notice--error {
-  color: #983b38;
-  background: #fff3f2;
-  border-color: #f0cfcc;
-}
-
-.plugins-notice--info {
-  color: #315f96;
-  background: #f0f6ff;
-  border-color: #cfdef3;
-}
-
 .plugins-catalog-section {
   margin-top: 32px;
 }

@@ -6,6 +6,9 @@ import type {
   TtsModelDownloadProgress,
   TtsModelInfo
 } from '../../../../shared/tts'
+import AlertNotification, {
+  type AlertNotificationVariant
+} from '../ui/AlertNotification'
 import PluginDetailView from './PluginDetailView'
 import PluginListView from './PluginListView'
 import { getPluginPresentation } from './pluginPresentation'
@@ -20,7 +23,7 @@ const PLUGIN_ORDER = [
 type ExtensionTab = 'plugins' | 'skills'
 
 interface PluginsNotice {
-  type: 'success' | 'error' | 'info'
+  type: AlertNotificationVariant
   text: string
 }
 
@@ -133,7 +136,6 @@ function PluginsView({ onOpenTts = () => undefined }: PluginsViewProps): JSX.Ele
     const pluginName = getPluginPresentation(model).name
     setDownloadProgress(null)
     setActiveActionId(model.id)
-    setNotice({ type: 'info', text: `正在下载${pluginName}，请保持网络连接` })
 
     try {
       const response = await window.api.installTtsModel(model.id)
@@ -183,15 +185,20 @@ function PluginsView({ onOpenTts = () => undefined }: PluginsViewProps): JSX.Ele
     }
   }
 
+  const notification = notice ? (
+    <AlertNotification
+      open
+      variant={notice.type}
+      message={notice.text}
+      onClose={() => setNotice(null)}
+    />
+  ) : null
+
   if (selectedModel) {
     return (
       <section className="plugins-page" aria-label="插件中心">
         <div className="plugins-page__shell">
-          {notice && (
-            <div className={`plugins-notice plugins-notice--${notice.type}`} role="status">
-              {notice.text}
-            </div>
-          )}
+          {notification}
           <PluginDetailView
             model={selectedModel}
             busyPluginId={busyPluginId}
@@ -256,11 +263,7 @@ function PluginsView({ onOpenTts = () => undefined }: PluginsViewProps): JSX.Ele
               />
             </label>
 
-            {notice && (
-              <div className={`plugins-notice plugins-notice--${notice.type}`} role="status">
-                {notice.text}
-              </div>
-            )}
+            {notification}
 
             {isLoading && !catalog ? (
               <div className="plugins-empty-state" role="status">
