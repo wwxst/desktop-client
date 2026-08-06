@@ -1,6 +1,8 @@
 import { useReducer, type JSX } from 'react'
 import AiPanel from '../AiPanel/AiPanel'
 import MediaLibraryView from '../MediaLibrary/MediaLibraryView'
+import NovelPromotionSidePanel from '../NovelPromotion/NovelPromotionSidePanel'
+import NovelPromotionView from '../NovelPromotion/NovelPromotionView'
 import PluginsView from '../Plugins/PluginsView'
 import Sidebar from '../Sidebar/Sidebar'
 import SmartEditDraftView from '../SmartEdit/SmartEditDraftView'
@@ -34,6 +36,7 @@ function WorkspaceView(): JSX.Element {
     navigation.activeMenu === 'smart-edit' && !smartEditEnabled ? 'home' : navigation.activeMenu
 
   let workspaceContent: JSX.Element = <div className="workspace-empty-page" aria-hidden="true" />
+  let rightPanel: JSX.Element = <AiPanel />
 
   if (smartEditEnabled && navigation.activeMenu === 'smart-edit') {
     workspaceContent =
@@ -44,6 +47,11 @@ function WorkspaceView(): JSX.Element {
       ) : (
         <SmartEditDraftView onCreateDraft={() => dispatchNavigation({ type: 'draft/created' })} />
       )
+  }
+
+  if (navigation.activeMenu === 'novel-promotion') {
+    workspaceContent = <NovelPromotionView />
+    rightPanel = <NovelPromotionSidePanel />
   }
 
   if (navigation.activeMenu === 'tts-voiceover') {
@@ -76,7 +84,7 @@ function WorkspaceView(): JSX.Element {
         />
       }
       content={workspaceContent}
-      aiPanel={<AiPanel />}
+      aiPanel={rightPanel}
     />
   )
 }
