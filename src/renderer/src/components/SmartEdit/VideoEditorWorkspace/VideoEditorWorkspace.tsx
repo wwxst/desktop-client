@@ -1,57 +1,141 @@
 import type { JSX } from 'react'
-import { useMemo, useReducer } from 'react'
+import { useCallback, useEffect, useMemo, useReducer } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import FunctionPanel from './FunctionPanel'
 import ParameterPanel from './ParameterPanel'
 import PlayerPanel from './PlayerPanel'
 import Timeline from './Timeline'
 import {
-  createInitialEditorProjectState,
-  editorProjectReducer,
+  createEditorAgentApi,
+  registerEditorAgentApi
+} from './editorAgentApi'
+import type { ClipPatch, EditorCommand } from './editorCommands'
+import {
+  createInitialEditorHistoryState,
+  editorHistoryReducer
+} from './editorHistory'
+import {
   selectActiveAsset,
+  selectActiveClip,
   type CanvasAspectRatio,
-  type DraftRow
+  type EditorProjectAction,
+  type EditorTrack
 } from './editorProject'
 import { useMediaLibrary } from './useMediaLibrary'
 import './VideoEditorWorkspace.css'
 
 /**
- * 视频编辑工作区：上方为功能、播放和参数区域，下方为横跨三块的时间线。
+ * 视频编辑工作区 V1：
+ * - 真正的轨道/片段数据模型
+ * - Command 驱动剪辑
+ * - Undo / Redo
+ * - Agent API 注册
+ * - 时间线、播放头、右侧参数同步
  */
 function VideoEditorWorkspace(): JSX.Element {
-  const [project, dispatch] = useReducer(editorProjectReducer, undefined, () =>
-    createInitialEditorProjectState(crypto.randomUUID())
+  const [history, dispatch] = useReducer(editorHistoryReducer, undefined, () =>
+    createInitialEditorHistoryState(crypto.randomUUID())
   )
-  const { importMediaFiles, reportMediaError } = useMediaLibrary(dispatch)
-  const addedMediaIds = useMemo(
+  const project = history.present
+
+  const dispatchProjectAction = useCallback((action: EditorProjectAction): void => {
+    dispatch({ type: 'project/action', action })
+  }, [])
+
+  const execute = useCallback((command: EditorCommand): void => {
+    dispatch({ type: 'command/execute', command })
+  }, [])
+
+  const executeBatch = useCallback((commands: readonly EditorCommand[]): void => {
+    dispatch({ type: 'command/batch', commands })
+  }, [])
+
+  const undo = useCallback((): void => dispatch({ type: 'history/undo' }), [])
+  const redo = useCallback((): void => dispatch({ type: 'history/redo' }), [])
+
+  const { importMediaFiles, reportMediaError } = useMediaLibrary(dispatchProjectAction)
+  const addedMediaIds = useMemo<Set<string>>(
     () => new Set(project.clips.map((clip) => clip.assetId)),
     [project.clips]
   )
   const activeAsset = selectActiveAsset(project)
+  const activeClip = selectActiveClip(project)
+  const activeTrack = activeClip
+    ? (project.tracks.find((track) => track.id === activeClip.trackId) ?? null)
+    : null
 
   const handleAddMedia = (mediaId: string): void => {
-    dispatch({ type: 'timeline/assetAdded', assetId: mediaId })
+    execute({
+      type: 'clip/addAsset',
+      assetId: mediaId,
+      clipId: crypto.randomUUID()
+    })
   }
 
   const handleSelectClip = (clipId: string): void => {
-    dispatch({ type: 'timeline/clipSelected', clipId })
+    dispatchProjectAction({ type: 'timeline/clipSelected', clipId })
   }
 
-  const handleUpdateRow = (rowId: string, updates: Partial<Omit<DraftRow, 'id'>>): void => {
-    dispatch({ type: 'draft/rowUpdated', rowId, changes: updates })
-  }
-
-  const handleAddRow = (afterRowId: string): void => {
-    dispatch({ type: 'draft/rowAdded', rowId: crypto.randomUUID(), afterRowId })
-  }
-
-  const handleDeleteRow = (rowId: string): void => {
-    dispatch({ type: 'draft/rowDeleted', rowId })
+  const handleSetPlayhead = (time: number): void => {
+    dispatchProjectAction({ type: 'timeline/playheadChanged', time })
   }
 
   const handleAspectRatioChange = (aspectRatio: CanvasAspectRatio): void => {
-    dispatch({ type: 'aspectRatio/selected', aspectRatio })
+    execute({ type: 'canvas/setAspectRatio', aspectRatio })
   }
+
+  const handleUpdateClip = (patch: ClipPatch): void => {
+    if (!activeClip) return
+    execute({ type: 'clip/update', clipId: activeClip.id, patch })
+  }
+
+  const handleUpdateTrack = (
+    trackId: string,
+    patch: Partial<Pick<EditorTrack, 'locked' | 'hidden' | 'muted' | 'name'>>
+  ): void => {
+    execute({ type: 'track/update', trackId, patch })
+  }
+
+  const agentApi = useMemo(
+    () =>
+      createEditorAgentApi({
+        getProject: () => project,
+        execute,
+        executeBatch,
+        undo,
+        redo
+      }),
+    [execute, executeBatch, project, redo, undo]
+  )
+
+  useEffect(() => registerEditorAgentApi(agentApi), [agentApi])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      const isTyping =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable
+      if (isTyping) return
+
+      const modifier = event.ctrlKey || event.metaKey
+      if (modifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+        return
+      }
+
+      if ((event.key === 'Delete' || event.key === 'Backspace') && activeClip) {
+        event.preventDefault()
+        execute({ type: 'clip/delete', clipId: activeClip.id })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeClip, execute, redo, undo])
 
   return (
     <section className="studio-workspace" aria-label="剪辑工作区">
@@ -60,7 +144,7 @@ function VideoEditorWorkspace(): JSX.Element {
         orientation="vertical"
         resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}
       >
-        <Panel id="workspace-top" defaultSize="68" minSize={280}>
+        <Panel id="workspace-top" defaultSize="64" minSize={280}>
           <div className="studio-workspace__top">
             <Group
               className="studio-workspace__columns"
@@ -71,7 +155,7 @@ function VideoEditorWorkspace(): JSX.Element {
                 id="function-panel"
                 defaultSize={148}
                 minSize={112}
-                maxSize={240}
+                maxSize={260}
                 groupResizeBehavior="preserve-pixel-size"
               >
                 <FunctionPanel
@@ -81,37 +165,40 @@ function VideoEditorWorkspace(): JSX.Element {
                   onAddMedia={handleAddMedia}
                 />
               </Panel>
-
               <Separator
                 id="function-panel-resize-handle"
                 className="studio-workspace__column-resize-handle"
                 aria-label="调整功能区宽度"
               />
-
-              <Panel id="player-panel" minSize={220}>
+              <Panel id="player-panel" minSize={260}>
                 <PlayerPanel
-                  key={activeAsset ? `${activeAsset.id}:${activeAsset.status}` : 'empty-player'}
                   activeAsset={activeAsset}
+                  activeClip={activeClip}
+                  activeTrack={activeTrack}
+                  playhead={project.playhead}
                   selectedRatio={project.aspectRatio}
+                  onPlayheadChange={handleSetPlayhead}
                   onAspectRatioChange={handleAspectRatioChange}
                   onMediaError={reportMediaError}
                 />
               </Panel>
-
               <Separator
                 id="parameter-panel-resize-handle"
                 className="studio-workspace__column-resize-handle"
                 aria-label="调整参数区宽度"
               />
-
               <Panel
                 id="parameter-panel"
-                defaultSize={180}
-                minSize={140}
-                maxSize={300}
+                defaultSize={220}
+                minSize={180}
+                maxSize={340}
                 groupResizeBehavior="preserve-pixel-size"
               >
-                <ParameterPanel />
+                <ParameterPanel
+                  clip={activeClip}
+                  asset={activeAsset}
+                  onUpdateClip={handleUpdateClip}
+                />
               </Panel>
             </Group>
           </div>
@@ -122,18 +209,33 @@ function VideoEditorWorkspace(): JSX.Element {
           className="studio-workspace__row-resize-handle"
           aria-label="调整时间线高度"
         />
-
-        <Panel id="workspace-timeline" defaultSize="32" minSize={176} maxSize="55">
+        <Panel id="workspace-timeline" defaultSize="36" minSize={210} maxSize="62">
           <div className="studio-workspace__timeline">
             <Timeline
               clips={project.clips}
               assets={project.assets}
+              tracks={project.tracks}
+              playhead={project.playhead}
+              zoom={project.timelineZoom}
               activeClipId={project.activeClipId}
-              rows={project.draftRows}
+              canUndo={history.past.length > 0}
+              canRedo={history.future.length > 0}
               onSelectClip={handleSelectClip}
-              onUpdateRow={handleUpdateRow}
-              onAddRow={handleAddRow}
-              onDeleteRow={handleDeleteRow}
+              onSetPlayhead={handleSetPlayhead}
+              onMoveClip={(clipId, timelineStart, trackId) =>
+                execute({ type: 'clip/move', clipId, timelineStart, trackId })
+              }
+              onTrimClip={(clipId, trim) => execute({ type: 'clip/trim', clipId, ...trim })}
+              onSplitClip={(clipId, at) =>
+                execute({ type: 'clip/split', clipId, at, rightClipId: crypto.randomUUID() })
+              }
+              onDeleteClip={(clipId) => execute({ type: 'clip/delete', clipId })}
+              onUpdateTrack={handleUpdateTrack}
+              onZoomChange={(zoom) =>
+                dispatchProjectAction({ type: 'timeline/zoomChanged', zoom })
+              }
+              onUndo={undo}
+              onRedo={redo}
             />
           </div>
         </Panel>

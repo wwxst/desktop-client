@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import Timeline from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/Timeline'
 import type {
   DraftRow,
+  EditorTrack,
   MediaAsset,
   TimelineClip
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
@@ -24,11 +25,16 @@ const row: DraftRow = {
   fixedEndFileName: '选择视频'
 }
 
-function renderTimeline(rows: DraftRow[] = [row]): {
+function renderTimeline(
+  rows: DraftRow[] = [row],
+  overrides: { tracks?: EditorTrack[]; zoom?: number } = {}
+): {
   clips: TimelineClip[]
   assets: MediaAsset[]
   activeClipId: null
   rows: DraftRow[]
+  tracks?: EditorTrack[]
+  zoom?: number
   onSelectClip: ReturnType<typeof vi.fn>
   onUpdateRow: ReturnType<typeof vi.fn>
   onAddRow: ReturnType<typeof vi.fn>
@@ -42,7 +48,8 @@ function renderTimeline(rows: DraftRow[] = [row]): {
     onSelectClip: vi.fn(),
     onUpdateRow: vi.fn(),
     onAddRow: vi.fn(),
-    onDeleteRow: vi.fn()
+    onDeleteRow: vi.fn(),
+    ...overrides
   }
   render(<Timeline {...props} />)
   return props
@@ -76,5 +83,40 @@ describe('Timeline', () => {
 
     await user.click(screen.getByRole('button', { name: '在第 1 行后新增' }))
     expect(single.onAddRow).toHaveBeenCalledWith('row-1')
+  })
+
+  it('exposes the zoom-dependent grid size on the timeline canvas', () => {
+    const zoom = 144
+    renderTimeline([row], { zoom })
+
+    const canvas = document.querySelector<HTMLElement>('.studio-timeline__canvas')
+    expect(canvas).not.toBeNull()
+    expect(canvas?.style.getPropertyValue('--timeline-grid-size')).toBe(`${zoom}px`)
+  })
+
+  it('keeps track headers vertically aligned with the timeline scroll area', () => {
+    const tracks: EditorTrack[] = Array.from({ length: 4 }, (_, index) => ({
+      id: `track-${index + 1}`,
+      name: `V${index + 1}`,
+      kind: 'video',
+      locked: false,
+      hidden: false,
+      muted: false
+    }))
+    renderTimeline([row], { tracks })
+
+    const headers = document.querySelector<HTMLElement>('.studio-timeline__track-headers')
+    const scrollArea = document.querySelector<HTMLElement>('.studio-timeline__scroll-area')
+    expect(headers).not.toBeNull()
+    expect(scrollArea).not.toBeNull()
+
+    Object.defineProperty(scrollArea, 'scrollTop', {
+      configurable: true,
+      value: 112,
+      writable: true
+    })
+    fireEvent.scroll(scrollArea)
+
+    expect(headers?.scrollTop).toBe(112)
   })
 })

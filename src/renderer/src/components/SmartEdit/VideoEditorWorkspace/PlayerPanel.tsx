@@ -2,7 +2,12 @@ import type { JSX } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import { Maximize2, Menu, Monitor, Ratio } from 'lucide-react'
 import CanvasRatioMenu from './CanvasRatioMenu'
-import type { CanvasAspectRatio, MediaAsset } from './editorProject'
+import type {
+  CanvasAspectRatio,
+  MediaAsset,
+  EditorTrack,
+  ResolvedTimelineClip
+} from './editorProject'
 import VideoPlayback from './VideoPlayback'
 import './PlayerPanel.css'
 
@@ -11,13 +16,22 @@ interface PlayerPanelProps {
   selectedRatio: CanvasAspectRatio
   onAspectRatioChange: (aspectRatio: CanvasAspectRatio) => void
   onMediaError: (mediaId: string) => void
+  /** V1 新增；保持可选以兼容旧调用/测试。 */
+  activeClip?: ResolvedTimelineClip | null
+  activeTrack?: EditorTrack | null
+  playhead?: number
+  onPlayheadChange?: (time: number) => void
 }
 
 function PlayerPanel({
   activeAsset,
   selectedRatio,
   onAspectRatioChange,
-  onMediaError
+  onMediaError,
+  activeClip = null,
+  activeTrack = null,
+  playhead = 0,
+  onPlayheadChange
 }: PlayerPanelProps): JSX.Element {
   const ratioButtonRef = useRef<HTMLButtonElement>(null)
   const [isRatioMenuOpen, setIsRatioMenuOpen] = useState(false)
@@ -27,15 +41,17 @@ function PlayerPanel({
     <section className="studio-player" aria-label="播放器">
       <header className="studio-player__header">
         <h2>播放器</h2>
-
         <button type="button" aria-label="播放器菜单" title="播放器菜单" disabled>
           <Menu size={17} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </header>
-
       <VideoPlayback
-        activeAsset={activeAsset}
+          activeAsset={activeAsset}
+          activeClip={activeClip}
+          activeTrack={activeTrack}
+          playhead={playhead}
         selectedRatio={selectedRatio}
+        onPlayheadChange={onPlayheadChange}
         onMediaError={onMediaError}
         rightControls={
           <>
@@ -59,7 +75,6 @@ function PlayerPanel({
           </>
         }
       />
-
       {isRatioMenuOpen && (
         <CanvasRatioMenu
           selectedRatio={selectedRatio}

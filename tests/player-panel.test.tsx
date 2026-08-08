@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import PlayerPanel from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/PlayerPanel'
 import type {
   CanvasAspectRatio,
-  MediaAsset
+  EditorTrack,
+  MediaAsset,
+  ResolvedTimelineClip
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
 
 const selectedRatio: CanvasAspectRatio = {
@@ -20,6 +22,30 @@ const readyAsset: MediaAsset = {
   url: 'blob:demo',
   duration: 12,
   status: 'ready'
+}
+
+const activeClip: ResolvedTimelineClip = {
+  id: 'clip-1',
+  assetId: readyAsset.id,
+  trackId: 'track-video-main',
+  timelineStart: 0,
+  duration: 12,
+  sourceStart: 0,
+  sourceEnd: 12,
+  transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+  opacity: 1,
+  volume: 1,
+  muted: false,
+  speed: 1
+}
+
+const mainTrack: EditorTrack = {
+  id: 'track-video-main',
+  name: 'V1',
+  kind: 'video',
+  locked: false,
+  hidden: false,
+  muted: false
 }
 
 function renderPlayer(activeAsset: MediaAsset | null = null): {
@@ -105,5 +131,38 @@ describe('PlayerPanel', () => {
     Object.defineProperty(video, 'paused', { configurable: true, value: false })
     await user.click(screen.getByRole('button', { name: '暂停' }))
     expect(pause).toHaveBeenCalled()
+  })
+
+  it('does not render a hidden track in the preview', () => {
+    render(
+      <PlayerPanel
+        activeAsset={readyAsset}
+        activeClip={activeClip}
+        activeTrack={{ ...mainTrack, hidden: true }}
+        selectedRatio={selectedRatio}
+        onAspectRatioChange={vi.fn()}
+        onMediaError={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByLabelText('demo.mp4播放器预览')).not.toBeInTheDocument()
+  })
+
+  it('applies track mute to the active preview', () => {
+    render(
+      <PlayerPanel
+        activeAsset={readyAsset}
+        activeClip={activeClip}
+        activeTrack={{ ...mainTrack, muted: true }}
+        selectedRatio={selectedRatio}
+        onAspectRatioChange={vi.fn()}
+        onMediaError={vi.fn()}
+      />
+    )
+
+    const video = screen.getByLabelText('demo.mp4播放器预览') as HTMLVideoElement
+    fireEvent.loadedData(video)
+
+    expect(video.muted).toBe(true)
   })
 })

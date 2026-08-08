@@ -1,13 +1,22 @@
 import type { CSSProperties, JSX, ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Film, ListVideo, Pause, Play } from 'lucide-react'
-import type { CanvasAspectRatio, MediaAsset } from './editorProject'
+import type {
+  CanvasAspectRatio,
+  EditorTrack,
+  MediaAsset,
+  ResolvedTimelineClip
+} from './editorProject'
 
 interface VideoPlaybackProps {
   activeAsset: MediaAsset | null
   selectedRatio: CanvasAspectRatio
   rightControls: ReactNode
   onMediaError: (mediaId: string) => void
+  activeClip?: ResolvedTimelineClip | null
+  activeTrack?: EditorTrack | null
+  playhead?: number
+  onPlayheadChange?: (time: number) => void
 }
 
 interface CanvasStyle extends CSSProperties {
@@ -23,7 +32,6 @@ const formatPlaybackTime = (seconds: number): string => {
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const remainingSeconds = totalSeconds % 60
-
   return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, '0')).join(':')
 }
 
@@ -34,37 +42,94 @@ const resetVideo = (video: HTMLVideoElement): void => {
 
 function VideoPlayback({
   activeAsset,
+  activeClip = null,
+  activeTrack = null,
+  playhead = 0,
   selectedRatio,
   rightControls,
+  onPlayheadChange,
   onMediaError
 }: VideoPlaybackProps): JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [isVideoReady, setIsVideoReady] = useState(false)
+  const [readyVideoKey, setReadyVideoKey] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
+  const [legacyCurrentTime, setLegacyCurrentTime] = useState(0)
+  const [legacyDuration, setLegacyDuration] = useState(0)
   const isActiveAssetReady = activeAsset?.status === 'ready'
+  const isTrackHidden = activeTrack?.hidden === true
+  const isTrackMuted = activeTrack?.muted === true
+  const videoKey = activeAsset
+    ? `${activeAsset.id}:${activeAsset.status}:${isTrackHidden ? 'hidden' : 'visible'}`
+    : null
+  const isVideoReady = videoKey !== null && readyVideoKey === videoKey
+  const canRenderVideo = Boolean(activeAsset && isActiveAssetReady && !isTrackHidden)
+  const isPlaybackActive = isPlaying && canRenderVideo
   const canvasStyle: CanvasStyle = {
     '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
     '--canvas-ratio-value': selectedRatio.width / selectedRatio.height
   }
 
+  const clipTransformStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!activeClip) return undefined
+    const { transform, opacity } = activeClip
+    return {
+      opacity,
+      transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scaleX}, ${transform.scaleY}) rotate(${transform.rotation}deg)`
+    }
+  }, [activeClip])
+
+  const displayCurrentTime = activeClip ? playhead : legacyCurrentTime
+  const displayDuration = activeClip
+    ? activeClip.timelineStart + activeClip.duration
+    : legacyDuration
+
   useEffect(() => {
     const video = videoRef.current
     if (video) resetVideo(video)
-
     return () => {
       if (video) resetVideo(video)
     }
-  }, [activeAsset?.id])
+  }, [activeAsset?.id, activeClip?.id, activeTrack?.hidden])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !activeClip || !isVideoReady || isPlaying) return
+
+    const clipStart = activeClip.timelineStart
+    const clipEnd = clipStart + activeClip.duration
+    const boundedProjectTime = clamp(playhead, clipStart, clipEnd)
+    const sourceTime = clamp(
+      activeClip.sourceStart + (boundedProjectTime - clipStart) * activeClip.speed,
+      activeClip.sourceStart,
+      activeClip.sourceEnd
+    )
+    if (Math.abs(video.currentTime - sourceTime) > 0.04) video.currentTime = sourceTime
+  }, [activeClip, isPlaying, isVideoReady, playhead])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.playbackRate = activeClip?.speed ?? 1
+    video.muted = isTrackMuted || Boolean(activeClip?.muted)
+    video.volume = isTrackMuted ? 0 : clamp(activeClip?.volume ?? 1, 0, 1)
+  }, [activeClip, isTrackMuted])
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current
-    if (!video || !activeAsset || !isActiveAssetReady || !isVideoReady) return
+    if (!video || !activeAsset || !isActiveAssetReady || !isVideoReady || !canRenderVideo) return
 
     if (!video.paused) {
       video.pause()
       return
+    }
+
+    if (activeClip) {
+      const clipEnd = activeClip.timelineStart + activeClip.duration
+      if (playhead < activeClip.timelineStart || playhead >= clipEnd) {
+        video.currentTime = activeClip.sourceStart
+        onPlayheadChange?.(activeClip.timelineStart)
+      }
+      video.playbackRate = activeClip.speed
     }
 
     try {
@@ -83,30 +148,59 @@ function VideoPlayback({
           role={activeAsset ? undefined : 'img'}
           aria-label={
             activeAsset
-              ? `${activeAsset.name} 播放器画布，画面比例 ${selectedRatio.label}`
+              ? `${activeAsset.name} 播放器画布，${isTrackHidden ? '轨道已隐藏，' : ''}画面比例 ${selectedRatio.label}`
               : `暂无预览内容，画面比例 ${selectedRatio.label}`
           }
         >
-          {activeAsset && isActiveAssetReady ? (
+          {activeAsset && isActiveAssetReady && !isTrackHidden ? (
             <video
-              key={activeAsset.id}
+              key={videoKey ?? activeAsset?.id}
               ref={videoRef}
               src={activeAsset.url}
+              style={clipTransformStyle}
               preload="auto"
               playsInline
               aria-label={`${activeAsset.name}播放器预览`}
               onLoadedData={(event) => {
-                event.currentTarget.currentTime = 0
-                setCurrentTime(0)
-                setDuration(event.currentTarget.duration)
-                setIsVideoReady(true)
+                const video = event.currentTarget
+                if (activeClip) {
+                  video.currentTime = activeClip.sourceStart
+                  video.playbackRate = activeClip.speed
+                  video.muted = isTrackMuted || activeClip.muted
+                  video.volume = isTrackMuted ? 0 : clamp(activeClip.volume, 0, 1)
+                } else {
+                  video.currentTime = 0
+                  setLegacyCurrentTime(0)
+                  setLegacyDuration(video.duration)
+                }
+                if (videoKey) setReadyVideoKey(videoKey)
               }}
-              onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+              onTimeUpdate={(event) => {
+                const video = event.currentTarget
+                if (!activeClip) {
+                  setLegacyCurrentTime(video.currentTime)
+                  return
+                }
+
+                if (video.currentTime >= activeClip.sourceEnd - 0.01) {
+                  video.pause()
+                  video.currentTime = activeClip.sourceEnd
+                  onPlayheadChange?.(activeClip.timelineStart + activeClip.duration)
+                  return
+                }
+
+                const projectTime =
+                  activeClip.timelineStart +
+                  (video.currentTime - activeClip.sourceStart) / activeClip.speed
+                onPlayheadChange?.(
+                  clamp(projectTime, activeClip.timelineStart, activeClip.timelineStart + activeClip.duration)
+                )
+              }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
               onError={() => {
-                setIsVideoReady(false)
+                setReadyVideoKey(null)
                 setIsPlaying(false)
                 onMediaError(activeAsset.id)
               }}
@@ -116,44 +210,46 @@ function VideoPlayback({
           )}
         </div>
       </div>
-
       <footer className="studio-player__controls" aria-label="播放控制">
         <div className="studio-player__controls-left">
           <time
             className="studio-player__current-time"
-            dateTime={`PT${getWholeSeconds(currentTime)}S`}
+            dateTime={`PT${getWholeSeconds(displayCurrentTime)}S`}
           >
-            {formatPlaybackTime(currentTime)}
+            {formatPlaybackTime(displayCurrentTime)}
           </time>
           <span className="studio-player__time-divider" aria-hidden="true">
             /
           </span>
-          <time dateTime={`PT${getWholeSeconds(duration)}S`}>{formatPlaybackTime(duration)}</time>
-
+          <time dateTime={`PT${getWholeSeconds(displayDuration)}S`}>
+            {formatPlaybackTime(displayDuration)}
+          </time>
           <button type="button" aria-label="片段列表" title="片段列表" disabled>
             <ListVideo size={17} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
-
         <button
           className="studio-player__play"
           type="button"
-          aria-label={isPlaying ? '暂停' : '播放'}
-          title={isPlaying ? '暂停' : '播放'}
-          disabled={!isActiveAssetReady || !isVideoReady}
+          aria-label={isPlaybackActive ? '暂停' : '播放'}
+          title={isPlaybackActive ? '暂停' : '播放'}
+          disabled={!isActiveAssetReady || !isVideoReady || isTrackHidden}
           onClick={() => void togglePlayback()}
         >
-          {isPlaying ? (
+          {isPlaybackActive ? (
             <Pause size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
           ) : (
             <Play size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
           )}
         </button>
-
         <div className="studio-player__controls-right">{rightControls}</div>
       </footer>
     </>
   )
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }
 
 export default VideoPlayback
