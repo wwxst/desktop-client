@@ -1,4 +1,8 @@
-import type { EditorCommand } from './editorCommands'
+import type {
+  EditorBatchCommandResult,
+  EditorCommand,
+  EditorCommandResult
+} from './editorCommands'
 import type { EditorProjectState } from './editorProject'
 
 export interface EditorCapability {
@@ -9,16 +13,16 @@ export interface EditorCapability {
 export interface EditorAgentApi {
   getProjectSnapshot: () => EditorProjectState
   getCapabilities: () => readonly EditorCapability[]
-  execute: (command: EditorCommand) => void
-  executeBatch: (commands: readonly EditorCommand[]) => void
+  execute: (command: EditorCommand) => EditorCommandResult
+  executeBatch: (commands: readonly EditorCommand[]) => EditorBatchCommandResult
   undo: () => void
   redo: () => void
 }
 
 export interface EditorAgentApiDependencies {
   getProject: () => EditorProjectState
-  execute: (command: EditorCommand) => void
-  executeBatch: (commands: readonly EditorCommand[]) => void
+  execute: (command: EditorCommand) => EditorCommandResult
+  executeBatch: (commands: readonly EditorCommand[]) => EditorBatchCommandResult
   undo: () => void
   redo: () => void
 }

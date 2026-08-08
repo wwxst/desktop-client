@@ -11,6 +11,12 @@ import {
 } from './editorAgentApi'
 import type { ClipPatch, EditorCommand } from './editorCommands'
 import {
+  applyEditorCommand,
+  applyEditorCommandsWithResult,
+  type EditorBatchCommandResult,
+  type EditorCommandResult
+} from './editorCommands'
+import {
   createInitialEditorHistoryState,
   editorHistoryReducer
 } from './editorHistory'
@@ -42,13 +48,23 @@ function VideoEditorWorkspace(): JSX.Element {
     dispatch({ type: 'project/action', action })
   }, [])
 
-  const execute = useCallback((command: EditorCommand): void => {
-    dispatch({ type: 'command/execute', command })
-  }, [])
+  const execute = useCallback(
+    (command: EditorCommand): EditorCommandResult => {
+      const result = applyEditorCommand(project, command)
+      if (result.changed) dispatch({ type: 'command/execute', command })
+      return result
+    },
+    [project]
+  )
 
-  const executeBatch = useCallback((commands: readonly EditorCommand[]): void => {
-    dispatch({ type: 'command/batch', commands })
-  }, [])
+  const executeBatch = useCallback(
+    (commands: readonly EditorCommand[]): EditorBatchCommandResult => {
+      const result = applyEditorCommandsWithResult(project, commands)
+      if (result.changed) dispatch({ type: 'command/batch', commands })
+      return result
+    },
+    [project]
+  )
 
   const undo = useCallback((): void => dispatch({ type: 'history/undo' }), [])
   const redo = useCallback((): void => dispatch({ type: 'history/redo' }), [])
