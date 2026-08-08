@@ -43,6 +43,7 @@ function CompositionPreview({
       media.volume = composition.audioLayers.some((layer) => layer.id === clip.id)
         ? clamp(clip.volume, 0, 1)
         : 0
+      media.playbackRate = clip.speed
       const sourceTime = getSourceTime(clip, playhead)
       if (Math.abs(media.currentTime - sourceTime) > 0.04) media.currentTime = sourceTime
     }

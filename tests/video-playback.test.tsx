@@ -82,6 +82,7 @@ describe('Composition Preview playback', () => {
         timelineStart: 5,
         sourceStart: 0,
         sourceEnd: 5,
+        speed: 2,
         transform: { x: 12, y: -8, scaleX: 1.2, scaleY: 0.8, rotation: 10 },
         opacity: 0.5
       }
@@ -98,6 +99,7 @@ describe('Composition Preview playback', () => {
       opacity: '0.5',
       transform: 'translate(12px, -8px) scale(1.2, 0.8) rotate(10deg)'
     })
+    expect((overlayVideo as HTMLVideoElement).playbackRate).toBe(2)
   })
 
   it('uses the project duration for the playback counter', () => {

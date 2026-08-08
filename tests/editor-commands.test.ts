@@ -201,4 +201,24 @@ describe('editor commands', () => {
     expect(right.timelineStart).toBe(8)
     expect(right.duration).toBe(12)
   })
+
+  it('reports an invalid range when splitting at a clip boundary', () => {
+    let state = createReadyProject()
+    state = applyEditorCommand(state, {
+      type: 'clip/addAsset',
+      assetId: asset.id,
+      clipId: 'clip-1'
+    }).state
+
+    const result = applyEditorCommand(state, {
+      type: 'clip/split',
+      clipId: 'clip-1',
+      at: 0.01,
+      rightClipId: 'clip-2'
+    })
+
+    expect(result.state).toBe(state)
+    expect(result.success).toBe(false)
+    expect(result.code).toBe('INVALID_RANGE')
+  })
 })

@@ -195,6 +195,14 @@ function getCommandFailure(
       const track = state.tracks.find((item) => item.id === clip.trackId)
       if (track?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
       if (!Number.isFinite(command.at)) return failure('INVALID_RANGE', '分割位置无效')
+      const asset = state.assets.find((item) => item.id === clip.assetId) ?? null
+      const resolved = resolveTimelineClip(clip, asset)
+      if (
+        command.at <= resolved.timelineStart + MIN_CLIP_DURATION ||
+        command.at >= resolved.timelineStart + resolved.duration - MIN_CLIP_DURATION
+      ) {
+        return failure('INVALID_RANGE', '分割位置必须位于片段内部')
+      }
       return null
     }
 
