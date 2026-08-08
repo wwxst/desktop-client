@@ -62,6 +62,12 @@ export interface ResolvedTimelineClip extends TimelineClip {
   speed: number
 }
 
+export interface TimelineComposition {
+  time: number
+  videoLayers: ResolvedTimelineClip[]
+  audioLayers: ResolvedTimelineClip[]
+}
+
 export interface EditorTrack {
   id: string
   name: string
@@ -285,6 +291,44 @@ export function getProjectDuration(state: EditorProjectState): number {
     const resolved = resolveTimelineClip(clip, asset)
     return Math.max(end, resolved.timelineStart + resolved.duration)
   }, 0)
+}
+
+export function selectCompositionAtTime(
+  state: EditorProjectState,
+  time: number
+): TimelineComposition {
+  const safeTime = Math.max(0, finiteOr(time, state.playhead))
+  const videoByTrack = new Map<string, ResolvedTimelineClip>()
+  const audioByTrack = new Map<string, ResolvedTimelineClip>()
+
+  for (const rawClip of state.clips) {
+    const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
+    const resolved = resolveTimelineClip(rawClip, asset)
+    const track = state.tracks.find((item) => item.id === resolved.trackId)
+    if (!track || track.hidden) continue
+    if (
+      safeTime < resolved.timelineStart ||
+      safeTime >= resolved.timelineStart + resolved.duration
+    ) {
+      continue
+    }
+
+    if (track.kind === 'audio') {
+      if (!track.muted && !resolved.muted) audioByTrack.set(track.id, resolved)
+    } else if (track.kind === 'video' || track.kind === 'overlay') {
+      videoByTrack.set(track.id, resolved)
+    }
+  }
+
+  const trackOrder = new Map(state.tracks.map((track, index) => [track.id, index]))
+  const sortBottomToTop = (left: ResolvedTimelineClip, right: ResolvedTimelineClip): number =>
+    (trackOrder.get(left.trackId) ?? 0) - (trackOrder.get(right.trackId) ?? 0)
+
+  return {
+    time: safeTime,
+    videoLayers: [...videoByTrack.values()].sort(sortBottomToTop).reverse(),
+    audioLayers: [...audioByTrack.values()].sort(sortBottomToTop).reverse()
+  }
 }
 
 export function selectActiveClip(state: EditorProjectState): ResolvedTimelineClip | null {
