@@ -16,6 +16,7 @@ import {
   ZoomIn,
   ZoomOut
 } from 'lucide-react'
+import { canMoveClipToTrack } from './editorClipMath'
 import {
   MAX_TIMELINE_ZOOM,
   MIN_CLIP_DURATION,
@@ -69,7 +70,10 @@ interface DragState {
   mode: 'move' | 'trim-left' | 'trim-right'
   clip: ResolvedTimelineClip
   startClientX: number
+  startClientY: number
   previewTimelineStart: number
+  previewTrackId: string
+  isDropValid: boolean
   previewSourceStart: number
   previewSourceEnd: number
   previewDuration: number
@@ -135,6 +139,7 @@ function Timeline({
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets])
   const [dragState, setDragState] = useState<DragState | null>(null)
   const trackHeadersRef = useRef<HTMLDivElement>(null)
+  const trackRowsRef = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const resolvedClips = useMemo(
     () =>
@@ -163,6 +168,16 @@ function Timeline({
     '--timeline-grid-size': `${zoom}px`
   }
 
+  const findTrackAtClientY = (clientY: number): EditorTrack | null => {
+    for (const track of tracks) {
+      const row = trackRowsRef.current.get(track.id)
+      if (!row) continue
+      const rect = row.getBoundingClientRect()
+      if (clientY >= rect.top && clientY < rect.bottom) return track
+    }
+    return null
+  }
+
   useEffect(() => {
     if (!dragState) return
 
@@ -172,11 +187,21 @@ function Timeline({
       const clip = dragState.clip
 
       if (dragState.mode === 'move') {
+        const targetTrack = findTrackAtClientY(event.clientY)
+        const asset = assetsById.get(clip.assetId)
+        const targetTrackId = targetTrack?.id ?? dragState.previewTrackId
+        const isDropValid = Boolean(
+          targetTrack &&
+            !targetTrack.locked &&
+            canMoveClipToTrack(asset?.kind ?? 'video', targetTrack.kind)
+        )
         setDragState((current) =>
           current
             ? {
                 ...current,
-                previewTimelineStart: snapTime(Math.max(0, clip.timelineStart + deltaSeconds))
+                previewTimelineStart: snapTime(Math.max(0, clip.timelineStart + deltaSeconds)),
+                previewTrackId: targetTrackId,
+                isDropValid
               }
             : current
         )
@@ -185,13 +210,14 @@ function Timeline({
 
       if (dragState.mode === 'trim-left') {
         const maxDelta = clip.duration - MIN_CLIP_DURATION
-        const appliedDelta = clamp(deltaSeconds, -clip.sourceStart / clip.speed, maxDelta)
+        const minDelta = Math.max(-clip.sourceStart / clip.speed, -clip.timelineStart)
+        const appliedDelta = clamp(deltaSeconds, minDelta, maxDelta)
         const sourceStart = clip.sourceStart + appliedDelta * clip.speed
         setDragState((current) =>
           current
             ? {
                 ...current,
-                previewTimelineStart: Math.max(0, clip.timelineStart + appliedDelta),
+                previewTimelineStart: clip.timelineStart + appliedDelta,
                 previewSourceStart: sourceStart,
                 previewDuration: Math.max(MIN_CLIP_DURATION, clip.duration - appliedDelta)
               }
@@ -220,7 +246,13 @@ function Timeline({
       if (event.pointerId !== dragState.pointerId) return
 
       if (dragState.mode === 'move') {
-        onMoveClip?.(dragState.clip.id, dragState.previewTimelineStart)
+        if (dragState.isDropValid) {
+          onMoveClip?.(
+            dragState.clip.id,
+            dragState.previewTimelineStart,
+            dragState.previewTrackId
+          )
+        }
       } else {
         onTrimClip?.(dragState.clip.id, {
           sourceStart: dragState.previewSourceStart,
@@ -239,7 +271,7 @@ function Timeline({
       window.removeEventListener('pointerup', handlePointerUp)
       window.removeEventListener('pointercancel', handlePointerUp)
     }
-  }, [assetsById, dragState, onMoveClip, onTrimClip, zoom])
+  }, [assetsById, dragState, findTrackAtClientY, onMoveClip, onTrimClip, tracks, zoom])
 
   const activeClip = resolvedClips.find((clip) => clip.id === activeClipId) ?? null
   const activeTrack = activeClip ? tracks.find((track) => track.id === activeClip.trackId) : null
@@ -265,7 +297,10 @@ function Timeline({
       mode: 'move',
       clip,
       startClientX: event.clientX,
+      startClientY: event.clientY,
       previewTimelineStart: clip.timelineStart,
+      previewTrackId: clip.trackId,
+      isDropValid: true,
       previewSourceStart: clip.sourceStart,
       previewSourceEnd: clip.sourceEnd,
       previewDuration: clip.duration
@@ -288,7 +323,10 @@ function Timeline({
       mode,
       clip,
       startClientX: event.clientX,
+      startClientY: event.clientY,
       previewTimelineStart: clip.timelineStart,
+      previewTrackId: clip.trackId,
+      isDropValid: true,
       previewSourceStart: clip.sourceStart,
       previewSourceEnd: clip.sourceEnd,
       previewDuration: clip.duration
@@ -467,18 +505,34 @@ function Timeline({
             >
               <span />
             </div>
-            {tracks.map((track) => (
+            {tracks.map((track) => {
+              const isDropPreview = dragState?.mode === 'move' && dragState.previewTrackId === track.id
+              const isDropValid = isDropPreview && dragState.isDropValid
+              const isDropInvalid = isDropPreview && !dragState.isDropValid
+              return (
               <div
                 className="studio-timeline__track-row"
                 key={track.id}
+                ref={(element) => {
+                  if (element) trackRowsRef.current.set(track.id, element)
+                  else trackRowsRef.current.delete(track.id)
+                }}
                 data-locked={track.locked}
                 data-hidden={track.hidden}
+                data-drop-target={isDropValid ? 'true' : undefined}
+                data-drop-invalid={isDropInvalid ? 'true' : undefined}
               >
                 {resolvedClips
-                  .filter((clip) => clip.trackId === track.id)
+                  .filter(
+                    (clip) =>
+                      (dragState?.clip.id === clip.id && dragState.mode === 'move'
+                        ? dragState.previewTrackId
+                        : clip.trackId) === track.id
+                  )
                   .map((clip) => renderClip(clip))}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
