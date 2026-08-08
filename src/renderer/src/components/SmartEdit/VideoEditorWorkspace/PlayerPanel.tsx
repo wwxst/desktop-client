@@ -49,11 +49,11 @@ function PlayerPanel({
         </button>
       </header>
       <VideoPlayback
-          project={project}
-          activeAsset={activeAsset}
-          activeClip={activeClip}
-          activeTrack={activeTrack}
-          playhead={playhead}
+        project={project}
+        activeAsset={activeAsset}
+        activeClip={activeClip}
+        activeTrack={activeTrack}
+        playhead={playhead}
         selectedRatio={selectedRatio}
         onPlayheadChange={onPlayheadChange}
         onMediaError={onMediaError}

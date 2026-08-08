@@ -122,7 +122,9 @@ describe('selectCompositionAtTime', () => {
           muted: true
         }
       ],
-      tracks.map((track) => (track.id === 'track-video-overlay' ? { ...track, hidden: false } : track))
+      tracks.map((track) =>
+        track.id === 'track-video-overlay' ? { ...track, hidden: false } : track
+      )
     )
 
     const composition = selectCompositionAtTime(project, 2)

@@ -46,8 +46,10 @@ export function canMoveClipToTrack(
   targetTrackKind: TargetTrackKind
 ): boolean {
   if (assetKind === 'audio') return targetTrackKind === 'audio'
-  return (assetKind === 'video' || assetKind === 'image') &&
+  return (
+    (assetKind === 'video' || assetKind === 'image') &&
     (targetTrackKind === 'video' || targetTrackKind === 'overlay')
+  )
 }
 
 function finitePositiveOr(value: number | null | undefined, fallback: number): number {

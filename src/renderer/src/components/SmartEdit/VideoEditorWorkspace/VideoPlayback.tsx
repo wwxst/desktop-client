@@ -326,7 +326,11 @@ function LegacyVideoPlayback({
                   activeClip.timelineStart +
                   (video.currentTime - activeClip.sourceStart) / activeClip.speed
                 onPlayheadChange?.(
-                  clamp(projectTime, activeClip.timelineStart, activeClip.timelineStart + activeClip.duration)
+                  clamp(
+                    projectTime,
+                    activeClip.timelineStart,
+                    activeClip.timelineStart + activeClip.duration
+                  )
                 )
               }}
               onPlay={() => setIsPlaying(true)}

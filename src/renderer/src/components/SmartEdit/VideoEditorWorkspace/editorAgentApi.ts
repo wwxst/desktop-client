@@ -1,8 +1,4 @@
-import type {
-  EditorBatchCommandResult,
-  EditorCommand,
-  EditorCommandResult
-} from './editorCommands'
+import type { EditorBatchCommandResult, EditorCommand, EditorCommandResult } from './editorCommands'
 import type { EditorProjectState } from './editorProject'
 
 export interface EditorCapability {

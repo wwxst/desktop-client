@@ -60,11 +60,7 @@ const formatDuration = (duration: number | null): string => {
   return hours > 0 ? `${hours}:${minuteText}:${secondText}` : `${minuteText}:${secondText}`
 }
 
-function FunctionPanel({
-  mediaItems,
-  onImportMedia,
-  onAddMedia
-}: FunctionPanelProps): JSX.Element {
+function FunctionPanel({ mediaItems, onImportMedia, onAddMedia }: FunctionPanelProps): JSX.Element {
   const [selectedCategory, setSelectedCategory] = useState('媒体')
   const [isDragging, setIsDragging] = useState(false)
   const categoryListRef = useRef<HTMLElement | null>(null)

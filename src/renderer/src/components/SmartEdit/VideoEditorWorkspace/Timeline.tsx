@@ -1,5 +1,5 @@
 import type { CSSProperties, JSX, PointerEvent as ReactPointerEvent } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Eye,
   EyeOff,
@@ -142,8 +142,7 @@ function Timeline({
   const trackRowsRef = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const resolvedClips = useMemo(
-    () =>
-      clips.map((clip) => resolveTimelineClip(clip, assetsById.get(clip.assetId) ?? null)),
+    () => clips.map((clip) => resolveTimelineClip(clip, assetsById.get(clip.assetId) ?? null)),
     [assetsById, clips]
   )
 
@@ -168,15 +167,18 @@ function Timeline({
     '--timeline-grid-size': `${zoom}px`
   }
 
-  const findTrackAtClientY = (clientY: number): EditorTrack | null => {
-    for (const track of tracks) {
-      const row = trackRowsRef.current.get(track.id)
-      if (!row) continue
-      const rect = row.getBoundingClientRect()
-      if (clientY >= rect.top && clientY < rect.bottom) return track
-    }
-    return null
-  }
+  const findTrackAtClientY = useCallback(
+    (clientY: number): EditorTrack | null => {
+      for (const track of tracks) {
+        const row = trackRowsRef.current.get(track.id)
+        if (!row) continue
+        const rect = row.getBoundingClientRect()
+        if (clientY >= rect.top && clientY < rect.bottom) return track
+      }
+      return null
+    },
+    [tracks]
+  )
 
   useEffect(() => {
     if (!dragState) return
@@ -192,8 +194,8 @@ function Timeline({
         const targetTrackId = targetTrack?.id ?? dragState.previewTrackId
         const isDropValid = Boolean(
           targetTrack &&
-            !targetTrack.locked &&
-            canMoveClipToTrack(asset?.kind ?? 'video', targetTrack.kind)
+          !targetTrack.locked &&
+          canMoveClipToTrack(asset?.kind ?? 'video', targetTrack.kind)
         )
         setDragState((current) =>
           current
@@ -247,11 +249,7 @@ function Timeline({
 
       if (dragState.mode === 'move') {
         if (dragState.isDropValid) {
-          onMoveClip?.(
-            dragState.clip.id,
-            dragState.previewTimelineStart,
-            dragState.previewTrackId
-          )
+          onMoveClip?.(dragState.clip.id, dragState.previewTimelineStart, dragState.previewTrackId)
         }
       } else {
         onTrimClip?.(dragState.clip.id, {
@@ -278,9 +276,9 @@ function Timeline({
   const canEditActiveClip = Boolean(activeClip && !activeTrack?.locked)
   const canSplitActiveClip = Boolean(
     activeClip &&
-      canEditActiveClip &&
-      playhead > activeClip.timelineStart + MIN_CLIP_DURATION &&
-      playhead < activeClip.timelineStart + activeClip.duration - MIN_CLIP_DURATION
+    canEditActiveClip &&
+    playhead > activeClip.timelineStart + MIN_CLIP_DURATION &&
+    playhead < activeClip.timelineStart + activeClip.duration - MIN_CLIP_DURATION
   )
 
   const handleClipPointerDown = (
@@ -380,10 +378,22 @@ function Timeline({
     <section className="studio-timeline" aria-label="时间线">
       <header className="studio-timeline__toolbar">
         <div className="studio-timeline__toolbar-group">
-          <button type="button" title="撤销 Ctrl+Z" aria-label="撤销" disabled={!canUndo} onClick={onUndo}>
+          <button
+            type="button"
+            title="撤销 Ctrl+Z"
+            aria-label="撤销"
+            disabled={!canUndo}
+            onClick={onUndo}
+          >
             <Undo2 size={15} aria-hidden="true" />
           </button>
-          <button type="button" title="重做 Ctrl+Shift+Z" aria-label="重做" disabled={!canRedo} onClick={onRedo}>
+          <button
+            type="button"
+            title="重做 Ctrl+Shift+Z"
+            aria-label="重做"
+            disabled={!canRedo}
+            onClick={onRedo}
+          >
             <Redo2 size={15} aria-hidden="true" />
           </button>
         </div>
@@ -506,31 +516,32 @@ function Timeline({
               <span />
             </div>
             {tracks.map((track) => {
-              const isDropPreview = dragState?.mode === 'move' && dragState.previewTrackId === track.id
+              const isDropPreview =
+                dragState?.mode === 'move' && dragState.previewTrackId === track.id
               const isDropValid = isDropPreview && dragState.isDropValid
               const isDropInvalid = isDropPreview && !dragState.isDropValid
               return (
-              <div
-                className="studio-timeline__track-row"
-                key={track.id}
-                ref={(element) => {
-                  if (element) trackRowsRef.current.set(track.id, element)
-                  else trackRowsRef.current.delete(track.id)
-                }}
-                data-locked={track.locked}
-                data-hidden={track.hidden}
-                data-drop-target={isDropValid ? 'true' : undefined}
-                data-drop-invalid={isDropInvalid ? 'true' : undefined}
-              >
-                {resolvedClips
-                  .filter(
-                    (clip) =>
-                      (dragState?.clip.id === clip.id && dragState.mode === 'move'
-                        ? dragState.previewTrackId
-                        : clip.trackId) === track.id
-                  )
-                  .map((clip) => renderClip(clip))}
-              </div>
+                <div
+                  className="studio-timeline__track-row"
+                  key={track.id}
+                  ref={(element) => {
+                    if (element) trackRowsRef.current.set(track.id, element)
+                    else trackRowsRef.current.delete(track.id)
+                  }}
+                  data-locked={track.locked}
+                  data-hidden={track.hidden}
+                  data-drop-target={isDropValid ? 'true' : undefined}
+                  data-drop-invalid={isDropInvalid ? 'true' : undefined}
+                >
+                  {resolvedClips
+                    .filter(
+                      (clip) =>
+                        (dragState?.clip.id === clip.id && dragState.mode === 'move'
+                          ? dragState.previewTrackId
+                          : clip.trackId) === track.id
+                    )
+                    .map((clip) => renderClip(clip))}
+                </div>
               )
             })}
           </div>

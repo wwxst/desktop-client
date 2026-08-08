@@ -1,10 +1,6 @@
 import type { CSSProperties, JSX } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
-import type {
-  EditorProjectState,
-  ResolvedTimelineClip,
-  TimelineComposition
-} from './editorProject'
+import type { EditorProjectState, ResolvedTimelineClip, TimelineComposition } from './editorProject'
 import './CompositionPreview.css'
 
 interface CompositionPreviewProps {
@@ -27,8 +23,18 @@ function CompositionPreview({
   onMediaError
 }: CompositionPreviewProps): JSX.Element {
   const mediaRefs = useRef<Map<string, HTMLMediaElement>>(new Map())
-  const assetsById = useMemo(() => new Map(project.assets.map((asset) => [asset.id, asset])), [project.assets])
-  const layers = [...composition.videoLayers, ...composition.audioLayers]
+  const assetsById = useMemo(
+    () => new Map(project.assets.map((asset) => [asset.id, asset])),
+    [project.assets]
+  )
+  const layers = useMemo(
+    () => [...composition.videoLayers, ...composition.audioLayers],
+    [composition.audioLayers, composition.videoLayers]
+  )
+  const audioLayerIds = useMemo(
+    () => new Set(composition.audioLayers.map((layer) => layer.id)),
+    [composition.audioLayers]
+  )
 
   useEffect(() => {
     const visibleIds = new Set(layers.map((clip) => clip.id))
@@ -39,15 +45,14 @@ function CompositionPreview({
     for (const clip of layers) {
       const media = mediaRefs.current.get(clip.id)
       if (!media) continue
-      media.muted = composition.audioLayers.every((layer) => layer.id !== clip.id)
-      media.volume = composition.audioLayers.some((layer) => layer.id === clip.id)
-        ? clamp(clip.volume, 0, 1)
-        : 0
+      const isAudio = audioLayerIds.has(clip.id)
+      media.muted = !isAudio
+      media.volume = isAudio ? clamp(clip.volume, 0, 1) : 0
       media.playbackRate = clip.speed
       const sourceTime = getSourceTime(clip, playhead)
       if (Math.abs(media.currentTime - sourceTime) > 0.04) media.currentTime = sourceTime
     }
-  }, [layers, playhead])
+  }, [audioLayerIds, layers, playhead])
 
   useEffect(() => {
     for (const media of mediaRefs.current.values()) {
@@ -70,7 +75,7 @@ function CompositionPreview({
         const asset = assetsById.get(clip.assetId)
         if (!asset || asset.status !== 'ready') return null
 
-        const isAudio = composition.audioLayers.some((layer) => layer.id === clip.id)
+        const isAudio = audioLayerIds.has(clip.id)
         const mediaProps = {
           key: clip.id,
           ref: (media: HTMLMediaElement | null) => {

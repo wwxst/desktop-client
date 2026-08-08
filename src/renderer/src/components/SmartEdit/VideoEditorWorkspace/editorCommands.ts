@@ -1,8 +1,4 @@
-import {
-  canMoveClipToTrack,
-  normalizeSourceRange,
-  type ClipAssetKind
-} from './editorClipMath'
+import { canMoveClipToTrack, normalizeSourceRange, type ClipAssetKind } from './editorClipMath'
 import {
   MIN_CLIP_DURATION,
   createTimelineClipFromAsset,
@@ -63,12 +59,7 @@ export type EditorCommand =
   | { type: 'canvas/setAspectRatio'; aspectRatio: CanvasAspectRatio }
 
 export type EditorExecutionCode =
-  | 'OK'
-  | 'NOT_FOUND'
-  | 'INVALID_RANGE'
-  | 'TRACK_LOCKED'
-  | 'INCOMPATIBLE_TRACK'
-  | 'NO_CHANGE'
+  'OK' | 'NOT_FOUND' | 'INVALID_RANGE' | 'TRACK_LOCKED' | 'INCOMPATIBLE_TRACK' | 'NO_CHANGE'
 
 export interface EditorCommandResult {
   state: EditorProjectState
@@ -223,11 +214,7 @@ function getCommandFailure(
       const currentTrack = state.tracks.find((track) => track.id === clip.trackId)
       if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
       const asset = state.assets.find((item) => item.id === clip.assetId)
-      return getTargetTrackFailure(
-        state,
-        getAssetKind(asset),
-        command.trackId ?? clip.trackId
-      )
+      return getTargetTrackFailure(state, getAssetKind(asset), command.trackId ?? clip.trackId)
     }
 
     case 'track/update':
@@ -267,7 +254,10 @@ function getTargetTrackFailure(
   return null
 }
 
-function reduceEditorCommand(state: EditorProjectState, command: EditorCommand): EditorProjectState {
+function reduceEditorCommand(
+  state: EditorProjectState,
+  command: EditorCommand
+): EditorProjectState {
   switch (command.type) {
     case 'clip/addAsset': {
       const clip = createTimelineClipFromAsset(state, command.assetId, command.clipId, {
@@ -405,7 +395,9 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
 
     case 'track/update': {
       const tracks = state.tracks.map((track) =>
-        track.id === command.trackId ? { ...track, ...command.patch, id: track.id, kind: track.kind } : track
+        track.id === command.trackId
+          ? { ...track, ...command.patch, id: track.id, kind: track.kind }
+          : track
       )
       return { ...state, tracks }
     }

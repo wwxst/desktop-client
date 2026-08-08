@@ -5,10 +5,7 @@ import FunctionPanel from './FunctionPanel'
 import ParameterPanel from './ParameterPanel'
 import PlayerPanel from './PlayerPanel'
 import Timeline from './Timeline'
-import {
-  createEditorAgentApi,
-  registerEditorAgentApi
-} from './editorAgentApi'
+import { createEditorAgentApi, registerEditorAgentApi } from './editorAgentApi'
 import type { ClipPatch, EditorCommand } from './editorCommands'
 import {
   applyEditorCommand,
@@ -16,10 +13,7 @@ import {
   type EditorBatchCommandResult,
   type EditorCommandResult
 } from './editorCommands'
-import {
-  createInitialEditorHistoryState,
-  editorHistoryReducer
-} from './editorHistory'
+import { createInitialEditorHistoryState, editorHistoryReducer } from './editorHistory'
 import {
   selectActiveAsset,
   selectActiveClip,
@@ -126,9 +120,7 @@ function VideoEditorWorkspace(): JSX.Element {
     const handleKeyDown = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null
       const isTyping =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable
+        target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
       if (isTyping) return
 
       const modifier = event.ctrlKey || event.metaKey
@@ -243,9 +235,7 @@ function VideoEditorWorkspace(): JSX.Element {
               }
               onDeleteClip={(clipId) => execute({ type: 'clip/delete', clipId })}
               onUpdateTrack={handleUpdateTrack}
-              onZoomChange={(zoom) =>
-                dispatchProjectAction({ type: 'timeline/zoomChanged', zoom })
-              }
+              onZoomChange={(zoom) => dispatchProjectAction({ type: 'timeline/zoomChanged', zoom })}
               onUndo={undo}
               onRedo={redo}
             />
