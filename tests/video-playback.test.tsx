@@ -4,6 +4,7 @@ import PlayerPanel from '../src/renderer/src/components/SmartEdit/VideoEditorWor
 import {
   DEFAULT_EDITOR_TRACKS,
   createInitialEditorProjectState,
+  selectCompositionAtTime,
   type EditorProjectState,
   type MediaAsset,
   type TimelineClip
@@ -33,13 +34,13 @@ const overlay: MediaAsset = {
 
 const ratio = { id: '9:16', label: '9:16（抖音）', width: 9, height: 16 }
 
-function createProject(clips: TimelineClip[]): EditorProjectState {
+function createProject(clips: TimelineClip[], tracks = DEFAULT_EDITOR_TRACKS): EditorProjectState {
   const initial = createInitialEditorProjectState('row-1')
   return {
     ...initial,
     assets: [videoA, videoB, overlay],
     clips,
-    tracks: DEFAULT_EDITOR_TRACKS
+    tracks
   }
 }
 
@@ -100,6 +101,73 @@ describe('Composition Preview playback', () => {
       transform: 'translate(12px, -8px) scale(1.2, 0.8) rotate(10deg)'
     })
     expect((overlayVideo as HTMLVideoElement).playbackRate).toBe(2)
+  })
+
+  it('plays a video clip original audio at its clip volume', () => {
+    const project = createProject([
+      {
+        id: 'clip-a',
+        assetId: videoA.id,
+        trackId: 'track-video-main',
+        timelineStart: 0,
+        sourceStart: 0,
+        sourceEnd: 5,
+        volume: 0.4,
+        muted: false
+      }
+    ])
+
+    renderComposition(project, 2)
+
+    const video = screen.getByLabelText(/^a\.mp4/) as HTMLVideoElement
+    expect(video.muted).toBe(false)
+    expect(video.volume).toBe(0.4)
+  })
+
+  it('mutes a video track without removing its picture from the composition', () => {
+    const project = createProject(
+      [
+        {
+          id: 'clip-a',
+          assetId: videoA.id,
+          trackId: 'track-video-main',
+          timelineStart: 0,
+          sourceStart: 0,
+          sourceEnd: 5,
+          volume: 0.4
+        }
+      ],
+      DEFAULT_EDITOR_TRACKS.map((track) =>
+        track.id === 'track-video-main' ? { ...track, muted: true } : track
+      )
+    )
+
+    expect(selectCompositionAtTime(project, 2).videoLayers[0]?.muted).toBe(true)
+    renderComposition(project, 2)
+
+    const video = screen.getByLabelText(/^a\.mp4/) as HTMLVideoElement
+    expect(video).toBeInTheDocument()
+    expect(video.muted).toBe(true)
+  })
+
+  it('mutes a video clip without removing its picture from the composition', () => {
+    const project = createProject([
+      {
+        id: 'clip-a',
+        assetId: videoA.id,
+        trackId: 'track-video-main',
+        timelineStart: 0,
+        sourceStart: 0,
+        sourceEnd: 5,
+        muted: true
+      }
+    ])
+
+    renderComposition(project, 2)
+
+    const video = screen.getByLabelText(/^a\.mp4/) as HTMLVideoElement
+    expect(video).toBeInTheDocument()
+    expect(video.muted).toBe(true)
   })
 
   it('uses the project duration for the playback counter', () => {

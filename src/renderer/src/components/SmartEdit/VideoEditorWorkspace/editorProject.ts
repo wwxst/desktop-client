@@ -316,7 +316,7 @@ export function selectCompositionAtTime(
     if (track.kind === 'audio') {
       if (!track.muted && !resolved.muted) audioByTrack.set(track.id, resolved)
     } else if (track.kind === 'video' || track.kind === 'overlay') {
-      videoByTrack.set(track.id, resolved)
+      videoByTrack.set(track.id, track.muted ? { ...resolved, muted: true } : resolved)
     }
   }
 

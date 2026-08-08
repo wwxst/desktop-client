@@ -31,10 +31,6 @@ function CompositionPreview({
     () => [...composition.videoLayers, ...composition.audioLayers],
     [composition.audioLayers, composition.videoLayers]
   )
-  const audioLayerIds = useMemo(
-    () => new Set(composition.audioLayers.map((layer) => layer.id)),
-    [composition.audioLayers]
-  )
 
   useEffect(() => {
     const visibleIds = new Set(layers.map((clip) => clip.id))
@@ -45,14 +41,13 @@ function CompositionPreview({
     for (const clip of layers) {
       const media = mediaRefs.current.get(clip.id)
       if (!media) continue
-      const isAudio = audioLayerIds.has(clip.id)
-      media.muted = !isAudio
-      media.volume = isAudio ? clamp(clip.volume, 0, 1) : 0
+      media.muted = clip.muted
+      media.volume = clip.muted ? 0 : clamp(clip.volume, 0, 1)
       media.playbackRate = clip.speed
       const sourceTime = getSourceTime(clip, playhead)
       if (Math.abs(media.currentTime - sourceTime) > 0.04) media.currentTime = sourceTime
     }
-  }, [audioLayerIds, layers, playhead])
+  }, [layers, playhead])
 
   useEffect(() => {
     for (const media of mediaRefs.current.values()) {
@@ -75,7 +70,7 @@ function CompositionPreview({
         const asset = assetsById.get(clip.assetId)
         if (!asset || asset.status !== 'ready') return null
 
-        const isAudio = audioLayerIds.has(clip.id)
+        const isAudio = composition.audioLayers.some((layer) => layer.id === clip.id)
         const mediaProps = {
           key: clip.id,
           ref: (media: HTMLMediaElement | null) => {
@@ -85,7 +80,7 @@ function CompositionPreview({
           src: asset.url,
           preload: 'auto' as const,
           playsInline: true,
-          muted: isAudio ? clip.muted : true,
+          muted: clip.muted,
           onLoadedData: (event: React.SyntheticEvent<HTMLMediaElement>) => {
             event.currentTarget.currentTime = getSourceTime(clip, playhead)
           },
