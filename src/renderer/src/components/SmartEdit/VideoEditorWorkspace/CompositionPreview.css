@@ -1,0 +1,29 @@
+.studio-player__canvas--composition {
+  position: relative;
+}
+
+.studio-composition-preview {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #111111;
+}
+
+.studio-composition-preview__media {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.studio-composition-preview__audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

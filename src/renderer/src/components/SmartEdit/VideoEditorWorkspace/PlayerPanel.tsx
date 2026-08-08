@@ -4,6 +4,7 @@ import { Maximize2, Menu, Monitor, Ratio } from 'lucide-react'
 import CanvasRatioMenu from './CanvasRatioMenu'
 import type {
   CanvasAspectRatio,
+  EditorProjectState,
   MediaAsset,
   EditorTrack,
   ResolvedTimelineClip
@@ -12,7 +13,8 @@ import VideoPlayback from './VideoPlayback'
 import './PlayerPanel.css'
 
 interface PlayerPanelProps {
-  activeAsset: MediaAsset | null
+  project?: EditorProjectState
+  activeAsset?: MediaAsset | null
   selectedRatio: CanvasAspectRatio
   onAspectRatioChange: (aspectRatio: CanvasAspectRatio) => void
   onMediaError: (mediaId: string) => void
@@ -28,6 +30,7 @@ function PlayerPanel({
   selectedRatio,
   onAspectRatioChange,
   onMediaError,
+  project,
   activeClip = null,
   activeTrack = null,
   playhead = 0,
@@ -46,6 +49,7 @@ function PlayerPanel({
         </button>
       </header>
       <VideoPlayback
+          project={project}
           activeAsset={activeAsset}
           activeClip={activeClip}
           activeTrack={activeTrack}

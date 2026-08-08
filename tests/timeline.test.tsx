@@ -27,7 +27,13 @@ const row: DraftRow = {
 
 function renderTimeline(
   rows: DraftRow[] = [row],
-  overrides: { tracks?: EditorTrack[]; zoom?: number } = {}
+  overrides: {
+    clips?: TimelineClip[]
+    tracks?: EditorTrack[]
+    zoom?: number
+    onMoveClip?: ReturnType<typeof vi.fn>
+    onTrimClip?: ReturnType<typeof vi.fn>
+  } = {}
 ): {
   clips: TimelineClip[]
   assets: MediaAsset[]
@@ -39,9 +45,13 @@ function renderTimeline(
   onUpdateRow: ReturnType<typeof vi.fn>
   onAddRow: ReturnType<typeof vi.fn>
   onDeleteRow: ReturnType<typeof vi.fn>
+  onMoveClip: ReturnType<typeof vi.fn>
+  onTrimClip: ReturnType<typeof vi.fn>
 } {
+  const onMoveClip = overrides.onMoveClip ?? vi.fn()
+  const onTrimClip = overrides.onTrimClip ?? vi.fn()
   const props = {
-    clips: [clip],
+    clips: overrides.clips ?? [clip],
     assets: [asset],
     activeClipId: null,
     rows,
@@ -49,6 +59,8 @@ function renderTimeline(
     onUpdateRow: vi.fn(),
     onAddRow: vi.fn(),
     onDeleteRow: vi.fn(),
+    onMoveClip,
+    onTrimClip,
     ...overrides
   }
   render(<Timeline {...props} />)
@@ -118,5 +130,145 @@ describe('Timeline', () => {
     fireEvent.scroll(scrollArea)
 
     expect(headers?.scrollTop).toBe(112)
+  })
+
+  it('does not let left trim move the clip before timeline zero', () => {
+    const onTrimClip = vi.fn()
+    const clipAtOneSecond: TimelineClip = {
+      ...clip,
+      timelineStart: 1,
+      duration: 10,
+      sourceStart: 5,
+      sourceEnd: 15,
+      speed: 1
+    }
+    renderTimeline([row], { clips: [clipAtOneSecond], onTrimClip })
+
+    const handle = document.querySelector<HTMLElement>('.studio-timeline__trim-handle--left')
+    expect(handle).not.toBeNull()
+    fireEvent.pointerDown(handle!, { pointerId: 1, button: 0, clientX: 0, clientY: 100 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: -216, clientY: 100 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: -216, clientY: 100 })
+
+    expect(onTrimClip).toHaveBeenCalledWith('clip-1', {
+      sourceStart: 4,
+      sourceEnd: 15,
+      timelineStart: 0
+    })
+  })
+
+  it('does not let right trim move beyond the asset duration', () => {
+    const onTrimClip = vi.fn()
+    const clipNearAssetEnd: TimelineClip = {
+      ...clip,
+      duration: 10,
+      sourceStart: 5,
+      sourceEnd: 15,
+      speed: 1
+    }
+    renderTimeline([row], { clips: [clipNearAssetEnd], onTrimClip })
+
+    const handle = document.querySelector<HTMLElement>('.studio-timeline__trim-handle--right')
+    expect(handle).not.toBeNull()
+    fireEvent.pointerDown(handle!, { pointerId: 2, button: 0, clientX: 0, clientY: 100 })
+    fireEvent.pointerMove(window, { pointerId: 2, clientX: 4320, clientY: 100 })
+    fireEvent.pointerUp(window, { pointerId: 2, clientX: 4320, clientY: 100 })
+
+    expect(onTrimClip).toHaveBeenCalledWith('clip-1', {
+      sourceStart: 5,
+      sourceEnd: 65,
+      timelineStart: 0
+    })
+  })
+
+  it('passes a compatible vertical track target when a clip is dragged across rows', () => {
+    const onMoveClip = vi.fn()
+    const tracks: EditorTrack[] = [
+      {
+        id: 'track-video-overlay',
+        name: 'V2',
+        kind: 'overlay',
+        locked: false,
+        hidden: false,
+        muted: false
+      },
+      {
+        id: 'track-video-main',
+        name: 'V1',
+        kind: 'video',
+        locked: false,
+        hidden: false,
+        muted: false
+      },
+      {
+        id: 'track-audio-main',
+        name: 'A1',
+        kind: 'audio',
+        locked: false,
+        hidden: false,
+        muted: false
+      }
+    ]
+    renderTimeline([row], { tracks, onMoveClip })
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.studio-timeline__track-row'))
+    rows.forEach((trackRow, index) => {
+      Object.defineProperty(trackRow, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({ top: 30 + index * 56, bottom: 30 + (index + 1) * 56 })
+      })
+    })
+
+    const clipButton = screen.getByRole('button', { name: /clip.mp4.*01:05/ })
+    fireEvent.pointerDown(clipButton, { pointerId: 3, button: 0, clientX: 0, clientY: 100 })
+    fireEvent.pointerMove(window, { pointerId: 3, clientX: 72, clientY: 50 })
+    fireEvent.pointerUp(window, { pointerId: 3, clientX: 72, clientY: 50 })
+
+    expect(onMoveClip).toHaveBeenCalledWith('clip-1', 1, 'track-video-overlay')
+  })
+
+  it('does not drop a video clip onto an audio or locked track', () => {
+    const onMoveClip = vi.fn()
+    const tracks: EditorTrack[] = [
+      {
+        id: 'track-video-overlay',
+        name: 'V2',
+        kind: 'overlay',
+        locked: false,
+        hidden: false,
+        muted: false
+      },
+      {
+        id: 'track-video-main',
+        name: 'V1',
+        kind: 'video',
+        locked: false,
+        hidden: false,
+        muted: false
+      },
+      {
+        id: 'track-audio-main',
+        name: 'A1',
+        kind: 'audio',
+        locked: true,
+        hidden: false,
+        muted: false
+      }
+    ]
+    renderTimeline([row], { tracks, onMoveClip })
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.studio-timeline__track-row'))
+    rows.forEach((trackRow, index) => {
+      Object.defineProperty(trackRow, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({ top: 30 + index * 56, bottom: 30 + (index + 1) * 56 })
+      })
+    })
+
+    const clipButton = screen.getByRole('button', { name: /clip.mp4.*01:05/ })
+    fireEvent.pointerDown(clipButton, { pointerId: 4, button: 0, clientX: 0, clientY: 100 })
+    fireEvent.pointerMove(window, { pointerId: 4, clientX: 72, clientY: 170 })
+    expect(rows[2]).toHaveAttribute('data-drop-invalid', 'true')
+    fireEvent.pointerUp(window, { pointerId: 4, clientX: 72, clientY: 170 })
+
+    expect(onMoveClip).not.toHaveBeenCalled()
   })
 })

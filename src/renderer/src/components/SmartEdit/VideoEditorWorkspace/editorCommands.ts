@@ -1,11 +1,19 @@
 import {
+  canMoveClipToTrack,
+  normalizeSourceRange,
+  type ClipAssetKind
+} from './editorClipMath'
+import {
   MIN_CLIP_DURATION,
   createTimelineClipFromAsset,
+  getDefaultTrackIdForAsset,
+  getMediaAssetKind,
   resolveTimelineClip,
   type CanvasAspectRatio,
   type ClipTransform,
   type EditorProjectState,
   type EditorTrack,
+  type MediaAsset,
   type TimelineClip
 } from './editorProject'
 
@@ -54,31 +62,214 @@ export type EditorCommand =
     }
   | { type: 'canvas/setAspectRatio'; aspectRatio: CanvasAspectRatio }
 
+export type EditorExecutionCode =
+  | 'OK'
+  | 'NOT_FOUND'
+  | 'INVALID_RANGE'
+  | 'TRACK_LOCKED'
+  | 'INCOMPATIBLE_TRACK'
+  | 'NO_CHANGE'
+
 export interface EditorCommandResult {
   state: EditorProjectState
+  success: boolean
   changed: boolean
+  code: EditorExecutionCode
   command: EditorCommand
+  message?: string
+}
+
+export interface EditorBatchCommandResult {
+  state: EditorProjectState
+  success: boolean
+  changed: boolean
+  code: EditorExecutionCode
+  results: readonly EditorCommandResult[]
+}
+
+interface CommandFailure {
+  code: Exclude<EditorExecutionCode, 'OK'>
+  message: string
 }
 
 export function applyEditorCommand(
   state: EditorProjectState,
   command: EditorCommand
 ): EditorCommandResult {
+  const failure = getCommandFailure(state, command)
+  if (failure) {
+    return {
+      state,
+      success: false,
+      changed: false,
+      code: failure.code,
+      command,
+      message: failure.message
+    }
+  }
+
   const nextState = reduceEditorCommand(state, command)
-  return { state: nextState, changed: nextState !== state, command }
+  const changed = nextState !== state
+  return {
+    state: nextState,
+    success: changed,
+    changed,
+    code: changed ? 'OK' : 'NO_CHANGE',
+    command,
+    message: changed ? undefined : '命令没有改变工程状态'
+  }
 }
 
 export function applyEditorCommands(
   state: EditorProjectState,
   commands: readonly EditorCommand[]
 ): EditorProjectState {
-  return commands.reduce((current, command) => reduceEditorCommand(current, command), state)
+  return applyEditorCommandsWithResult(state, commands).state
+}
+
+export function applyEditorCommandsWithResult(
+  state: EditorProjectState,
+  commands: readonly EditorCommand[]
+): EditorBatchCommandResult {
+  let current = state
+  const results: EditorCommandResult[] = []
+  for (const command of commands) {
+    const result = applyEditorCommand(current, command)
+    results.push(result)
+    current = result.state
+  }
+
+  const failedResult = results.find((result) => !result.success)
+  return {
+    state: current,
+    success: results.length > 0 && !failedResult,
+    changed: current !== state,
+    code: failedResult?.code ?? (results.length > 0 ? 'OK' : 'NO_CHANGE'),
+    results
+  }
+}
+
+function getCommandFailure(
+  state: EditorProjectState,
+  command: EditorCommand
+): CommandFailure | null {
+  switch (command.type) {
+    case 'clip/addAsset': {
+      if (state.clips.some((clip) => clip.id === command.clipId)) {
+        return failure('NO_CHANGE', 'Clip ID 已存在')
+      }
+      const asset = state.assets.find((item) => item.id === command.assetId)
+      if (!asset || asset.status !== 'ready') return failure('NOT_FOUND', '素材不存在或尚未就绪')
+      if (!hasPositiveDuration(asset.duration)) return failure('INVALID_RANGE', '素材时长无效')
+      return getTargetTrackFailure(
+        state,
+        getAssetKind(asset),
+        command.trackId ?? getDefaultTrackIdForAsset(state, asset)
+      )
+    }
+
+    case 'clip/delete':
+      return state.clips.some((clip) => clip.id === command.clipId)
+        ? null
+        : failure('NOT_FOUND', 'Clip 不存在')
+
+    case 'clip/move': {
+      const clip = state.clips.find((item) => item.id === command.clipId)
+      if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
+      if (!Number.isFinite(command.timelineStart)) return failure('INVALID_RANGE', '时间线位置无效')
+      const currentTrack = state.tracks.find((track) => track.id === clip.trackId)
+      if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+      const asset = state.assets.find((item) => item.id === clip.assetId)
+      return getTargetTrackFailure(state, getAssetKind(asset), command.trackId)
+    }
+
+    case 'clip/trim':
+      return getClipEditFailure(state, command.clipId)
+
+    case 'clip/split': {
+      const clip = state.clips.find((item) => item.id === command.clipId)
+      if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
+      if (state.clips.some((item) => item.id === command.rightClipId)) {
+        return failure('NO_CHANGE', '目标 Clip ID 已存在')
+      }
+      const track = state.tracks.find((item) => item.id === clip.trackId)
+      if (track?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+      if (!Number.isFinite(command.at)) return failure('INVALID_RANGE', '分割位置无效')
+      const asset = state.assets.find((item) => item.id === clip.assetId) ?? null
+      const resolved = resolveTimelineClip(clip, asset)
+      if (
+        command.at <= resolved.timelineStart + MIN_CLIP_DURATION ||
+        command.at >= resolved.timelineStart + resolved.duration - MIN_CLIP_DURATION
+      ) {
+        return failure('INVALID_RANGE', '分割位置必须位于片段内部')
+      }
+      return null
+    }
+
+    case 'clip/update': {
+      const clipFailure = getClipEditFailure(state, command.clipId)
+      if (clipFailure) return clipFailure
+      const clip = state.clips.find((item) => item.id === command.clipId)
+      const currentAsset = state.assets.find((item) => item.id === clip?.assetId)
+      return getTargetTrackFailure(state, getAssetKind(currentAsset), command.patch.trackId)
+    }
+
+    case 'clip/duplicate': {
+      if (state.clips.some((clip) => clip.id === command.newClipId)) {
+        return failure('NO_CHANGE', '目标 Clip ID 已存在')
+      }
+      const clip = state.clips.find((item) => item.id === command.clipId)
+      if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
+      const currentTrack = state.tracks.find((track) => track.id === clip.trackId)
+      if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+      const asset = state.assets.find((item) => item.id === clip.assetId)
+      return getTargetTrackFailure(
+        state,
+        getAssetKind(asset),
+        command.trackId ?? clip.trackId
+      )
+    }
+
+    case 'track/update':
+      return state.tracks.some((track) => track.id === command.trackId)
+        ? null
+        : failure('NOT_FOUND', '轨道不存在')
+
+    case 'canvas/setAspectRatio':
+      return isValidAspectRatio(command.aspectRatio)
+        ? null
+        : failure('INVALID_RANGE', '画布比例无效')
+  }
+}
+
+function getClipEditFailure(state: EditorProjectState, clipId: string): CommandFailure | null {
+  const clip = state.clips.find((item) => item.id === clipId)
+  if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
+  const track = state.tracks.find((item) => item.id === clip.trackId)
+  if (track?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+  const asset = state.assets.find((item) => item.id === clip.assetId)
+  if (!hasPositiveDuration(asset?.duration)) return failure('INVALID_RANGE', '素材时长无效')
+  return null
+}
+
+function getTargetTrackFailure(
+  state: EditorProjectState,
+  assetKind: ClipAssetKind,
+  trackId: string | undefined
+): CommandFailure | null {
+  if (!trackId) return null
+  const target = state.tracks.find((track) => track.id === trackId)
+  if (!target) return failure('NOT_FOUND', '目标轨道不存在')
+  if (target.locked) return failure('TRACK_LOCKED', '目标轨道已锁定')
+  if (!canMoveClipToTrack(assetKind, target.kind)) {
+    return failure('INCOMPATIBLE_TRACK', '素材类型与目标轨道不兼容')
+  }
+  return null
 }
 
 function reduceEditorCommand(state: EditorProjectState, command: EditorCommand): EditorProjectState {
   switch (command.type) {
     case 'clip/addAsset': {
-      if (state.clips.some((clip) => clip.id === command.clipId)) return state
       const clip = createTimelineClipFromAsset(state, command.assetId, command.clipId, {
         trackId: command.trackId,
         timelineStart: command.timelineStart
@@ -93,7 +284,6 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
     }
 
     case 'clip/delete': {
-      if (!state.clips.some((clip) => clip.id === command.clipId)) return state
       const clips = state.clips.filter((clip) => clip.id !== command.clipId)
       const activeClipId =
         state.activeClipId === command.clipId ? (clips.at(-1)?.id ?? null) : state.activeClipId
@@ -101,41 +291,25 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
     }
 
     case 'clip/move':
-      return updateClip(state, command.clipId, (clip) => {
-        const track = command.trackId
-          ? state.tracks.find((item) => item.id === command.trackId)
-          : undefined
-        if (command.trackId && (!track || track.locked)) return clip
-
-        const currentTrack = state.tracks.find((item) => item.id === clip.trackId)
-        if (currentTrack?.locked) return clip
-
-        return {
-          ...clip,
-          trackId: command.trackId ?? clip.trackId,
-          timelineStart: Math.max(0, finiteOr(command.timelineStart, clip.timelineStart))
-        }
-      })
+      return updateClip(state, command.clipId, (clip) => ({
+        ...clip,
+        trackId: command.trackId ?? clip.trackId,
+        timelineStart: Math.max(0, finiteOr(command.timelineStart, clip.timelineStart))
+      }))
 
     case 'clip/trim':
       return updateClip(state, command.clipId, (clip, assetDuration) => {
-        const track = state.tracks.find((item) => item.id === clip.trackId)
-        if (track?.locked) return clip
-
-        const sourceStart = clamp(finiteOr(command.sourceStart, clip.sourceStart), 0, assetDuration)
-        const sourceEnd = clamp(
-          finiteOr(command.sourceEnd, clip.sourceEnd),
-          sourceStart + MIN_CLIP_DURATION,
-          Math.max(sourceStart + MIN_CLIP_DURATION, assetDuration)
-        )
-        if (sourceEnd - sourceStart < MIN_CLIP_DURATION) return clip
-
-        const duration = Math.max(MIN_CLIP_DURATION, (sourceEnd - sourceStart) / clip.speed)
+        const sourceRange = normalizeSourceRange({
+          sourceStart: command.sourceStart,
+          sourceEnd: command.sourceEnd,
+          assetDuration,
+          minDuration: MIN_CLIP_DURATION
+        })
         return {
           ...clip,
-          sourceStart,
-          sourceEnd,
-          duration,
+          sourceStart: sourceRange.sourceStart,
+          sourceEnd: sourceRange.sourceEnd,
+          duration: (sourceRange.sourceEnd - sourceRange.sourceStart) / clip.speed,
           timelineStart:
             command.timelineStart === undefined
               ? clip.timelineStart
@@ -145,18 +319,11 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
 
     case 'clip/split': {
       const originalIndex = state.clips.findIndex((clip) => clip.id === command.clipId)
-      if (originalIndex === -1 || state.clips.some((clip) => clip.id === command.rightClipId)) {
-        return state
-      }
-
       const rawClip = state.clips[originalIndex]
       const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
       const clip = resolveTimelineClip(rawClip, asset)
-      const track = state.tracks.find((item) => item.id === clip.trackId)
-      if (track?.locked) return state
-
       const clipEnd = clip.timelineStart + clip.duration
-      const at = finiteOr(command.at, clip.timelineStart)
+      const at = command.at
       if (at <= clip.timelineStart + MIN_CLIP_DURATION || at >= clipEnd - MIN_CLIP_DURATION) {
         return state
       }
@@ -186,37 +353,21 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
 
     case 'clip/update':
       return updateClip(state, command.clipId, (clip, assetDuration) => {
-        const track = state.tracks.find((item) => item.id === clip.trackId)
-        if (track?.locked) return clip
-
-        const nextTrack = command.patch.trackId
-          ? state.tracks.find((item) => item.id === command.patch.trackId)
-          : undefined
-        if (command.patch.trackId && (!nextTrack || nextTrack.locked)) return clip
-
         const speed = clamp(finiteOr(command.patch.speed, clip.speed), 0.1, 8)
-        const sourceStart = clamp(
-          finiteOr(command.patch.sourceStart, clip.sourceStart),
-          0,
-          assetDuration
-        )
-        const sourceEnd = clamp(
-          finiteOr(command.patch.sourceEnd, clip.sourceEnd),
-          sourceStart + MIN_CLIP_DURATION,
-          Math.max(sourceStart + MIN_CLIP_DURATION, assetDuration)
-        )
-
+        const sourceRange = normalizeSourceRange({
+          sourceStart: command.patch.sourceStart ?? clip.sourceStart,
+          sourceEnd: command.patch.sourceEnd ?? clip.sourceEnd,
+          assetDuration,
+          minDuration: MIN_CLIP_DURATION
+        })
         const transformPatch = command.patch.transform
         return {
           ...clip,
           trackId: command.patch.trackId ?? clip.trackId,
-          timelineStart: Math.max(
-            0,
-            finiteOr(command.patch.timelineStart, clip.timelineStart)
-          ),
-          sourceStart,
-          sourceEnd,
-          duration: Math.max(MIN_CLIP_DURATION, (sourceEnd - sourceStart) / speed),
+          timelineStart: Math.max(0, finiteOr(command.patch.timelineStart, clip.timelineStart)),
+          sourceStart: sourceRange.sourceStart,
+          sourceEnd: sourceRange.sourceEnd,
+          duration: (sourceRange.sourceEnd - sourceRange.sourceStart) / speed,
           speed,
           opacity: clamp(finiteOr(command.patch.opacity, clip.opacity), 0, 1),
           volume: clamp(finiteOr(command.patch.volume, clip.volume), 0, 2),
@@ -232,24 +383,17 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
       })
 
     case 'clip/duplicate': {
-      if (state.clips.some((clip) => clip.id === command.newClipId)) return state
       const rawClip = state.clips.find((clip) => clip.id === command.clipId)
       if (!rawClip) return state
 
       const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
       const clip = resolveTimelineClip(rawClip, asset)
       const targetTrackId = command.trackId ?? clip.trackId
-      const track = state.tracks.find((item) => item.id === targetTrackId)
-      if (!track || track.locked) return state
-
       const duplicate: TimelineClip = {
         ...clip,
         id: command.newClipId,
         trackId: targetTrackId,
-        timelineStart: Math.max(
-          0,
-          command.timelineStart ?? clip.timelineStart + clip.duration
-        )
+        timelineStart: Math.max(0, command.timelineStart ?? clip.timelineStart + clip.duration)
       }
       return {
         ...state,
@@ -260,23 +404,13 @@ function reduceEditorCommand(state: EditorProjectState, command: EditorCommand):
     }
 
     case 'track/update': {
-      const trackIndex = state.tracks.findIndex((track) => track.id === command.trackId)
-      if (trackIndex === -1) return state
-      const tracks = state.tracks.map((track, index) =>
-        index === trackIndex ? { ...track, ...command.patch, id: track.id, kind: track.kind } : track
+      const tracks = state.tracks.map((track) =>
+        track.id === command.trackId ? { ...track, ...command.patch, id: track.id, kind: track.kind } : track
       )
       return { ...state, tracks }
     }
 
     case 'canvas/setAspectRatio':
-      if (
-        !Number.isFinite(command.aspectRatio.width) ||
-        !Number.isFinite(command.aspectRatio.height) ||
-        command.aspectRatio.width <= 0 ||
-        command.aspectRatio.height <= 0
-      ) {
-        return state
-      }
       return { ...state, aspectRatio: command.aspectRatio }
   }
 }
@@ -292,7 +426,7 @@ function updateClip(
   const rawClip = state.clips[clipIndex]
   const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
   const clip = resolveTimelineClip(rawClip, asset)
-  const assetDuration = Math.max(clip.sourceEnd, asset?.duration ?? clip.sourceEnd)
+  const assetDuration = asset?.duration ?? clip.sourceEnd
   const nextClip = update(clip, assetDuration)
 
   if (shallowClipEqual(clip, nextClip)) return state
@@ -302,6 +436,27 @@ function updateClip(
 
 function shallowClipEqual(left: TimelineClip, right: TimelineClip): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function isValidAspectRatio(aspectRatio: CanvasAspectRatio): boolean {
+  return (
+    Number.isFinite(aspectRatio.width) &&
+    Number.isFinite(aspectRatio.height) &&
+    aspectRatio.width > 0 &&
+    aspectRatio.height > 0
+  )
+}
+
+function hasPositiveDuration(duration: number | null | undefined): duration is number {
+  return typeof duration === 'number' && Number.isFinite(duration) && duration > 0
+}
+
+function getAssetKind(asset: MediaAsset | undefined): ClipAssetKind {
+  return asset ? getMediaAssetKind(asset) : 'video'
+}
+
+function failure(code: Exclude<EditorExecutionCode, 'OK'>, message: string): CommandFailure {
+  return { code, message }
 }
 
 function finiteOr(value: number | undefined, fallback: number): number {
