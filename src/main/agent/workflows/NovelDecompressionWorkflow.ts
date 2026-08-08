@@ -18,6 +18,7 @@ import { ExportTool } from '../tools/ExportTool'
 import { MediaTool } from '../tools/MediaTool'
 import { SubtitleTool } from '../tools/SubtitleTool'
 import { TtsTool } from '../tools/TtsTool'
+import { resolveBundledMediaTool } from '../tools/mediaBinaryPaths'
 
 export interface NovelWorkflowDependencies {
   storyAgent: StoryAgent
@@ -165,9 +166,10 @@ export class NovelDecompressionWorkflow {
     await this.deps.subtitleTool.writeSrt(subtitlePath, subtitles)
 
     const requireProbe = Boolean(request.export?.enabled)
+    const ffprobePath = request.ffprobePath?.trim() || resolveBundledMediaTool('ffprobe')
     const assets = await this.deps.mediaTool.scan(
       request.mediaDirectory,
-      request.ffprobePath,
+      ffprobePath,
       requireProbe,
       (current, total, message) => {
         const ratio = total > 0 ? current / total : 0
@@ -241,6 +243,8 @@ export class NovelDecompressionWorkflow {
     }
 
     if (request.export?.enabled) {
+      const ffmpegPath =
+        request.export.ffmpegPath?.trim() || resolveBundledMediaTool('ffmpeg')
       for (let index = 0; index < artifacts.length; index += 1) {
         assertNotAborted(context.signal)
         const artifact = artifacts[index]
@@ -253,7 +257,7 @@ export class NovelDecompressionWorkflow {
           artifact.plan,
           outputPath,
           subtitlePath,
-          request.export.ffmpegPath,
+          ffmpegPath,
           request.export.burnSubtitles ?? true,
           (current, total, message) => {
             const copyBase = index / artifacts.length

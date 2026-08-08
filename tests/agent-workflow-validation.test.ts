@@ -7,7 +7,9 @@ import type { NovelWorkflowDependencies } from '../src/main/agent/workflows/Nove
 
 vi.mock('electron', () => ({
   app: {
-    getPath: () => join(tmpdir(), 'desktop-client-agent-tests')
+    getAppPath: () => process.cwd(),
+    getPath: () => join(tmpdir(), 'desktop-client-agent-tests'),
+    isPackaged: false
   }
 }))
 
@@ -117,5 +119,25 @@ describe('NovelDecompressionWorkflow validation', () => {
       })
     ).rejects.toThrow()
     expect(deps.ttsTool.segmentText).not.toHaveBeenCalled()
+  })
+
+  it('uses bundled media tools when paths are omitted', async () => {
+    const outputDirectory = await mkdtemp(join(tmpdir(), 'agent-workflow-'))
+    const audioPath = join(outputDirectory, 'source.wav')
+    await writeFile(audioPath, 'test audio')
+    const deps = createDependencies(audioPath)
+    const workflow = new NovelDecompressionWorkflow(deps)
+
+    await workflow.run(request(outputDirectory, { export: { enabled: true } }), {
+      taskId: 'task-3',
+      signal: new AbortController().signal,
+      emit: vi.fn()
+    })
+
+    const expectedBin = join(process.cwd(), 'resources', 'ffmpeg')
+    const scanCall = (deps.mediaTool.scan as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    const exportCall = (deps.exportTool.export as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(scanCall[1]).toBe(join(expectedBin, 'ffprobe.exe'))
+    expect(exportCall[3]).toBe(join(expectedBin, 'ffmpeg.exe'))
   })
 })
