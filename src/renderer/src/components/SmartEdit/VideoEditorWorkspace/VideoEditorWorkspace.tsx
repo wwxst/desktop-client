@@ -167,6 +167,7 @@ function VideoEditorWorkspace(): JSX.Element {
               />
               <Panel id="player-panel" minSize={260}>
                 <PlayerPanel
+                  project={project}
                   activeAsset={activeAsset}
                   activeClip={activeClip}
                   activeTrack={activeTrack}

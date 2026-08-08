@@ -1,15 +1,20 @@
 import type { CSSProperties, JSX, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Film, ListVideo, Pause, Play } from 'lucide-react'
-import type {
-  CanvasAspectRatio,
-  EditorTrack,
-  MediaAsset,
-  ResolvedTimelineClip
+import CompositionPreview from './CompositionPreview'
+import {
+  getProjectDuration,
+  selectCompositionAtTime,
+  type CanvasAspectRatio,
+  type EditorProjectState,
+  type EditorTrack,
+  type MediaAsset,
+  type ResolvedTimelineClip
 } from './editorProject'
 
 interface VideoPlaybackProps {
-  activeAsset: MediaAsset | null
+  project?: EditorProjectState
+  activeAsset?: MediaAsset | null
   selectedRatio: CanvasAspectRatio
   rightControls: ReactNode
   onMediaError: (mediaId: string) => void
@@ -35,13 +40,141 @@ const formatPlaybackTime = (seconds: number): string => {
   return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, '0')).join(':')
 }
 
-const resetVideo = (video: HTMLVideoElement): void => {
-  video.pause()
-  if (video.readyState > 0) video.currentTime = 0
+function VideoPlayback(props: VideoPlaybackProps): JSX.Element {
+  if (props.project) return <CompositionVideoPlayback {...props} project={props.project} />
+  return <LegacyVideoPlayback {...props} />
 }
 
-function VideoPlayback({
-  activeAsset,
+function CompositionVideoPlayback({
+  project,
+  selectedRatio,
+  rightControls,
+  onPlayheadChange,
+  onMediaError,
+  playhead = 0
+}: VideoPlaybackProps & { project: EditorProjectState }): JSX.Element {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const playheadRef = useRef(playhead)
+  const projectDuration = getProjectDuration(project)
+  const composition = selectCompositionAtTime(project, playhead)
+  const hasPlayableMedia = project.clips.some((clip) =>
+    project.assets.some((asset) => asset.id === clip.assetId && asset.status === 'ready')
+  )
+  const canPlay = hasPlayableMedia && projectDuration > 0
+  const isPlaybackActive = isPlaying && canPlay
+  const canvasStyle: CanvasStyle = {
+    '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
+    '--canvas-ratio-value': selectedRatio.width / selectedRatio.height
+  }
+
+  useEffect(() => {
+    playheadRef.current = playhead
+  }, [playhead])
+
+  useEffect(() => {
+    if (!isPlaying || !canPlay) return
+
+    let animationFrame = 0
+    let lastTimestamp = performance.now()
+    const tick = (timestamp: number): void => {
+      const elapsed = Math.max(0, (timestamp - lastTimestamp) / 1000)
+      lastTimestamp = timestamp
+      const nextTime = Math.min(projectDuration, playheadRef.current + elapsed)
+      playheadRef.current = nextTime
+      onPlayheadChange?.(nextTime)
+      if (nextTime >= projectDuration) {
+        setIsPlaying(false)
+        return
+      }
+      animationFrame = requestAnimationFrame(tick)
+    }
+
+    animationFrame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(animationFrame)
+  }, [canPlay, isPlaying, onPlayheadChange, projectDuration])
+
+  const togglePlayback = (): void => {
+    if (!canPlay) return
+    if (isPlaying) {
+      setIsPlaying(false)
+      return
+    }
+
+    if (playhead >= projectDuration) {
+      playheadRef.current = 0
+      onPlayheadChange?.(0)
+    }
+    setIsPlaying(true)
+  }
+
+  const hasVisibleLayers = composition.videoLayers.length > 0 || composition.audioLayers.length > 0
+
+  return (
+    <>
+      <div className="studio-player__stage">
+        <div
+          className={`studio-player__canvas${hasVisibleLayers ? ' studio-player__canvas--composition' : ''}`}
+          style={canvasStyle}
+          role={hasVisibleLayers ? undefined : 'img'}
+          aria-label={
+            hasVisibleLayers
+              ? `工程合成预览画布，画面比例 ${selectedRatio.label}`
+              : `暂无预览内容，画面比例 ${selectedRatio.label}`
+          }
+        >
+          {hasVisibleLayers ? (
+            <CompositionPreview
+              project={project}
+              composition={composition}
+              playhead={playhead}
+              isPlaying={isPlaying}
+              onMediaError={onMediaError}
+            />
+          ) : (
+            <Film size={34} strokeWidth={1.4} aria-hidden="true" />
+          )}
+        </div>
+      </div>
+      <footer className="studio-player__controls" aria-label="播放控制">
+        <div className="studio-player__controls-left">
+          <time
+            className="studio-player__current-time"
+            dateTime={`PT${getWholeSeconds(playhead)}S`}
+          >
+            {formatPlaybackTime(playhead)}
+          </time>
+          <span className="studio-player__time-divider" aria-hidden="true">
+            /
+          </span>
+          <time dateTime={`PT${getWholeSeconds(projectDuration)}S`}>
+            {formatPlaybackTime(projectDuration)}
+          </time>
+          <button type="button" aria-label="片段列表" title="片段列表" disabled>
+            <ListVideo size={17} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+        <button
+          className="studio-player__play"
+          type="button"
+          aria-label={isPlaybackActive ? '暂停' : '播放'}
+          title={isPlaybackActive ? '暂停' : '播放'}
+          disabled={!canPlay}
+          onClick={togglePlayback}
+        >
+          {isPlaybackActive ? (
+            <Pause size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+          ) : (
+            <Play size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+          )}
+        </button>
+        <div className="studio-player__controls-right">{rightControls}</div>
+      </footer>
+    </>
+  )
+}
+
+function LegacyVideoPlayback({
+  activeAsset = null,
   activeClip = null,
   activeTrack = null,
   playhead = 0,
@@ -85,16 +218,21 @@ function VideoPlayback({
 
   useEffect(() => {
     const video = videoRef.current
-    if (video) resetVideo(video)
+    if (video) {
+      video.pause()
+      if (video.readyState > 0) video.currentTime = 0
+    }
     return () => {
-      if (video) resetVideo(video)
+      if (video) {
+        video.pause()
+        if (video.readyState > 0) video.currentTime = 0
+      }
     }
   }, [activeAsset?.id, activeClip?.id, activeTrack?.hidden])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video || !activeClip || !isVideoReady || isPlaying) return
-
     const clipStart = activeClip.timelineStart
     const clipEnd = clipStart + activeClip.duration
     const boundedProjectTime = clamp(playhead, clipStart, clipEnd)
@@ -117,12 +255,10 @@ function VideoPlayback({
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current
     if (!video || !activeAsset || !isActiveAssetReady || !isVideoReady || !canRenderVideo) return
-
     if (!video.paused) {
       video.pause()
       return
     }
-
     if (activeClip) {
       const clipEnd = activeClip.timelineStart + activeClip.duration
       if (playhead < activeClip.timelineStart || playhead >= clipEnd) {
@@ -131,7 +267,6 @@ function VideoPlayback({
       }
       video.playbackRate = activeClip.speed
     }
-
     try {
       await video.play()
     } catch {
@@ -154,7 +289,7 @@ function VideoPlayback({
         >
           {activeAsset && isActiveAssetReady && !isTrackHidden ? (
             <video
-              key={videoKey ?? activeAsset?.id}
+              key={videoKey ?? activeAsset.id}
               ref={videoRef}
               src={activeAsset.url}
               style={clipTransformStyle}
@@ -181,14 +316,12 @@ function VideoPlayback({
                   setLegacyCurrentTime(video.currentTime)
                   return
                 }
-
                 if (video.currentTime >= activeClip.sourceEnd - 0.01) {
                   video.pause()
                   video.currentTime = activeClip.sourceEnd
                   onPlayheadChange?.(activeClip.timelineStart + activeClip.duration)
                   return
                 }
-
                 const projectTime =
                   activeClip.timelineStart +
                   (video.currentTime - activeClip.sourceStart) / activeClip.speed
