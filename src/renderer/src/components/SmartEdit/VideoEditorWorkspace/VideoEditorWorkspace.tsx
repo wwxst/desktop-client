@@ -54,10 +54,6 @@ function VideoEditorWorkspace(): JSX.Element {
   const redo = useCallback((): void => dispatch({ type: 'history/redo' }), [])
 
   const { importMediaFiles, reportMediaError } = useMediaLibrary(dispatchProjectAction)
-  const addedMediaIds = useMemo<Set<string>>(
-    () => new Set(project.clips.map((clip) => clip.assetId)),
-    [project.clips]
-  )
   const activeAsset = selectActiveAsset(project)
   const activeClip = selectActiveClip(project)
   const activeTrack = activeClip
@@ -160,7 +156,6 @@ function VideoEditorWorkspace(): JSX.Element {
               >
                 <FunctionPanel
                   mediaItems={project.assets}
-                  addedMediaIds={addedMediaIds}
                   onImportMedia={importMediaFiles}
                   onAddMedia={handleAddMedia}
                 />

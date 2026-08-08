@@ -14,13 +14,11 @@ const readyAsset: MediaAsset = {
 
 function renderPanel(mediaItems: MediaAsset[] = []): {
   mediaItems: MediaAsset[]
-  addedMediaIds: Set<string>
   onImportMedia: ReturnType<typeof vi.fn>
   onAddMedia: ReturnType<typeof vi.fn>
 } {
   const props = {
     mediaItems,
-    addedMediaIds: new Set<string>(),
     onImportMedia: vi.fn(),
     onAddMedia: vi.fn()
   }
@@ -58,5 +56,20 @@ describe('FunctionPanel', () => {
     expect(screen.getByText('01:05')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '添加ready.mp4' }))
     expect(onAddMedia).toHaveBeenCalledWith('asset-1')
+  })
+
+  it('allows adding the same ready media three times', async () => {
+    const user = userEvent.setup()
+    const { onAddMedia } = renderPanel([readyAsset])
+    const addButton = screen.getByRole('button', { name: /ready\.mp4/ })
+
+    await user.click(addButton)
+    await user.click(addButton)
+    await user.click(addButton)
+
+    expect(onAddMedia).toHaveBeenCalledTimes(3)
+    expect(onAddMedia).toHaveBeenNthCalledWith(1, readyAsset.id)
+    expect(onAddMedia).toHaveBeenNthCalledWith(2, readyAsset.id)
+    expect(onAddMedia).toHaveBeenNthCalledWith(3, readyAsset.id)
   })
 })

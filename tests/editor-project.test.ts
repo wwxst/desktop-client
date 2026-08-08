@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_CANVAS_ASPECT_RATIO,
+  createTimelineClipFromAsset,
   createInitialEditorProjectState,
   editorProjectReducer,
   selectActiveAsset,
+  resolveTimelineClip,
   type MediaAsset
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
 
@@ -23,7 +25,7 @@ const secondAsset: MediaAsset = {
 }
 
 describe('editor project reducer', () => {
-  it('adds a ready asset once, creates and activates its clip, and selects it', () => {
+  it('adds a ready asset repeatedly with independent clips and selects the latest one', () => {
     let state = createInitialEditorProjectState('row-1')
     state = editorProjectReducer(state, { type: 'assets/imported', asset: firstAsset })
     expect(state.clips).toEqual([])
@@ -48,9 +50,20 @@ describe('editor project reducer', () => {
       duration: 12.5,
       status: 'ready'
     })
-    expect(editorProjectReducer(added, { type: 'timeline/assetAdded', assetId: 'asset-1' })).toBe(
-      added
-    )
+    const addedAgain = editorProjectReducer(added, {
+      type: 'timeline/assetAdded',
+      assetId: 'asset-1'
+    })
+
+    expect(addedAgain.clips).toHaveLength(2)
+    expect(addedAgain.clips.map((clip) => clip.assetId)).toEqual(['asset-1', 'asset-1'])
+    expect(addedAgain.clips[1].id).not.toBe(addedAgain.clips[0].id)
+    expect(addedAgain.activeClipId).toBe(addedAgain.clips[1].id)
+    expect(selectActiveAsset(addedAgain)).toEqual({
+      ...firstAsset,
+      duration: 12.5,
+      status: 'ready'
+    })
   })
 
   it('appends clips in add order and selects an existing clip', () => {
@@ -148,5 +161,60 @@ describe('editor project reducer', () => {
       aspectRatio: { id: '16:9', label: '横屏', width: 16, height: 9 }
     })
     expect(selected.aspectRatio).toEqual({ id: '16:9', label: '横屏', width: 16, height: 9 })
+  })
+
+  it('does not create a clip for a non-positive asset duration', () => {
+    const state = createInitialEditorProjectState('row-1')
+    const invalidAsset: MediaAsset = {
+      ...firstAsset,
+      duration: 0,
+      status: 'ready'
+    }
+
+    expect(
+      createTimelineClipFromAsset({ ...state, assets: [invalidAsset] }, invalidAsset.id, 'clip-1')
+    ).toBeNull()
+  })
+
+  it('uses the actual duration for a short ready asset', () => {
+    const state = createInitialEditorProjectState('row-1')
+    const shortAsset: MediaAsset = {
+      ...firstAsset,
+      duration: 0.02,
+      status: 'ready'
+    }
+    const clip = createTimelineClipFromAsset(
+      { ...state, assets: [shortAsset] },
+      shortAsset.id,
+      'clip-1'
+    )
+
+    expect(clip).toMatchObject({
+      duration: 0.02,
+      sourceStart: 0,
+      sourceEnd: 0.02
+    })
+  })
+
+  it('normalizes legacy clip ranges to the current asset duration', () => {
+    const asset: MediaAsset = {
+      ...firstAsset,
+      duration: 12,
+      status: 'ready'
+    }
+    const resolved = resolveTimelineClip(
+      {
+        id: 'legacy-clip',
+        assetId: asset.id,
+        sourceStart: 20,
+        sourceEnd: 40,
+        duration: 50
+      },
+      asset
+    )
+
+    expect(resolved.sourceStart).toBe(11.95)
+    expect(resolved.sourceEnd).toBe(12)
+    expect(resolved.duration).toBe(0.05)
   })
 })

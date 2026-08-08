@@ -7,7 +7,6 @@ import type {
 import { useRef, useState } from 'react'
 import {
   ArrowRightLeft,
-  Check,
   CirclePlus,
   Filter,
   Image,
@@ -32,7 +31,6 @@ interface FunctionTool {
 
 interface FunctionPanelProps {
   mediaItems: MediaAsset[]
-  addedMediaIds: ReadonlySet<string>
   onImportMedia: (files: readonly File[]) => void
   onAddMedia: (mediaId: string) => void
 }
@@ -64,7 +62,6 @@ const formatDuration = (duration: number | null): string => {
 
 function FunctionPanel({
   mediaItems,
-  addedMediaIds,
   onImportMedia,
   onAddMedia
 }: FunctionPanelProps): JSX.Element {
@@ -208,7 +205,6 @@ function FunctionPanel({
 
             <div className="studio-function-panel__media-grid">
               {mediaItems.map((mediaItem) => {
-                const isAdded = addedMediaIds.has(mediaItem.id)
                 const isPreviewReady = mediaItem.status === 'ready'
                 const hasPreviewFailed = mediaItem.status === 'error'
 
@@ -240,17 +236,13 @@ function FunctionPanel({
                       <button
                         className="studio-function-panel__media-add"
                         type="button"
-                        title={isAdded ? '已添加媒体' : '添加媒体'}
-                        aria-label={isAdded ? `已添加${mediaItem.name}` : `添加${mediaItem.name}`}
-                        disabled={isAdded || mediaItem.status !== 'ready'}
+                        title="添加媒体"
+                        aria-label={`添加${mediaItem.name}`}
+                        disabled={mediaItem.status !== 'ready'}
                         onClick={() => onAddMedia(mediaItem.id)}
                       >
-                        {isAdded ? (
-                          <Check size={11} strokeWidth={2} aria-hidden="true" />
-                        ) : (
-                          <Plus size={11} strokeWidth={2} aria-hidden="true" />
-                        )}
-                        <span>{isAdded ? '已添加' : '添加'}</span>
+                        <Plus size={11} strokeWidth={2} aria-hidden="true" />
+                        <span>添加</span>
                       </button>
                       <span className="studio-function-panel__media-duration">
                         {formatDuration(mediaItem.duration)}
