@@ -12,6 +12,9 @@ export interface NormalizedSourceRange {
 
 const DEFAULT_MIN_DURATION = 0.05
 
+export type ClipAssetKind = 'video' | 'image' | 'audio'
+export type TargetTrackKind = 'video' | 'audio' | 'text' | 'overlay'
+
 /** Keep a clip's source range inside the media asset while preserving a usable minimum range. */
 export function normalizeSourceRange({
   sourceStart,
@@ -36,6 +39,15 @@ export function normalizeSourceRange({
     sourceStart: normalizedStart,
     sourceEnd: normalizedEnd
   }
+}
+
+export function canMoveClipToTrack(
+  assetKind: ClipAssetKind,
+  targetTrackKind: TargetTrackKind
+): boolean {
+  if (assetKind === 'audio') return targetTrackKind === 'audio'
+  return (assetKind === 'video' || assetKind === 'image') &&
+    (targetTrackKind === 'video' || targetTrackKind === 'overlay')
 }
 
 function finitePositiveOr(value: number | null | undefined, fallback: number): number {
