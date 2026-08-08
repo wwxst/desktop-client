@@ -1,3 +1,5 @@
+import { normalizeSourceRange } from './editorClipMath'
+
 export type MediaAssetStatus = 'loading' | 'ready' | 'error'
 export type MediaAssetKind = 'video' | 'image' | 'audio'
 export type EditorTrackKind = 'video' | 'audio' | 'text' | 'overlay'
@@ -190,18 +192,22 @@ export function resolveTimelineClip(
   asset: MediaAsset | null = null
 ): ResolvedTimelineClip {
   const speed = clampFinite(clip.speed ?? 1, 0.1, 8)
-  const sourceStart = Math.max(0, finiteOr(clip.sourceStart, 0))
-  const fallbackSourceEnd = Math.max(sourceStart + MIN_CLIP_DURATION, asset?.duration ?? sourceStart + 5)
-  const sourceEnd = Math.max(sourceStart + MIN_CLIP_DURATION, finiteOr(clip.sourceEnd, fallbackSourceEnd))
-  const fallbackDuration = Math.max(MIN_CLIP_DURATION, (sourceEnd - sourceStart) / speed)
+  const assetDuration = getResolutionAssetDuration(clip, asset)
+  const sourceRange = normalizeSourceRange({
+    sourceStart: clip.sourceStart,
+    sourceEnd: clip.sourceEnd,
+    assetDuration,
+    minDuration: MIN_CLIP_DURATION
+  })
+  const duration = (sourceRange.sourceEnd - sourceRange.sourceStart) / speed
 
   return {
     ...clip,
     trackId: clip.trackId ?? 'track-video-main',
     timelineStart: Math.max(0, finiteOr(clip.timelineStart, 0)),
-    duration: Math.max(MIN_CLIP_DURATION, finiteOr(clip.duration, fallbackDuration)),
-    sourceStart,
-    sourceEnd,
+    duration: Math.abs(duration - MIN_CLIP_DURATION) < 1e-9 ? MIN_CLIP_DURATION : duration,
+    sourceStart: sourceRange.sourceStart,
+    sourceEnd: sourceRange.sourceEnd,
     transform: {
       x: finiteOr(clip.transform?.x, 0),
       y: finiteOr(clip.transform?.y, 0),
@@ -225,7 +231,20 @@ export function createTimelineClipFromAsset(
   const asset = state.assets.find((item) => item.id === assetId)
   if (!asset || asset.status !== 'ready') return null
 
-  const sourceDuration = Math.max(MIN_CLIP_DURATION, asset.duration ?? 5)
+  if (
+    typeof asset.duration !== 'number' ||
+    !Number.isFinite(asset.duration) ||
+    asset.duration <= 0
+  ) {
+    return null
+  }
+
+  const sourceRange = normalizeSourceRange({
+    sourceStart: 0,
+    sourceEnd: asset.duration,
+    assetDuration: asset.duration,
+    minDuration: MIN_CLIP_DURATION
+  })
   const trackId = options.trackId ?? getDefaultTrackIdForAsset(state, asset)
   const trackEnd = getTrackEnd(state, trackId)
 
@@ -233,10 +252,10 @@ export function createTimelineClipFromAsset(
     id: clipId,
     assetId,
     trackId,
-    timelineStart: Math.max(0, options.timelineStart ?? trackEnd),
-    duration: sourceDuration,
-    sourceStart: 0,
-    sourceEnd: sourceDuration,
+    timelineStart: Math.max(0, finiteOr(options.timelineStart, trackEnd)),
+    duration: sourceRange.sourceEnd - sourceRange.sourceStart,
+    sourceStart: sourceRange.sourceStart,
+    sourceEnd: sourceRange.sourceEnd,
     transform: {
       x: 0,
       y: 0,
@@ -332,15 +351,9 @@ export function editorProjectReducer(
 
     case 'timeline/assetAdded': {
       const asset = state.assets.find((item) => item.id === action.assetId)
-      if (
-        !asset ||
-        asset.status !== 'ready' ||
-        state.clips.some((clip) => clip.assetId === asset.id)
-      ) {
-        return state
-      }
+      if (!asset || asset.status !== 'ready') return state
 
-      const clip = createTimelineClipFromAsset(state, asset.id, `clip-${asset.id}`)
+      const clip = createTimelineClipFromAsset(state, asset.id, createUniqueClipId(state, asset.id))
       if (!clip) return state
       return {
         ...state,
@@ -407,8 +420,31 @@ export function editorProjectReducer(
   }
 }
 
+function createUniqueClipId(state: EditorProjectState, assetId: string): string {
+  const baseId = `clip-${assetId}`
+  if (!state.clips.some((clip) => clip.id === baseId)) return baseId
+
+  let suffix = 2
+  let candidate = `${baseId}-${suffix}`
+  while (state.clips.some((clip) => clip.id === candidate)) {
+    suffix += 1
+    candidate = `${baseId}-${suffix}`
+  }
+  return candidate
+}
+
 function finiteOr(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function getResolutionAssetDuration(clip: TimelineClip, asset: MediaAsset | null): number {
+  if (asset && typeof asset.duration === 'number') {
+    return Number.isFinite(asset.duration) ? asset.duration : 0
+  }
+
+  const sourceStart = Math.max(0, finiteOr(clip.sourceStart, 0))
+  const sourceEnd = finiteOr(clip.sourceEnd, sourceStart + 5)
+  return Math.max(sourceStart + MIN_CLIP_DURATION, sourceEnd)
 }
 
 function clampFinite(value: number, min: number, max: number): number {

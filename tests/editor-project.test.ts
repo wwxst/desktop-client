@@ -87,9 +87,9 @@ describe('editor project reducer', () => {
     })
     expect(selected.activeClipId).toBe(state.clips[0].id)
     expect(selectActiveAsset(selected)?.id).toBe('asset-1')
-    expect(editorProjectReducer(selected, { type: 'timeline/clipSelected', clipId: 'missing' })).toBe(
-      selected
-    )
+    expect(
+      editorProjectReducer(selected, { type: 'timeline/clipSelected', clipId: 'missing' })
+    ).toBe(selected)
   })
 
   it('only adds ready assets and records readiness and errors immutably', () => {
