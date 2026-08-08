@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerTtsIpc } from './tts/registerTtsIpc'
+import { registerAgentIpc } from './agent/registerAgentIpc'
 
 import type {
   ApiResult,
@@ -236,6 +237,7 @@ app.whenReady().then(() => {
   registerAuthIpc()
   registerSubscriptionIpc()
   registerTtsIpc()
+  registerAgentIpc()
 
   createWindow()
 

@@ -1,13 +1,12 @@
 import { ipcMain } from 'electron'
 
 import type { TtsGenerateRequest } from '../../shared/tts'
-import { TtsEngineRegistry } from './engineRegistry'
-import { TtsJobManager } from './jobManager'
-import { TtsModelManager } from './modelManager'
-
-const modelManager = new TtsModelManager()
-const engineRegistry = new TtsEngineRegistry(modelManager)
-const jobManager = new TtsJobManager(modelManager, engineRegistry)
+import {
+  hasActiveAgentTts,
+  ttsEngineRegistry as engineRegistry,
+  ttsJobManager as jobManager,
+  ttsModelManager as modelManager
+} from './services'
 
 /**
  * 注册本地 TTS IPC。
@@ -33,7 +32,7 @@ export function registerTtsIpc(): void {
   ipcMain.handle('tts:catalog:list', async () => modelManager.getCatalog())
 
   ipcMain.handle('tts:model:install', async (event, modelId: string) => {
-    if (jobManager.hasActiveJob()) {
+    if (jobManager.hasActiveJob() || hasActiveAgentTts()) {
       return {
         success: false,
         message: '正在生成配音，完成或取消任务后再安装模型'
@@ -48,7 +47,7 @@ export function registerTtsIpc(): void {
   })
 
   ipcMain.handle('tts:model:remove', async (_event, modelId: string) => {
-    if (jobManager.hasActiveJob()) {
+    if (jobManager.hasActiveJob() || hasActiveAgentTts()) {
       return {
         success: false,
         message: '正在生成配音，暂时不能删除模型'
@@ -62,15 +61,19 @@ export function registerTtsIpc(): void {
   ipcMain.handle('tts:model:open-directory', async () => modelManager.openModelDirectory())
 
   ipcMain.handle('tts:preview', async (_event, request: TtsGenerateRequest) =>
-    jobManager.preview(request)
+    hasActiveAgentTts()
+      ? { success: false, message: 'Agent TTS is currently running' }
+      : jobManager.preview(request)
   )
 
   ipcMain.handle('tts:job:create', async (event, request: TtsGenerateRequest) =>
-    jobManager.createJob(request, (progress) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('tts:job:progress', progress)
-      }
-    })
+    hasActiveAgentTts()
+      ? Promise.resolve({ success: false, message: 'Agent TTS is currently running' })
+      : jobManager.createJob(request, (progress) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('tts:job:progress', progress)
+          }
+        })
   )
 
   ipcMain.handle('tts:job:cancel', async (_event, jobId: string) => jobManager.cancel(jobId))

@@ -15,6 +15,15 @@ import type {
   TtsModelDownloadProgress,
   TtsPreviewResponse
 } from '../shared/tts'
+import type {
+  AgentActionResponse,
+  AgentModelConfig,
+  AgentModelStatus,
+  AgentWorkflowProgress,
+  NovelDecompressionRequest,
+  StartAgentWorkflowResponse,
+  WorkflowTaskSnapshot
+} from '../shared/agent/workflow'
 
 /**
  * 只向 React 页面开放允许使用的功能。
@@ -72,6 +81,34 @@ const api = {
     return ipcRenderer.invoke('tts:job:save', jobId)
   },
 
+  /** 将大模型配置加载到 Electron 主进程内存。 */
+  configureAgentModel: (config: AgentModelConfig): Promise<AgentActionResponse> => {
+    return ipcRenderer.invoke('agent:model:configure', config)
+  },
+  /** 查询 Agent 当前使用的大模型，不返回 API Key。 */
+  getAgentModelStatus: (): Promise<AgentModelStatus> => {
+    return ipcRenderer.invoke('agent:model:status')
+  },
+  /** 启动“解压类小说推文”多 Agent 工作流。 */
+  runNovelDecompression: (request: NovelDecompressionRequest): Promise<StartAgentWorkflowResponse> => {
+    return ipcRenderer.invoke('agent:workflow:novel-decompression:start', request)
+  },
+  /** 查询 Agent 长任务状态和最终结果。 */
+  getAgentTask: (taskId: string): Promise<WorkflowTaskSnapshot | null> => {
+    return ipcRenderer.invoke('agent:workflow:get', taskId)
+  },
+  /** 取消一个 Agent 长任务。 */
+  cancelAgentTask: (taskId: string): Promise<AgentActionResponse> => {
+    return ipcRenderer.invoke('agent:workflow:cancel', taskId)
+  },
+  /** 监听 Agent 工作流进度。 */
+  onAgentWorkflowProgress: (callback: (progress: AgentWorkflowProgress) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: AgentWorkflowProgress): void => {
+      callback(progress)
+    }
+    ipcRenderer.on('agent:workflow:progress', listener)
+    return () => ipcRenderer.removeListener('agent:workflow:progress', listener)
+  },
   /** 监听模型下载和解压进度。 */
   onTtsModelDownloadProgress: (
     callback: (progress: TtsModelDownloadProgress) => void

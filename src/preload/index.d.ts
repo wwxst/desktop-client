@@ -14,6 +14,15 @@ import type {
   TtsModelDownloadProgress,
   TtsPreviewResponse
 } from '../shared/tts'
+import type {
+  AgentActionResponse,
+  AgentModelConfig,
+  AgentModelStatus,
+  AgentWorkflowProgress,
+  NovelDecompressionRequest,
+  StartAgentWorkflowResponse,
+  WorkflowTaskSnapshot
+} from '../shared/agent/workflow'
 
 interface DesktopApi {
   login(loginRequest: LoginRequest): Promise<LoginResponse>
@@ -29,6 +38,12 @@ interface DesktopApi {
   cancelTtsJob(jobId: string): Promise<TtsJobActionResponse>
   saveTtsJob(jobId: string): Promise<TtsJobActionResponse>
 
+  configureAgentModel(config: AgentModelConfig): Promise<AgentActionResponse>
+  getAgentModelStatus(): Promise<AgentModelStatus>
+  runNovelDecompression(request: NovelDecompressionRequest): Promise<StartAgentWorkflowResponse>
+  getAgentTask(taskId: string): Promise<WorkflowTaskSnapshot | null>
+  cancelAgentTask(taskId: string): Promise<AgentActionResponse>
+  onAgentWorkflowProgress(callback: (progress: AgentWorkflowProgress) => void): () => void
   onTtsModelDownloadProgress(
     callback: (progress: TtsModelDownloadProgress) => void
   ): () => void
