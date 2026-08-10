@@ -1,9 +1,9 @@
 .studio-player {
-  --player-panel: #1c1f22;
-  --player-border: rgb(255 255 255 / 8%);
-  --player-text: #e8ecef;
-  --player-muted: #858e95;
-  --player-accent: #38d7c4;
+  --player-panel: #ffffff;
+  --player-border: #dfe5ea;
+  --player-text: #25313b;
+  --player-muted: #687680;
+  --player-accent: #0f8f83;
   position: relative;
   display: grid;
   grid-template-rows: 38px minmax(0, 1fr) 44px;
@@ -14,7 +14,7 @@
   min-height: 0;
   overflow: hidden;
   color: var(--player-text);
-  background: #181b1e;
+  background: #f4f6f8;
 }
 
 .studio-player__header {
@@ -36,7 +36,7 @@
 .studio-player__header-hint {
   overflow: hidden;
   font-size: 9px;
-  color: #687178;
+  color: var(--player-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -51,9 +51,7 @@
   padding: 24px;
   container-type: size;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 45%, rgb(255 255 255 / 3%), transparent 45%),
-    #111315;
+  background: #f0f3f6;
 }
 
 .studio-player__canvas {
@@ -65,10 +63,10 @@
   max-height: 100%;
   aspect-ratio: var(--canvas-aspect-ratio);
   overflow: visible;
-  color: #707980;
-  background: #0b0d0f;
-  border: 1px solid rgb(255 255 255 / 10%);
-  box-shadow: 0 14px 36px rgb(0 0 0 / 34%);
+  color: #687680;
+  background: #ffffff;
+  border: 1px solid #cbd5dc;
+  box-shadow: 0 8px 22px rgb(31 41 55 / 14%);
   transform-origin: center;
   transition: transform 100ms ease-out;
 }
@@ -78,7 +76,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #0b0d0f;
+  background: #ffffff;
 }
 
 .studio-player__empty {
@@ -92,12 +90,12 @@
 .studio-player__empty strong {
   font-size: 11px;
   font-weight: 550;
-  color: #9ba3a9;
+  color: #34424d;
 }
 
 .studio-player__empty span {
   font-size: 9px;
-  color: #687178;
+  color: var(--player-muted);
 }
 
 .studio-player__controls {
@@ -117,7 +115,7 @@
   min-width: 28px;
   height: 28px;
   padding: 0 6px;
-  color: #aeb5ba;
+  color: #687680;
   background: transparent;
   border: 0;
   border-radius: 6px;
@@ -126,8 +124,8 @@
 
 .studio-player__controls button:hover:not(:disabled),
 .studio-player__controls button[aria-expanded='true'] {
-  color: #fff;
-  background: rgb(255 255 255 / 8%);
+  color: #25313b;
+  background: #edf2f5;
 }
 
 .studio-player__controls button:disabled {
@@ -150,7 +148,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
-  color: #7e878d;
+  color: #687680;
   white-space: nowrap;
 }
 
@@ -159,7 +157,7 @@
 }
 
 .studio-player__time-divider {
-  color: #4f575d;
+  color: #9aa6af;
 }
 
 .studio-player__transport {
@@ -169,8 +167,8 @@
 .studio-player__play {
   width: 32px !important;
   height: 32px !important;
-  color: #e7fbf8 !important;
-  background: rgb(56 215 196 / 13%) !important;
+  color: #0f655c !important;
+  background: #d9f5ef !important;
 }
 
 .studio-player__controls-right {
@@ -198,11 +196,11 @@
   max-height: calc(100% - 100px);
   padding: 5px;
   overflow: auto;
-  color: #d9dee1;
-  background: #24282c;
-  border: 1px solid rgb(255 255 255 / 11%);
+  color: #25313b;
+  background: #ffffff;
+  border: 1px solid #d7e0e6;
   border-radius: 8px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 38%);
+  box-shadow: 0 12px 32px rgb(31 41 55 / 16%);
 }
 
 .studio-player__ratio-option {
@@ -215,7 +213,7 @@
   padding: 0 7px;
   overflow: hidden;
   font-size: 10px;
-  color: #c6ccd0;
+  color: #52616c;
   text-align: left;
   background: transparent;
   border: 0;
@@ -224,7 +222,7 @@
 
 .studio-player__ratio-option:hover:not(:disabled),
 .studio-player__ratio-option:focus-visible {
-  background: rgb(255 255 255 / 7%);
+  background: #eef4f4;
   outline: none;
 }
 
@@ -250,7 +248,7 @@
 .studio-player__ratio-option-preview {
   width: min(26px, calc(16px * var(--option-ratio-value)));
   aspect-ratio: var(--option-ratio);
-  border: 1px solid #7b858c;
+  border: 1px solid #8b98a3;
 }
 
 .studio-player__ratio-source-preview,
@@ -263,16 +261,16 @@
   gap: 6px;
   align-items: center;
   width: 92px;
-  color: var(--editor-text-muted, #9aa4aa);
+  color: var(--player-muted);
 }
 
 .studio-player__master-volume input {
   min-width: 0;
   width: 62px;
-  accent-color: #38d7c4;
+  accent-color: var(--player-accent);
 }
 
 .studio-player__controls-right button[data-active='true'] {
-  color: #38d7c4;
-  background: rgb(56 215 196 / 10%);
+  color: var(--player-accent);
+  background: #e4f7f3;
 }

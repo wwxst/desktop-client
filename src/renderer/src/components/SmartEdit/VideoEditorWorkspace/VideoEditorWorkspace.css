@@ -4,26 +4,27 @@
 }
 
 .studio-workspace {
-  --workspace-bg: #151719;
-  --workspace-divider: rgb(255 255 255 / 8%);
-  --editor-bg: #151719;
-  --editor-panel: #1b1e21;
-  --editor-panel-raised: #202428;
-  --editor-border: rgb(255 255 255 / 8%);
-  --editor-border-subtle: rgb(255 255 255 / 5%);
-  --editor-border-strong: rgb(255 255 255 / 14%);
-  --editor-text: #e7ebed;
-  --editor-text-secondary: #b9c0c5;
-  --editor-text-muted: #7d878e;
-  --editor-hover: rgb(255 255 255 / 7%);
-  --editor-button: rgb(255 255 255 / 4%);
-  --editor-accent: #38d7c4;
+  --workspace-bg: #f3f5f7;
+  --workspace-divider: #d5dde4;
+  --editor-bg: #f5f7f9;
+  --editor-panel: #ffffff;
+  --editor-panel-raised: #f7f9fb;
+  --editor-popover: #ffffff;
+  --editor-border: #dfe5ea;
+  --editor-border-subtle: #e8edf1;
+  --editor-border-strong: #cbd5dc;
+  --editor-text: #26323d;
+  --editor-text-secondary: #596772;
+  --editor-text-muted: #77848e;
+  --editor-hover: #edf2f5;
+  --editor-button: #f4f7f9;
+  --editor-accent: #0f8f83;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  color: #e5e9eb;
+  color: var(--editor-text);
   background: var(--workspace-bg);
 }
 
@@ -38,11 +39,31 @@
   overflow: hidden;
 }
 
+.studio-workspace__top {
+  padding: 8px 8px 6px;
+  background: var(--workspace-bg);
+}
+
+.studio-workspace__card {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--editor-panel);
+  border: 1px solid var(--editor-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(31 41 55 / 8%);
+}
+
+.studio-workspace__timeline {
+  margin: 0 8px 8px;
+  height: calc(100% - 8px);
+}
+
 .studio-workspace__column-resize-handle {
   position: relative;
   z-index: 40;
-  width: 7px;
-  margin: 0 -3px;
+  width: 10px;
+  margin: 0;
   cursor: col-resize;
   background: transparent;
   outline: none;
@@ -65,14 +86,14 @@
 .studio-workspace__column-resize-handle:focus-visible::after,
 .studio-workspace__column-resize-handle[data-separator='active']::after {
   width: 2px;
-  background: rgb(56 215 196 / 58%);
+  background: rgb(15 143 131 / 58%);
 }
 
 .studio-workspace__row-resize-handle {
   position: relative;
   z-index: 45;
-  height: 8px;
-  margin: -4px 0;
+  height: 10px;
+  margin: 0;
   cursor: row-resize;
   background: transparent;
   outline: none;
@@ -95,5 +116,5 @@
 .studio-workspace__row-resize-handle:focus-visible::after,
 .studio-workspace__row-resize-handle[data-separator='active']::after {
   height: 2px;
-  background: rgb(56 215 196 / 58%);
+  background: rgb(15 143 131 / 58%);
 }

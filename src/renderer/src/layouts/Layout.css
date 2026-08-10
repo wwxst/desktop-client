@@ -49,6 +49,7 @@
 }
 
 .app-layout__ai-panel {
+  container-type: inline-size;
   background: #f3f3f3;
 }
 

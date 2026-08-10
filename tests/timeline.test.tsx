@@ -97,13 +97,45 @@ describe('Timeline', () => {
     expect(single.onAddRow).toHaveBeenCalledWith('row-1')
   })
 
-  it('exposes the zoom-dependent grid size on the timeline canvas', () => {
+  it('keeps timing marks in the ruler instead of the timeline content area', () => {
     const zoom = 144
     renderTimeline([row], { zoom })
 
     const canvas = document.querySelector<HTMLElement>('.studio-timeline__canvas')
+    const ruler = document.querySelector<HTMLElement>('.studio-timeline__ruler')
     expect(canvas).not.toBeNull()
-    expect(canvas?.style.getPropertyValue('--timeline-grid-size')).toBe(`${zoom}px`)
+    expect(canvas?.style.getPropertyValue('--timeline-grid-size')).toBe('')
+    expect(ruler?.style.getPropertyValue('--timeline-ruler-minor-step')).not.toBe('')
+  })
+
+  it('renders dense ruler subdivisions without extra nodes and keeps snapping controls icon-only', () => {
+    renderTimeline([row], { zoom: 100 })
+
+    const ruler = document.querySelector<HTMLElement>('.studio-timeline__ruler')
+    const rulerTicks = document.querySelectorAll('.studio-timeline__ruler-tick')
+    const rulerLabels = document.querySelectorAll('.studio-timeline__ruler-label')
+    const snappingButton = screen.getByRole('button', { name: '吸附' })
+    const magnetButton = screen.getByRole('button', { name: '磁吸' })
+
+    expect(ruler?.style.getPropertyValue('--timeline-ruler-minor-step')).toBe('10px')
+    expect(rulerTicks.length).toBe(rulerLabels.length)
+    expect(rulerLabels[0]).toHaveTextContent('00:00')
+    expect(snappingButton).toHaveTextContent('')
+    expect(magnetButton).toHaveTextContent('')
+  })
+
+  it('centers the only main track without rendering a main-track text label', () => {
+    renderTimeline([row], { clips: [] })
+
+    const editor = document.querySelector<HTMLElement>('.studio-timeline__editor')
+    const mainHeader = document.querySelector<HTMLElement>(
+      '.studio-timeline__track-header[data-main="true"]'
+    )
+    const trackKind = mainHeader?.querySelector<HTMLElement>('.studio-timeline__track-kind')
+
+    expect(editor).toHaveAttribute('data-main-centered', 'true')
+    expect(trackKind).toHaveTextContent('')
+    expect(trackKind?.querySelector('svg')).not.toBeNull()
   })
 
   it('keeps track headers vertically aligned with the timeline scroll area', () => {

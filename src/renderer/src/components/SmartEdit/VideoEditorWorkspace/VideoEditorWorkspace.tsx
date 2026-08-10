@@ -411,11 +411,18 @@ function VideoEditorWorkspace(): JSX.Element {
         <Panel id="workspace-top" defaultSize="64" minSize={280}>
           <div className="studio-workspace__top">
             <Group {...columnLayout} className="studio-workspace__columns" orientation="horizontal" resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}>
-              <Panel id="function-panel" defaultSize={168} minSize={126} maxSize={300} groupResizeBehavior="preserve-pixel-size">
+              <Panel
+                id="function-panel"
+                className="studio-workspace__card studio-workspace__card--function"
+                defaultSize={168}
+                minSize={126}
+                maxSize={300}
+                groupResizeBehavior="preserve-pixel-size"
+              >
                 <FunctionPanel mediaItems={project.assets} onImportMedia={importMediaFiles} onAddMedia={handleAddMedia} />
               </Panel>
               <Separator id="function-panel-resize-handle" className="studio-workspace__column-resize-handle" aria-label="调整素材区宽度" />
-              <Panel id="player-panel" minSize={300}>
+              <Panel id="player-panel" className="studio-workspace__card studio-workspace__card--player" minSize={300}>
                 <PlayerPanel
                   project={project}
                   playbackController={playbackController}
@@ -457,7 +464,14 @@ function VideoEditorWorkspace(): JSX.Element {
                 />
               </Panel>
               <Separator id="parameter-panel-resize-handle" className="studio-workspace__column-resize-handle" aria-label="调整属性区宽度" />
-              <Panel id="parameter-panel" defaultSize={244} minSize={198} maxSize={380} groupResizeBehavior="preserve-pixel-size">
+              <Panel
+                id="parameter-panel"
+                className="studio-workspace__card studio-workspace__card--parameter"
+                defaultSize={244}
+                minSize={198}
+                maxSize={380}
+                groupResizeBehavior="preserve-pixel-size"
+              >
                 <ParameterPanel clip={activeClip} asset={activeAsset} onUpdateClip={handleUpdateClip} />
               </Panel>
             </Group>
@@ -465,7 +479,7 @@ function VideoEditorWorkspace(): JSX.Element {
         </Panel>
         <Separator id="workspace-timeline-resize-handle" className="studio-workspace__row-resize-handle" aria-label="调整时间线高度" />
         <Panel id="workspace-timeline" defaultSize="36" minSize={220} maxSize="72">
-          <div className="studio-workspace__timeline">
+          <div className="studio-workspace__timeline studio-workspace__card studio-workspace__card--timeline">
             <Timeline
               clips={project.clips}
               assets={project.assets}

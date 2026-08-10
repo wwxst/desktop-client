@@ -133,7 +133,7 @@
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #101116;
+  background: #eef2f5;
   border: 1px solid var(--editor-border);
   border-radius: 7px;
 }
@@ -161,7 +161,7 @@
 }
 
 .studio-function-panel__media-placeholder[data-error='true'] {
-  color: #d98d8d;
+  color: #c74d4d;
 }
 
 .studio-function-panel__media-add {
@@ -172,9 +172,9 @@
   place-items: center;
   width: 23px;
   height: 23px;
-  color: white;
-  background: rgb(14 15 19 / 76%);
-  border: 1px solid rgb(255 255 255 / 15%);
+  color: #26323d;
+  background: rgb(255 255 255 / 92%);
+  border: 1px solid #cbd5dc;
   border-radius: 6px;
   opacity: 0;
   cursor: pointer;
@@ -196,10 +196,11 @@
   right: 5px;
   bottom: 4px;
   padding: 1px 4px;
-  color: #f7f7f8;
+  color: #42515c;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
-  background: rgb(0 0 0 / 62%);
+  background: rgb(255 255 255 / 88%);
+  border: 1px solid #d7e0e6;
   border-radius: 4px;
 }
 

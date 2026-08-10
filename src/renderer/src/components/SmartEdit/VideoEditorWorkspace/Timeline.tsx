@@ -12,6 +12,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Layers2,
   Lock,
   Magnet,
   Redo2,
@@ -22,6 +23,7 @@ import {
   Unlock,
   Upload,
   Plus,
+  Video,
   Volume2,
   VolumeX,
   ZoomIn,
@@ -180,9 +182,8 @@ interface TimelineCssProperties extends CSSProperties {
   '--clip-width': string
 }
 
-interface TimelineCanvasCssProperties extends CSSProperties {
-  '--timeline-grid-size': string
-  '--timeline-major-grid-size': string
+interface TimelineRulerCssProperties extends CSSProperties {
+  '--timeline-ruler-minor-step': string
 }
 
 interface AssetDropPreview {
@@ -296,12 +297,7 @@ function Timeline({
   const projectDuration = getProjectDuration(pseudoProject)
   const timelineDuration = Math.max(12, Math.ceil(projectDuration + 5))
   const timelineWidth = Math.max(760, timelineDuration * zoom)
-  const rulerStep = getRulerStep(zoom)
-  const timelineCanvasStyle: TimelineCanvasCssProperties = {
-    width: timelineWidth,
-    '--timeline-grid-size': `${zoom}px`,
-    '--timeline-major-grid-size': `${zoom * Math.max(1, rulerStep)}px`
-  }
+  const timelineCanvasStyle: CSSProperties = { width: timelineWidth }
 
   const clipsByTrack = useMemo(() => {
     const map = new Map<string, ResolvedTimelineClip[]>()
@@ -326,6 +322,7 @@ function Timeline({
     })
     return [...visual, ...audio]
   }, [assetDropPreview?.trackId, clipsByTrack, interaction, mainVisualTrack?.id, tracks])
+  const isMainTrackCentered = displayTracks.length === 1 && displayTracks[0]?.role === 'main'
 
   const activeClip = resolvedClips.find((clip) => clip.id === activeClipId) ?? null
   const activeTrack = activeClip ? tracks.find((track) => track.id === activeClip.trackId) : null
@@ -1271,31 +1268,31 @@ function Timeline({
             <Trash2 size={15} aria-hidden="true" />
           </button>
         </div>
+        <div className="studio-timeline__toolbar-spacer" />
+        <span className="studio-timeline__playhead-time">{formatTimecode(playhead)}</span>
         <span className="studio-timeline__toolbar-divider" />
         <button
           type="button"
           className="studio-timeline__snap-button"
           data-active={snappingEnabled ? 'true' : undefined}
+          aria-label="吸附"
           aria-pressed={snappingEnabled}
           title="吸附（拖动时按住 Shift 临时关闭）"
           onClick={() => onSnappingChange?.(!snappingEnabled)}
         >
           <Magnet size={14} aria-hidden="true" />
-          <span>吸附</span>
         </button>
         <button
           type="button"
           className="studio-timeline__snap-button"
           data-active={magnetEnabled ? 'true' : undefined}
+          aria-label="磁吸"
           aria-pressed={magnetEnabled}
           title="主内容磁吸：删除中间片段后自动前贴"
           onClick={() => onMagnetChange?.(!magnetEnabled)}
         >
           <Magnet size={14} aria-hidden="true" />
-          <span>磁吸</span>
         </button>
-        <div className="studio-timeline__toolbar-spacer" />
-        <span className="studio-timeline__playhead-time">{formatTimecode(playhead)}</span>
         <div className="studio-timeline__toolbar-group">
           <button
             type="button"
@@ -1327,7 +1324,7 @@ function Timeline({
         </div>
       </header>
 
-      <div className="studio-timeline__editor">
+      <div className="studio-timeline__editor" data-main-centered={isMainTrackCentered ? 'true' : undefined}>
         <div ref={trackHeadersRef} className="studio-timeline__track-headers" aria-label="内容层控制">
           <div className="studio-timeline__ruler-corner" aria-hidden="true" />
           <div className="studio-timeline__new-layer-gutter" aria-hidden="true" />
@@ -1348,7 +1345,13 @@ function Timeline({
               }}
             >
               <span className="studio-timeline__track-kind" aria-hidden="true">
-                {track.kind === 'audio' ? <Volume2 size={13} /> : track.role === 'main' ? '主' : '层'}
+                {track.kind === 'audio' ? (
+                  <Volume2 size={13} />
+                ) : track.role === 'main' ? (
+                  <Video size={13} />
+                ) : (
+                  <Layers2 size={13} />
+                )}
               </span>
               <div className="studio-timeline__layer-controls">
                 <button
@@ -1564,13 +1567,29 @@ function Ruler({
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
 }): JSX.Element {
   const step = getRulerStep(zoom)
-  const markers: number[] = []
-  for (let second = 0; second <= duration; second += step) markers.push(second)
+  const subdivisions = 10
+  const markers = Array.from(
+    { length: Math.floor(duration / step) + 1 },
+    (_, index) => index * step
+  )
+  const rulerStyle: TimelineRulerCssProperties = {
+    '--timeline-ruler-minor-step': `${(step * zoom) / subdivisions}px`
+  }
   return (
-    <div className="studio-timeline__ruler" aria-label="时间尺" onPointerDown={onPointerDown}>
+    <div
+      className="studio-timeline__ruler"
+      aria-label="时间尺"
+      style={rulerStyle}
+      onPointerDown={onPointerDown}
+    >
       {markers.map((second) => (
-        <span key={second} style={{ left: `${second * zoom}px` }}>
-          {formatTimecode(second, 0)}
+        <span
+          className="studio-timeline__ruler-mark"
+          key={second}
+          style={{ left: `${second * zoom}px` }}
+        >
+          <span className="studio-timeline__ruler-tick studio-timeline__ruler-tick--major" />
+          <span className="studio-timeline__ruler-label">{formatTimecode(second, 0)}</span>
         </span>
       ))}
     </div>

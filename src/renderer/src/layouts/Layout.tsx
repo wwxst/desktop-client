@@ -1,5 +1,5 @@
-import type { JSX, ReactNode } from 'react'
-import { Group, Panel, Separator } from 'react-resizable-panels'
+import type { JSX, ReactNode, Ref } from 'react'
+import { Group, Panel, Separator, type PanelImperativeHandle } from 'react-resizable-panels'
 
 import './Layout.css'
 
@@ -12,13 +12,16 @@ interface LayoutProps {
 
   /** 右侧区域。 */
   aiPanel: ReactNode
+
+  /** 允许右侧面板从自身工具栏折叠或恢复。 */
+  aiPanelRef?: Ref<PanelImperativeHandle | null>
 }
 
 /**
  * 客户端登录后的可调整三栏布局。
  * 只负责三栏排列、尺寸约束和拖拽边界，具体内容由外部组件传入。
  */
-function Layout({ sidebar, content, aiPanel }: LayoutProps): JSX.Element {
+function Layout({ sidebar, content, aiPanel, aiPanelRef }: LayoutProps): JSX.Element {
   return (
     <Group
       className="app-layout"
@@ -53,10 +56,13 @@ function Layout({ sidebar, content, aiPanel }: LayoutProps): JSX.Element {
 
       <Panel
         id="ai-panel"
-        defaultSize={260}
-        minSize={260}
-        maxSize={520}
+        defaultSize={400}
+        minSize={300}
+        maxSize={560}
+        collapsedSize={40}
+        collapsible
         groupResizeBehavior="preserve-pixel-size"
+        panelRef={aiPanelRef}
       >
         <aside className="app-layout__ai-panel">{aiPanel}</aside>
       </Panel>

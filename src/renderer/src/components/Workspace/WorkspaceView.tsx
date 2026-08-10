@@ -1,4 +1,5 @@
-import { useReducer, type JSX } from 'react'
+import { useReducer, useRef, type JSX } from 'react'
+import type { PanelImperativeHandle } from 'react-resizable-panels'
 import AiPanel from '../AiPanel/AiPanel'
 import MediaLibraryView from '../MediaLibrary/MediaLibraryView'
 import NovelPromotionSidePanel from '../NovelPromotion/NovelPromotionSidePanel'
@@ -24,6 +25,7 @@ function WorkspaceView(): JSX.Element {
     initialWorkspaceNavigationState
   )
   const smartEditEnabled = import.meta.env.DEV
+  const aiPanelRef = useRef<PanelImperativeHandle>(null)
 
   const handleSidebarItemSelect = (menu: WorkspaceMenu): void => {
     dispatchNavigation({
@@ -36,7 +38,12 @@ function WorkspaceView(): JSX.Element {
     navigation.activeMenu === 'smart-edit' && !smartEditEnabled ? 'home' : navigation.activeMenu
 
   let workspaceContent: JSX.Element = <div className="workspace-empty-page" aria-hidden="true" />
-  let rightPanel: JSX.Element = <AiPanel />
+  let rightPanel: JSX.Element = (
+    <AiPanel
+      onCollapse={() => aiPanelRef.current?.collapse()}
+      onExpand={() => aiPanelRef.current?.expand()}
+    />
+  )
 
   if (smartEditEnabled && navigation.activeMenu === 'smart-edit') {
     workspaceContent =
@@ -85,6 +92,7 @@ function WorkspaceView(): JSX.Element {
       }
       content={workspaceContent}
       aiPanel={rightPanel}
+      aiPanelRef={aiPanelRef}
     />
   )
 }
