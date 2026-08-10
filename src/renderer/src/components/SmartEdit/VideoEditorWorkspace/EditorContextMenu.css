@@ -1,0 +1,69 @@
+.studio-context-menu {
+  position: fixed;
+  z-index: 1000;
+  width: 218px;
+  padding: 5px;
+  color: var(--editor-text, #e7e9ed);
+  background: var(--editor-popover, #25272d);
+  border: 1px solid var(--editor-border-strong, #3a3d45);
+  border-radius: 9px;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 34%);
+  user-select: none;
+}
+
+.studio-context-menu__item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 31px;
+  padding: 0 8px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.studio-context-menu__item:hover:not(:disabled),
+.studio-context-menu__item:focus-visible {
+  background: var(--editor-hover, #343741);
+  outline: none;
+}
+
+.studio-context-menu__item[data-danger='true'] {
+  color: #ff9a9a;
+}
+
+.studio-context-menu__item:disabled {
+  opacity: 0.38;
+}
+
+.studio-context-menu__icon {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.studio-context-menu__label {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-context-menu kbd {
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--editor-text-muted, #989ca5);
+  background: transparent;
+}
+
+.studio-context-menu__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--editor-border, #32353c);
+}

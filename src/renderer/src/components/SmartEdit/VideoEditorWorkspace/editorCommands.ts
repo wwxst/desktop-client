@@ -4,7 +4,11 @@ import {
   createTimelineClipFromAsset,
   getDefaultTrackIdForAsset,
   getMediaAssetKind,
+  getTrackEnd,
+  isDisposableTrack,
   resolveTimelineClip,
+  trackHasClips,
+  trackWouldCollide,
   type CanvasAspectRatio,
   type ClipTransform,
   type EditorProjectState,
@@ -23,6 +27,7 @@ export interface ClipPatch {
   volume?: number
   muted?: boolean
   speed?: number
+  enabled?: boolean
 }
 
 export type EditorCommand =
@@ -33,6 +38,7 @@ export type EditorCommand =
       trackId?: string
       timelineStart?: number
     }
+  | { type: 'clip/add'; clip: TimelineClip }
   | { type: 'clip/delete'; clipId: string }
   | { type: 'clip/move'; clipId: string; timelineStart: number; trackId?: string }
   | {
@@ -52,6 +58,12 @@ export type EditorCommand =
       trackId?: string
     }
   | {
+      type: 'track/add'
+      track: EditorTrack
+      index?: number
+    }
+  | { type: 'track/delete'; trackId: string }
+  | {
       type: 'track/update'
       trackId: string
       patch: Partial<Pick<EditorTrack, 'locked' | 'hidden' | 'muted' | 'name'>>
@@ -59,7 +71,15 @@ export type EditorCommand =
   | { type: 'canvas/setAspectRatio'; aspectRatio: CanvasAspectRatio }
 
 export type EditorExecutionCode =
-  'OK' | 'NOT_FOUND' | 'INVALID_RANGE' | 'TRACK_LOCKED' | 'INCOMPATIBLE_TRACK' | 'NO_CHANGE'
+  | 'OK'
+  | 'NOT_FOUND'
+  | 'INVALID_RANGE'
+  | 'TRACK_LOCKED'
+  | 'INCOMPATIBLE_TRACK'
+  | 'TRACK_NOT_EMPTY'
+  | 'PROTECTED_TRACK'
+  | 'TRANSACTION_ABORTED'
+  | 'NO_CHANGE'
 
 export interface EditorCommandResult {
   state: EditorProjectState
@@ -76,6 +96,7 @@ export interface EditorBatchCommandResult {
   changed: boolean
   code: EditorExecutionCode
   results: readonly EditorCommandResult[]
+  message?: string
 }
 
 interface CommandFailure {
@@ -118,6 +139,10 @@ export function applyEditorCommands(
   return applyEditorCommandsWithResult(state, commands).state
 }
 
+/**
+ * 非原子批处理：用于明确允许“前面成功、后面失败”的低层调用。
+ * UI 与 Agent 的一次用户动作优先使用 applyEditorTransactionWithResult()。
+ */
 export function applyEditorCommandsWithResult(
   state: EditorProjectState,
   commands: readonly EditorCommand[]
@@ -136,6 +161,53 @@ export function applyEditorCommandsWithResult(
     success: results.length > 0 && !failedResult,
     changed: current !== state,
     code: failedResult?.code ?? (results.length > 0 ? 'OK' : 'NO_CHANGE'),
+    results,
+    message: failedResult?.message
+  }
+}
+
+/**
+ * 原子事务：只要有一个命令失败，整个操作回滚到原始 state。
+ * 拖素材并自动建层、批量移动、Agent 一次自动剪辑都应该走这里。
+ */
+export function applyEditorTransactionWithResult(
+  state: EditorProjectState,
+  commands: readonly EditorCommand[]
+): EditorBatchCommandResult {
+  if (commands.length === 0) {
+    return {
+      state,
+      success: false,
+      changed: false,
+      code: 'NO_CHANGE',
+      results: [],
+      message: '事务中没有命令'
+    }
+  }
+
+  let current = state
+  const results: EditorCommandResult[] = []
+  for (const command of commands) {
+    const result = applyEditorCommand(current, command)
+    results.push(result)
+    if (!result.success) {
+      return {
+        state,
+        success: false,
+        changed: false,
+        code: 'TRANSACTION_ABORTED',
+        results,
+        message: result.message ?? '事务执行失败，已回滚'
+      }
+    }
+    current = result.state
+  }
+
+  return {
+    state: current,
+    success: true,
+    changed: current !== state,
+    code: current !== state ? 'OK' : 'NO_CHANGE',
     results
   }
 }
@@ -152,16 +224,35 @@ function getCommandFailure(
       const asset = state.assets.find((item) => item.id === command.assetId)
       if (!asset || asset.status !== 'ready') return failure('NOT_FOUND', '素材不存在或尚未就绪')
       if (!hasPositiveDuration(asset.duration)) return failure('INVALID_RANGE', '素材时长无效')
-      return getTargetTrackFailure(
-        state,
-        getAssetKind(asset),
-        command.trackId ?? getDefaultTrackIdForAsset(state, asset)
-      )
+      const trackId = command.trackId ?? getDefaultTrackIdForAsset(state, asset)
+      const trackFailure = getTargetTrackFailure(state, getAssetKind(asset), trackId)
+      if (trackFailure) return trackFailure
+      const timelineStart = command.timelineStart ?? getTrackEnd(state, trackId)
+      if (trackWouldCollide(state, trackId, Math.max(0, timelineStart), asset.duration)) {
+        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+      }
+      return null
+    }
+
+    case 'clip/add': {
+      if (state.clips.some((clip) => clip.id === command.clip.id)) {
+        return failure('NO_CHANGE', 'Clip ID 已存在')
+      }
+      const asset = state.assets.find((item) => item.id === command.clip.assetId)
+      if (!asset || asset.status !== 'ready') return failure('NOT_FOUND', '素材不存在或尚未就绪')
+      if (!hasPositiveDuration(asset.duration)) return failure('INVALID_RANGE', '素材时长无效')
+      const resolved = resolveTimelineClip(command.clip, asset)
+      const trackFailure = getTargetTrackFailure(state, getAssetKind(asset), resolved.trackId)
+      if (trackFailure) return trackFailure
+      if (trackWouldCollide(state, resolved.trackId, resolved.timelineStart, resolved.duration)) {
+        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+      }
+      return null
     }
 
     case 'clip/delete':
       return state.clips.some((clip) => clip.id === command.clipId)
-        ? null
+        ? getClipEditFailure(state, command.clipId)
         : failure('NOT_FOUND', 'Clip 不存在')
 
     case 'clip/move': {
@@ -169,9 +260,16 @@ function getCommandFailure(
       if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
       if (!Number.isFinite(command.timelineStart)) return failure('INVALID_RANGE', '时间线位置无效')
       const currentTrack = state.tracks.find((track) => track.id === clip.trackId)
-      if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+      if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前内容层已锁定')
       const asset = state.assets.find((item) => item.id === clip.assetId)
-      return getTargetTrackFailure(state, getAssetKind(asset), command.trackId)
+      const targetTrackId = command.trackId ?? clip.trackId ?? getDefaultTrackIdForAsset(state, asset!)
+      const trackFailure = getTargetTrackFailure(state, getAssetKind(asset), targetTrackId)
+      if (trackFailure) return trackFailure
+      const resolved = resolveTimelineClip(clip, asset ?? null)
+      if (trackWouldCollide(state, targetTrackId, Math.max(0, command.timelineStart), resolved.duration, [clip.id])) {
+        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+      }
+      return null
     }
 
     case 'clip/trim':
@@ -184,7 +282,7 @@ function getCommandFailure(
         return failure('NO_CHANGE', '目标 Clip ID 已存在')
       }
       const track = state.tracks.find((item) => item.id === clip.trackId)
-      if (track?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+      if (track?.locked) return failure('TRACK_LOCKED', '当前内容层已锁定')
       if (!Number.isFinite(command.at)) return failure('INVALID_RANGE', '分割位置无效')
       const asset = state.assets.find((item) => item.id === clip.assetId) ?? null
       const resolved = resolveTimelineClip(clip, asset)
@@ -202,7 +300,18 @@ function getCommandFailure(
       if (clipFailure) return clipFailure
       const clip = state.clips.find((item) => item.id === command.clipId)
       const currentAsset = state.assets.find((item) => item.id === clip?.assetId)
-      return getTargetTrackFailure(state, getAssetKind(currentAsset), command.patch.trackId)
+      if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
+      const current = resolveTimelineClip(clip, currentAsset ?? null)
+      const targetTrackId = command.patch.trackId ?? current.trackId
+      const trackFailure = getTargetTrackFailure(state, getAssetKind(currentAsset), targetTrackId)
+      if (trackFailure) return trackFailure
+      if (command.patch.timelineStart !== undefined || command.patch.trackId !== undefined) {
+        const nextStart = Math.max(0, command.patch.timelineStart ?? current.timelineStart)
+        if (trackWouldCollide(state, targetTrackId, nextStart, current.duration, [current.id])) {
+          return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+        }
+      }
+      return null
     }
 
     case 'clip/duplicate': {
@@ -212,15 +321,40 @@ function getCommandFailure(
       const clip = state.clips.find((item) => item.id === command.clipId)
       if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
       const currentTrack = state.tracks.find((track) => track.id === clip.trackId)
-      if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+      if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前内容层已锁定')
       const asset = state.assets.find((item) => item.id === clip.assetId)
-      return getTargetTrackFailure(state, getAssetKind(asset), command.trackId ?? clip.trackId)
+      const resolved = resolveTimelineClip(clip, asset ?? null)
+      const targetTrackId = command.trackId ?? resolved.trackId
+      const trackFailure = getTargetTrackFailure(state, getAssetKind(asset), targetTrackId)
+      if (trackFailure) return trackFailure
+      const start = Math.max(0, command.timelineStart ?? resolved.timelineStart + resolved.duration)
+      if (trackWouldCollide(state, targetTrackId, start, resolved.duration, [clip.id])) {
+        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+      }
+      return null
+    }
+
+    case 'track/add':
+      if (state.tracks.some((track) => track.id === command.track.id)) {
+        return failure('NO_CHANGE', '内容层 ID 已存在')
+      }
+      if (!command.track.id || !command.track.name) {
+        return failure('INVALID_RANGE', '内容层参数无效')
+      }
+      return null
+
+    case 'track/delete': {
+      const track = state.tracks.find((item) => item.id === command.trackId)
+      if (!track) return failure('NOT_FOUND', '内容层不存在')
+      if (!isDisposableTrack(track)) return failure('PROTECTED_TRACK', '基础内容层不能删除')
+      if (trackHasClips(state, track.id)) return failure('TRACK_NOT_EMPTY', '内容层仍有片段')
+      return null
     }
 
     case 'track/update':
       return state.tracks.some((track) => track.id === command.trackId)
         ? null
-        : failure('NOT_FOUND', '轨道不存在')
+        : failure('NOT_FOUND', '内容层不存在')
 
     case 'canvas/setAspectRatio':
       return isValidAspectRatio(command.aspectRatio)
@@ -233,7 +367,7 @@ function getClipEditFailure(state: EditorProjectState, clipId: string): CommandF
   const clip = state.clips.find((item) => item.id === clipId)
   if (!clip) return failure('NOT_FOUND', 'Clip 不存在')
   const track = state.tracks.find((item) => item.id === clip.trackId)
-  if (track?.locked) return failure('TRACK_LOCKED', '当前轨道已锁定')
+  if (track?.locked) return failure('TRACK_LOCKED', '当前内容层已锁定')
   const asset = state.assets.find((item) => item.id === clip.assetId)
   if (!hasPositiveDuration(asset?.duration)) return failure('INVALID_RANGE', '素材时长无效')
   return null
@@ -246,10 +380,10 @@ function getTargetTrackFailure(
 ): CommandFailure | null {
   if (!trackId) return null
   const target = state.tracks.find((track) => track.id === trackId)
-  if (!target) return failure('NOT_FOUND', '目标轨道不存在')
-  if (target.locked) return failure('TRACK_LOCKED', '目标轨道已锁定')
+  if (!target) return failure('NOT_FOUND', '目标内容层不存在')
+  if (target.locked) return failure('TRACK_LOCKED', '目标内容层已锁定')
   if (!canMoveClipToTrack(assetKind, target.kind)) {
-    return failure('INCOMPATIBLE_TRACK', '素材类型与目标轨道不兼容')
+    return failure('INCOMPATIBLE_TRACK', '素材类型与目标区域不兼容')
   }
   return null
 }
@@ -270,6 +404,17 @@ function reduceEditorCommand(
         clips: [...state.clips, clip],
         activeClipId: clip.id,
         playhead: clip.timelineStart
+      }
+    }
+
+    case 'clip/add': {
+      const asset = state.assets.find((item) => item.id === command.clip.assetId) ?? null
+      const resolved = resolveTimelineClip(command.clip, asset)
+      return {
+        ...state,
+        clips: [...state.clips, resolved],
+        activeClipId: resolved.id,
+        playhead: resolved.timelineStart
       }
     }
 
@@ -317,17 +462,11 @@ function reduceEditorCommand(
       if (at <= clip.timelineStart + MIN_CLIP_DURATION || at >= clipEnd - MIN_CLIP_DURATION) {
         return state
       }
-
       const leftDuration = at - clip.timelineStart
       const rightDuration = clipEnd - at
       const splitSourceTime = clip.sourceStart + leftDuration * clip.speed
       if (splitSourceTime <= clip.sourceStart || splitSourceTime >= clip.sourceEnd) return state
-
-      const leftClip: TimelineClip = {
-        ...clip,
-        duration: leftDuration,
-        sourceEnd: splitSourceTime
-      }
+      const leftClip: TimelineClip = { ...clip, duration: leftDuration, sourceEnd: splitSourceTime }
       const rightClip: TimelineClip = {
         ...clip,
         id: command.rightClipId,
@@ -335,7 +474,6 @@ function reduceEditorCommand(
         duration: rightDuration,
         sourceStart: splitSourceTime
       }
-
       const clips = [...state.clips]
       clips.splice(originalIndex, 1, leftClip, rightClip)
       return { ...state, clips, activeClipId: rightClip.id, playhead: at }
@@ -360,8 +498,9 @@ function reduceEditorCommand(
           duration: (sourceRange.sourceEnd - sourceRange.sourceStart) / speed,
           speed,
           opacity: clamp(finiteOr(command.patch.opacity, clip.opacity), 0, 1),
-          volume: clamp(finiteOr(command.patch.volume, clip.volume), 0, 2),
+          volume: clamp(finiteOr(command.patch.volume, clip.volume), 0, 1),
           muted: command.patch.muted ?? clip.muted,
+          enabled: command.patch.enabled ?? clip.enabled,
           transform: {
             x: finiteOr(transformPatch?.x, clip.transform.x),
             y: finiteOr(transformPatch?.y, clip.transform.y),
@@ -375,7 +514,6 @@ function reduceEditorCommand(
     case 'clip/duplicate': {
       const rawClip = state.clips.find((clip) => clip.id === command.clipId)
       if (!rawClip) return state
-
       const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
       const clip = resolveTimelineClip(rawClip, asset)
       const targetTrackId = command.trackId ?? clip.trackId
@@ -393,10 +531,23 @@ function reduceEditorCommand(
       }
     }
 
+    case 'track/add': {
+      const tracks = [...state.tracks]
+      const index =
+        command.index === undefined
+          ? tracks.length
+          : Math.min(tracks.length, Math.max(0, Math.round(command.index)))
+      tracks.splice(index, 0, { ...command.track })
+      return { ...state, tracks }
+    }
+
+    case 'track/delete':
+      return { ...state, tracks: state.tracks.filter((track) => track.id !== command.trackId) }
+
     case 'track/update': {
       const tracks = state.tracks.map((track) =>
         track.id === command.trackId
-          ? { ...track, ...command.patch, id: track.id, kind: track.kind }
+          ? { ...track, ...command.patch, id: track.id, kind: track.kind, role: track.role }
           : track
       )
       return { ...state, tracks }
@@ -414,13 +565,11 @@ function updateClip(
 ): EditorProjectState {
   const clipIndex = state.clips.findIndex((clip) => clip.id === clipId)
   if (clipIndex === -1) return state
-
   const rawClip = state.clips[clipIndex]
   const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
   const clip = resolveTimelineClip(rawClip, asset)
   const assetDuration = asset?.duration ?? clip.sourceEnd
   const nextClip = update(clip, assetDuration)
-
   if (shallowClipEqual(clip, nextClip)) return state
   const clips = state.clips.map((item, index) => (index === clipIndex ? nextClip : item))
   return { ...state, clips, activeClipId: clipId }

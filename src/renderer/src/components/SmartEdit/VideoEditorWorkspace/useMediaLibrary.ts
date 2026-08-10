@@ -3,15 +3,12 @@ import type { EditorProjectAction } from './editorProject'
 import { createMediaLibraryController, type MediaLibraryController } from './mediaLibrary'
 
 export function useMediaLibrary(dispatch: (action: EditorProjectAction) => void): {
-  importMediaFiles: (files: readonly File[]) => void
+  importMediaFiles: (files: readonly File[]) => string[]
   reportMediaError: (assetId: string) => void
 } {
   const controllerRef = useRef<MediaLibraryController | null>(null)
-
   const getController = useCallback((): MediaLibraryController => {
-    if (!controllerRef.current) {
-      controllerRef.current = createMediaLibraryController({ dispatch })
-    }
+    if (!controllerRef.current) controllerRef.current = createMediaLibraryController({ dispatch })
     return controllerRef.current
   }, [dispatch])
 
@@ -24,7 +21,7 @@ export function useMediaLibrary(dispatch: (action: EditorProjectAction) => void)
   )
 
   const importMediaFiles = useCallback(
-    (files: readonly File[]): void => getController().importFiles(files),
+    (files: readonly File[]): string[] => getController().importFiles(files),
     [getController]
   )
   const reportMediaError = useCallback(

@@ -1,7 +1,13 @@
 import type { EditorProjectAction, MediaAsset } from './editorProject'
 
+export interface MediaMetadata {
+  duration: number
+  width?: number
+  height?: number
+}
+
 interface MediaDetectionCallbacks {
-  onReady: (duration: number) => void
+  onReady: (metadata: MediaMetadata | number) => void
   onError: () => void
 }
 
@@ -20,7 +26,7 @@ interface MediaLibraryOptions {
 }
 
 export interface MediaLibraryController {
-  importFiles: (files: readonly File[]) => void
+  importFiles: (files: readonly File[]) => string[]
   reportError: (assetId: string) => void
   dispose: () => void
 }
@@ -41,9 +47,13 @@ const detectVideo = (url: string, callbacks: MediaDetectionCallbacks): (() => vo
   const finishReady = (): void => {
     if (!active) return
     active = false
-    const duration = video.duration
+    const metadata: MediaMetadata = {
+      duration: video.duration,
+      width: video.videoWidth || undefined,
+      height: video.videoHeight || undefined
+    }
     releaseVideo()
-    callbacks.onReady(duration)
+    callbacks.onReady(metadata)
   }
 
   function handleLoadedMetadata(): void {
@@ -100,28 +110,40 @@ export function createMediaLibraryController({
     dispatch({ type: 'asset/failed', assetId, error: '无法预览该视频' })
   }
 
-  const importFiles = (files: readonly File[]): void => {
-    if (disposed) return
+  const importFiles = (files: readonly File[]): string[] => {
+    if (disposed) return []
+    const assetIds: string[] = []
 
     files.forEach((file) => {
+      if (!file.type.startsWith('video/')) return
       const asset: MediaAsset = {
         id: resolvedDependencies.createId(),
         name: file.name,
         url: resolvedDependencies.createObjectURL(file),
         duration: null,
-        status: 'loading'
+        width: null,
+        height: null,
+        status: 'loading',
+        kind: 'video'
       }
+      assetIds.push(asset.id)
       let detectionSettled = false
 
       urlsByAssetId.set(asset.id, asset.url)
       dispatch({ type: 'assets/imported', asset })
-
       const cancelDetection = resolvedDependencies.detectMedia(asset.url, {
-        onReady: (duration) => {
+        onReady: (metadata) => {
           detectionSettled = true
+          const normalized = typeof metadata === 'number' ? { duration: metadata } : metadata
           if (disposed || !urlsByAssetId.has(asset.id)) return
           pendingDetections.delete(asset.id)
-          dispatch({ type: 'asset/ready', assetId: asset.id, duration })
+          dispatch({
+            type: 'asset/ready',
+            assetId: asset.id,
+            duration: normalized.duration,
+            width: normalized.width,
+            height: normalized.height
+          })
         },
         onError: () => {
           detectionSettled = true
@@ -130,6 +152,8 @@ export function createMediaLibraryController({
       })
       if (!detectionSettled) pendingDetections.set(asset.id, cancelDetection)
     })
+
+    return assetIds
   }
 
   const dispose = (): void => {

@@ -15,7 +15,7 @@ const DEFAULT_MIN_DURATION = 0.05
 export type ClipAssetKind = 'video' | 'image' | 'audio'
 export type TargetTrackKind = 'video' | 'audio' | 'text' | 'overlay'
 
-/** Keep a clip's source range inside the media asset while preserving a usable minimum range. */
+/** 把素材入点/出点约束在真实媒体长度内。 */
 export function normalizeSourceRange({
   sourceStart,
   sourceEnd,
@@ -24,7 +24,6 @@ export function normalizeSourceRange({
 }: SourceRangeInput): NormalizedSourceRange {
   const duration = finitePositiveOr(assetDuration, 0)
   if (duration <= 0) return { sourceStart: 0, sourceEnd: 0 }
-
   const requestedMinimum = finitePositiveOr(minDuration, DEFAULT_MIN_DURATION)
   const effectiveMinimum = Math.min(duration, requestedMinimum)
   const maxSourceStart = Math.max(0, duration - effectiveMinimum)
@@ -34,13 +33,10 @@ export function normalizeSourceRange({
     normalizedStart + effectiveMinimum,
     duration
   )
-
-  return {
-    sourceStart: normalizedStart,
-    sourceEnd: normalizedEnd
-  }
+  return { sourceStart: normalizedStart, sourceEnd: normalizedEnd }
 }
 
+/** 用户层面弱化轨道；Core 只保留“画面内容 / 声音内容”这层兼容判断。 */
 export function canMoveClipToTrack(
   assetKind: ClipAssetKind,
   targetTrackKind: TargetTrackKind
@@ -48,7 +44,7 @@ export function canMoveClipToTrack(
   if (assetKind === 'audio') return targetTrackKind === 'audio'
   return (
     (assetKind === 'video' || assetKind === 'image') &&
-    (targetTrackKind === 'video' || targetTrackKind === 'overlay')
+    (targetTrackKind === 'video' || targetTrackKind === 'overlay' || targetTrackKind === 'text')
   )
 }
 

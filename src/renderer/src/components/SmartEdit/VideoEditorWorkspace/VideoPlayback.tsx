@@ -1,7 +1,9 @@
-import type { CSSProperties, JSX, ReactNode } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Film, ListVideo, Pause, Play } from 'lucide-react'
+import type { CSSProperties, JSX, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Film, Pause, Play, Repeat2, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import CompositionPreview from './CompositionPreview'
+import type { ClipPatch } from './editorCommands'
+import { isTextEditingTarget } from './editorInteraction'
 import {
   getProjectDuration,
   selectCompositionAtTime,
@@ -11,9 +13,15 @@ import {
   type MediaAsset,
   type ResolvedTimelineClip
 } from './editorProject'
+import { formatTimecode } from './editorTime'
+import type { EditorPlaybackController } from './playback/editorPlaybackController'
+import { useEditorPlayback } from './playback/useEditorPlayback'
+import type { EditorInteractionController } from './interaction/editorInteractionController'
 
 interface VideoPlaybackProps {
   project?: EditorProjectState
+  playbackController?: EditorPlaybackController
+  interactionController?: EditorInteractionController
   activeAsset?: MediaAsset | null
   selectedRatio: CanvasAspectRatio
   rightControls: ReactNode
@@ -22,6 +30,19 @@ interface VideoPlaybackProps {
   activeTrack?: EditorTrack | null
   playhead?: number
   onPlayheadChange?: (time: number) => void
+  onSelectClip?: (clipId: string) => void
+  onUpdateClip?: (patch: ClipPatch) => void
+  onUpdateClipById?: (clipId: string, patch: ClipPatch) => void
+  onDeleteClip?: (clipId: string) => void
+  onCutClip?: (clipId: string) => void
+  onCopyClip?: (clipId: string) => void
+  onDuplicateClip?: (clipId: string) => void
+  onToggleClipMuted?: (clipId: string) => void
+  onToggleClipEnabled?: (clipId: string) => void
+  onResetClipTransform?: (clipId: string) => void
+  previewZoom?: number
+  onPreviewPanChange?: (pan: { x: number; y: number }) => void
+  previewPan?: { x: number; y: number }
 }
 
 interface CanvasStyle extends CSSProperties {
@@ -29,20 +50,175 @@ interface CanvasStyle extends CSSProperties {
   '--canvas-ratio-value': number
 }
 
-const getWholeSeconds = (seconds: number): number =>
-  Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
-
-const formatPlaybackTime = (seconds: number): string => {
-  const totalSeconds = getWholeSeconds(seconds)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const remainingSeconds = totalSeconds % 60
-  return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, '0')).join(':')
-}
+const FRAME_STEP = 1 / 30
 
 function VideoPlayback(props: VideoPlaybackProps): JSX.Element {
+  if (props.project && props.playbackController) {
+    return (
+      <ControlledCompositionVideoPlayback
+        {...props}
+        project={props.project}
+        playbackController={props.playbackController}
+      />
+    )
+  }
   if (props.project) return <CompositionVideoPlayback {...props} project={props.project} />
   return <LegacyVideoPlayback {...props} />
+}
+
+function ControlledCompositionVideoPlayback({
+  project,
+  playbackController,
+  interactionController,
+  selectedRatio,
+  rightControls,
+  onMediaError,
+  onSelectClip,
+  onUpdateClip,
+  onUpdateClipById,
+  onDeleteClip,
+  onCutClip,
+  onCopyClip,
+  onDuplicateClip,
+  onToggleClipMuted,
+  onToggleClipEnabled,
+  onResetClipTransform,
+  previewZoom = 1,
+  previewPan = { x: 0, y: 0 },
+  onPreviewPanChange
+}: VideoPlaybackProps & { project: EditorProjectState; playbackController: EditorPlaybackController }): JSX.Element {
+  const playback = useEditorPlayback(playbackController)
+  const panRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    startPanX: number
+    startPanY: number
+  } | null>(null)
+  const projectDuration = getProjectDuration(project)
+  const composition = selectCompositionAtTime(project, playback.playhead)
+  const hasPlayableMedia = project.clips.some((clip) =>
+    project.assets.some((asset) => asset.id === clip.assetId && asset.status === 'ready')
+  )
+  const canPlay = hasPlayableMedia && projectDuration > 0
+  const canvasStyle: CanvasStyle = {
+    '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
+    '--canvas-ratio-value': selectedRatio.width / selectedRatio.height,
+    transform: `translate(${previewPan.x}px, ${previewPan.y}px) scale(${previewZoom})`
+  }
+
+  useEffect(() => playbackController.setDuration(projectDuration), [playbackController, projectDuration])
+
+  useEffect(() => {
+    const move = (event: PointerEvent): void => {
+      const pan = panRef.current
+      if (!pan || event.pointerId !== pan.pointerId) return
+      interactionController?.markSpaceGestureUsed()
+      onPreviewPanChange?.({
+        x: pan.startPanX + event.clientX - pan.startX,
+        y: pan.startPanY + event.clientY - pan.startY
+      })
+    }
+    const stop = (event: PointerEvent): void => {
+      if (panRef.current?.pointerId !== event.pointerId) return
+      panRef.current = null
+      interactionController?.end('panning-canvas')
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+    }
+  }, [interactionController, onPreviewPanChange])
+
+  const hasVisibleLayers = composition.videoLayers.length > 0 || composition.audioLayers.length > 0
+  const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const useSpacePan = event.button === 0 && interactionController?.getSnapshot().spacePressed
+    if (event.button !== 1 && !useSpacePan) return
+    if (interactionController && !interactionController.begin('panning-canvas', event.pointerId)) return
+    if (useSpacePan) interactionController.markSpaceGestureUsed()
+    event.preventDefault()
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startPanX: previewPan.x,
+      startPanY: previewPan.y
+    }
+  }
+
+  return (
+    <>
+      <div className="studio-player__stage" onPointerDown={startPan}>
+        <div
+          className={`studio-player__canvas${hasVisibleLayers ? ' studio-player__canvas--composition' : ''}`}
+          style={canvasStyle}
+          role={hasVisibleLayers ? undefined : 'img'}
+          aria-label={hasVisibleLayers ? `工程合成预览画布，画面比例 ${selectedRatio.label}` : `暂无预览内容，画面比例 ${selectedRatio.label}`}
+        >
+          {hasVisibleLayers ? (
+            <CompositionPreview
+              project={project}
+              composition={composition}
+              playhead={playback.playhead}
+              isPlaying={playback.isPlaying}
+              masterVolume={playback.masterVolume}
+              interactionController={interactionController}
+              onMediaError={onMediaError}
+              activeClipId={project.activeClipId}
+              onSelectClip={onSelectClip}
+              onUpdateClip={onUpdateClip}
+              onUpdateClipById={onUpdateClipById}
+              onDeleteClip={onDeleteClip}
+              onCutClip={onCutClip}
+              onCopyClip={onCopyClip}
+              onDuplicateClip={onDuplicateClip}
+              onToggleClipMuted={onToggleClipMuted}
+              onToggleClipEnabled={onToggleClipEnabled}
+              onResetClipTransform={onResetClipTransform}
+            />
+          ) : (
+            <div className="studio-player__empty">
+              <Film size={30} strokeWidth={1.4} aria-hidden="true" />
+              <strong>把视频拖到时间线开始剪辑</strong>
+              <span>预览区会跟随播放头实时显示工程画面</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <footer className="studio-player__controls" aria-label="播放控制">
+        <div className="studio-player__controls-left">
+          <time className="studio-player__current-time">{formatTimecode(playback.playhead)}</time>
+          <span className="studio-player__time-divider" aria-hidden="true">/</span>
+          <time>{formatTimecode(projectDuration)}</time>
+        </div>
+        <div className="studio-player__transport">
+          <button type="button" aria-label="上一帧" title="上一帧 ←" disabled={!canPlay} onClick={() => playbackController.step(-FRAME_STEP)}>
+            <SkipBack size={15} aria-hidden="true" />
+          </button>
+          <button className="studio-player__play" type="button" aria-label={playback.isPlaying ? '暂停' : '播放'} title={`${playback.isPlaying ? '暂停' : '播放'} Space`} disabled={!canPlay} onClick={() => playbackController.toggle()}>
+            {playback.isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+          </button>
+          <button type="button" aria-label="下一帧" title="下一帧 →" disabled={!canPlay} onClick={() => playbackController.step(FRAME_STEP)}>
+            <SkipForward size={15} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="studio-player__controls-right">
+          <label className="studio-player__master-volume" title="预览总音量">
+            {playback.masterVolume <= 0.001 ? <VolumeX size={15} aria-hidden="true" /> : <Volume2 size={15} aria-hidden="true" />}
+            <input type="range" min="0" max="1" step="0.01" value={playback.masterVolume} onChange={(event) => playbackController.setMasterVolume(Number(event.currentTarget.value))} aria-label="预览总音量" />
+          </label>
+          <button type="button" data-active={playback.loop ? 'true' : undefined} aria-label="循环播放" title="循环播放" onClick={() => playbackController.setLoop(!playback.loop)}>
+            <Repeat2 size={15} aria-hidden="true" />
+          </button>
+          {rightControls}
+        </div>
+      </footer>
+    </>
+  )
 }
 
 function CompositionVideoPlayback({
@@ -51,10 +227,28 @@ function CompositionVideoPlayback({
   rightControls,
   onPlayheadChange,
   onMediaError,
-  playhead = 0
+  onSelectClip,
+  onUpdateClip,
+  onDeleteClip,
+  onCopyClip,
+  onDuplicateClip,
+  onToggleClipMuted,
+  onToggleClipEnabled,
+  onResetClipTransform,
+  playhead = 0,
+  previewZoom = 1,
+  previewPan = { x: 0, y: 0 },
+  onPreviewPanChange
 }: VideoPlaybackProps & { project: EditorProjectState }): JSX.Element {
   const [isPlaying, setIsPlaying] = useState(false)
   const playheadRef = useRef(playhead)
+  const panRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    startPanX: number
+    startPanY: number
+  } | null>(null)
   const projectDuration = getProjectDuration(project)
   const composition = selectCompositionAtTime(project, playhead)
   const hasPlayableMedia = project.clips.some((clip) =>
@@ -64,7 +258,8 @@ function CompositionVideoPlayback({
   const isPlaybackActive = isPlaying && canPlay
   const canvasStyle: CanvasStyle = {
     '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
-    '--canvas-ratio-value': selectedRatio.width / selectedRatio.height
+    '--canvas-ratio-value': selectedRatio.width / selectedRatio.height,
+    transform: `translate(${previewPan.x}px, ${previewPan.y}px) scale(${previewZoom})`
   }
 
   useEffect(() => {
@@ -73,7 +268,6 @@ function CompositionVideoPlayback({
 
   useEffect(() => {
     if (!isPlaying || !canPlay) return
-
     let animationFrame = 0
     let lastTimestamp = performance.now()
     const tick = (timestamp: number): void => {
@@ -88,30 +282,83 @@ function CompositionVideoPlayback({
       }
       animationFrame = requestAnimationFrame(tick)
     }
-
     animationFrame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(animationFrame)
   }, [canPlay, isPlaying, onPlayheadChange, projectDuration])
 
-  const togglePlayback = (): void => {
+  const togglePlayback = useCallback((): void => {
     if (!canPlay) return
     if (isPlaying) {
       setIsPlaying(false)
       return
     }
-
     if (playhead >= projectDuration) {
       playheadRef.current = 0
       onPlayheadChange?.(0)
     }
     setIsPlaying(true)
-  }
+  }, [canPlay, isPlaying, onPlayheadChange, playhead, projectDuration])
+
+  const stepFrame = useCallback(
+    (direction: -1 | 1): void => {
+      setIsPlaying(false)
+      onPlayheadChange?.(clamp(playhead + FRAME_STEP * direction, 0, projectDuration))
+    },
+    [onPlayheadChange, playhead, projectDuration]
+  )
+
+  useEffect(() => {
+    const keyDown = (event: KeyboardEvent): void => {
+      if (isTextEditingTarget(event.target)) return
+      if (event.code !== 'Space' || event.repeat) return
+      event.preventDefault()
+      togglePlayback()
+    }
+    window.addEventListener('keydown', keyDown)
+    return () => window.removeEventListener('keydown', keyDown)
+  }, [togglePlayback])
+
+  useEffect(() => {
+    const move = (event: PointerEvent): void => {
+      const pan = panRef.current
+      if (!pan || event.pointerId !== pan.pointerId) return
+      onPreviewPanChange?.({
+        x: pan.startPanX + event.clientX - pan.startX,
+        y: pan.startPanY + event.clientY - pan.startY
+      })
+    }
+    const stop = (event: PointerEvent): void => {
+      if (panRef.current?.pointerId !== event.pointerId) return
+      panRef.current = null
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+    }
+  }, [onPreviewPanChange])
 
   const hasVisibleLayers = composition.videoLayers.length > 0 || composition.audioLayers.length > 0
 
   return (
     <>
-      <div className="studio-player__stage">
+      <div
+        className="studio-player__stage"
+        onPointerDown={(event) => {
+          if (event.button !== 1) return
+          event.preventDefault()
+          panRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            startPanX: previewPan.x,
+            startPanY: previewPan.y
+          }
+        }}
+      >
         <div
           className={`studio-player__canvas${hasVisibleLayers ? ' studio-player__canvas--composition' : ''}`}
           style={canvasStyle}
@@ -129,44 +376,49 @@ function CompositionVideoPlayback({
               playhead={playhead}
               isPlaying={isPlaying}
               onMediaError={onMediaError}
+              activeClipId={project.activeClipId}
+              onSelectClip={onSelectClip}
+              onUpdateClip={onUpdateClip}
+              onDeleteClip={onDeleteClip}
+              onCopyClip={onCopyClip}
+              onDuplicateClip={onDuplicateClip}
+              onToggleClipMuted={onToggleClipMuted}
+              onToggleClipEnabled={onToggleClipEnabled}
+              onResetClipTransform={onResetClipTransform}
             />
           ) : (
-            <Film size={34} strokeWidth={1.4} aria-hidden="true" />
+            <div className="studio-player__empty">
+              <Film size={30} strokeWidth={1.4} aria-hidden="true" />
+              <strong>把视频拖到时间线开始剪辑</strong>
+              <span>预览区会跟随播放头实时显示工程画面</span>
+            </div>
           )}
         </div>
       </div>
       <footer className="studio-player__controls" aria-label="播放控制">
         <div className="studio-player__controls-left">
-          <time
-            className="studio-player__current-time"
-            dateTime={`PT${getWholeSeconds(playhead)}S`}
+          <time className="studio-player__current-time">{formatTimecode(playhead)}</time>
+          <span className="studio-player__time-divider" aria-hidden="true">/</span>
+          <time>{formatTimecode(projectDuration)}</time>
+        </div>
+        <div className="studio-player__transport">
+          <button type="button" aria-label="上一帧" title="上一帧 ←" disabled={!canPlay} onClick={() => stepFrame(-1)}>
+            <SkipBack size={15} aria-hidden="true" />
+          </button>
+          <button
+            className="studio-player__play"
+            type="button"
+            aria-label={isPlaybackActive ? '暂停' : '播放'}
+            title={`${isPlaybackActive ? '暂停' : '播放'} Space`}
+            disabled={!canPlay}
+            onClick={togglePlayback}
           >
-            {formatPlaybackTime(playhead)}
-          </time>
-          <span className="studio-player__time-divider" aria-hidden="true">
-            /
-          </span>
-          <time dateTime={`PT${getWholeSeconds(projectDuration)}S`}>
-            {formatPlaybackTime(projectDuration)}
-          </time>
-          <button type="button" aria-label="片段列表" title="片段列表" disabled>
-            <ListVideo size={17} strokeWidth={1.75} aria-hidden="true" />
+            {isPlaybackActive ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+          </button>
+          <button type="button" aria-label="下一帧" title="下一帧 →" disabled={!canPlay} onClick={() => stepFrame(1)}>
+            <SkipForward size={15} aria-hidden="true" />
           </button>
         </div>
-        <button
-          className="studio-player__play"
-          type="button"
-          aria-label={isPlaybackActive ? '暂停' : '播放'}
-          title={isPlaybackActive ? '暂停' : '播放'}
-          disabled={!canPlay}
-          onClick={togglePlayback}
-        >
-          {isPlaybackActive ? (
-            <Pause size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
-          ) : (
-            <Play size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
-          )}
-        </button>
         <div className="studio-player__controls-right">{rightControls}</div>
       </footer>
     </>
@@ -175,209 +427,53 @@ function CompositionVideoPlayback({
 
 function LegacyVideoPlayback({
   activeAsset = null,
-  activeClip = null,
-  activeTrack = null,
-  playhead = 0,
   selectedRatio,
   rightControls,
-  onPlayheadChange,
   onMediaError
 }: VideoPlaybackProps): JSX.Element {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [readyVideoKey, setReadyVideoKey] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [legacyCurrentTime, setLegacyCurrentTime] = useState(0)
-  const [legacyDuration, setLegacyDuration] = useState(0)
-  const isActiveAssetReady = activeAsset?.status === 'ready'
-  const isTrackHidden = activeTrack?.hidden === true
-  const isTrackMuted = activeTrack?.muted === true
-  const videoKey = activeAsset
-    ? `${activeAsset.id}:${activeAsset.status}:${isTrackHidden ? 'hidden' : 'visible'}`
-    : null
-  const isVideoReady = videoKey !== null && readyVideoKey === videoKey
-  const canRenderVideo = Boolean(activeAsset && isActiveAssetReady && !isTrackHidden)
-  const isPlaybackActive = isPlaying && canRenderVideo
+  const videoRef = useRef<HTMLVideoElement>(null)
   const canvasStyle: CanvasStyle = {
     '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
     '--canvas-ratio-value': selectedRatio.width / selectedRatio.height
   }
-
-  const clipTransformStyle = useMemo<CSSProperties | undefined>(() => {
-    if (!activeClip) return undefined
-    const { transform, opacity } = activeClip
-    return {
-      opacity,
-      transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scaleX}, ${transform.scaleY}) rotate(${transform.rotation}deg)`
-    }
-  }, [activeClip])
-
-  const displayCurrentTime = activeClip ? playhead : legacyCurrentTime
-  const displayDuration = activeClip
-    ? activeClip.timelineStart + activeClip.duration
-    : legacyDuration
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (video) {
-      video.pause()
-      if (video.readyState > 0) video.currentTime = 0
-    }
-    return () => {
-      if (video) {
-        video.pause()
-        if (video.readyState > 0) video.currentTime = 0
-      }
-    }
-  }, [activeAsset?.id, activeClip?.id, activeTrack?.hidden])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !activeClip || !isVideoReady || isPlaying) return
-    const clipStart = activeClip.timelineStart
-    const clipEnd = clipStart + activeClip.duration
-    const boundedProjectTime = clamp(playhead, clipStart, clipEnd)
-    const sourceTime = clamp(
-      activeClip.sourceStart + (boundedProjectTime - clipStart) * activeClip.speed,
-      activeClip.sourceStart,
-      activeClip.sourceEnd
-    )
-    if (Math.abs(video.currentTime - sourceTime) > 0.04) video.currentTime = sourceTime
-  }, [activeClip, isPlaying, isVideoReady, playhead])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    video.playbackRate = activeClip?.speed ?? 1
-    video.muted = isTrackMuted || Boolean(activeClip?.muted)
-    video.volume = isTrackMuted ? 0 : clamp(activeClip?.volume ?? 1, 0, 1)
-  }, [activeClip, isTrackMuted])
-
-  const togglePlayback = async (): Promise<void> => {
-    const video = videoRef.current
-    if (!video || !activeAsset || !isActiveAssetReady || !isVideoReady || !canRenderVideo) return
-    if (!video.paused) {
-      video.pause()
-      return
-    }
-    if (activeClip) {
-      const clipEnd = activeClip.timelineStart + activeClip.duration
-      if (playhead < activeClip.timelineStart || playhead >= clipEnd) {
-        video.currentTime = activeClip.sourceStart
-        onPlayheadChange?.(activeClip.timelineStart)
-      }
-      video.playbackRate = activeClip.speed
-    }
-    try {
-      await video.play()
-    } catch {
-      if (videoRef.current === video) setIsPlaying(false)
-    }
-  }
+  const canRender = activeAsset?.status === 'ready'
 
   return (
     <>
       <div className="studio-player__stage">
-        <div
-          className="studio-player__canvas"
-          style={canvasStyle}
-          role={activeAsset ? undefined : 'img'}
-          aria-label={
-            activeAsset
-              ? `${activeAsset.name} 播放器画布，${isTrackHidden ? '轨道已隐藏，' : ''}画面比例 ${selectedRatio.label}`
-              : `暂无预览内容，画面比例 ${selectedRatio.label}`
-          }
-        >
-          {activeAsset && isActiveAssetReady && !isTrackHidden ? (
+        <div className="studio-player__canvas" style={canvasStyle} aria-label={`播放器画布，画面比例 ${selectedRatio.label}`}>
+          {activeAsset && canRender ? (
             <video
-              key={videoKey ?? activeAsset.id}
               ref={videoRef}
               src={activeAsset.url}
-              style={clipTransformStyle}
               preload="auto"
               playsInline
               aria-label={`${activeAsset.name}播放器预览`}
-              onLoadedData={(event) => {
-                const video = event.currentTarget
-                if (activeClip) {
-                  video.currentTime = activeClip.sourceStart
-                  video.playbackRate = activeClip.speed
-                  video.muted = isTrackMuted || activeClip.muted
-                  video.volume = isTrackMuted ? 0 : clamp(activeClip.volume, 0, 1)
-                } else {
-                  video.currentTime = 0
-                  setLegacyCurrentTime(0)
-                  setLegacyDuration(video.duration)
-                }
-                if (videoKey) setReadyVideoKey(videoKey)
-              }}
-              onTimeUpdate={(event) => {
-                const video = event.currentTarget
-                if (!activeClip) {
-                  setLegacyCurrentTime(video.currentTime)
-                  return
-                }
-                if (video.currentTime >= activeClip.sourceEnd - 0.01) {
-                  video.pause()
-                  video.currentTime = activeClip.sourceEnd
-                  onPlayheadChange?.(activeClip.timelineStart + activeClip.duration)
-                  return
-                }
-                const projectTime =
-                  activeClip.timelineStart +
-                  (video.currentTime - activeClip.sourceStart) / activeClip.speed
-                onPlayheadChange?.(
-                  clamp(
-                    projectTime,
-                    activeClip.timelineStart,
-                    activeClip.timelineStart + activeClip.duration
-                  )
-                )
-              }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
-              onEnded={() => setIsPlaying(false)}
-              onError={() => {
-                setReadyVideoKey(null)
-                setIsPlaying(false)
-                onMediaError(activeAsset.id)
-              }}
+              onError={() => onMediaError(activeAsset.id)}
             />
           ) : (
-            <Film size={34} strokeWidth={1.4} aria-hidden="true" />
+            <Film size={30} strokeWidth={1.4} aria-hidden="true" />
           )}
         </div>
       </div>
       <footer className="studio-player__controls" aria-label="播放控制">
-        <div className="studio-player__controls-left">
-          <time
-            className="studio-player__current-time"
-            dateTime={`PT${getWholeSeconds(displayCurrentTime)}S`}
-          >
-            {formatPlaybackTime(displayCurrentTime)}
-          </time>
-          <span className="studio-player__time-divider" aria-hidden="true">
-            /
-          </span>
-          <time dateTime={`PT${getWholeSeconds(displayDuration)}S`}>
-            {formatPlaybackTime(displayDuration)}
-          </time>
-          <button type="button" aria-label="片段列表" title="片段列表" disabled>
-            <ListVideo size={17} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        </div>
+        <div className="studio-player__controls-left">00:00.00</div>
         <button
           className="studio-player__play"
           type="button"
-          aria-label={isPlaybackActive ? '暂停' : '播放'}
-          title={isPlaybackActive ? '暂停' : '播放'}
-          disabled={!isActiveAssetReady || !isVideoReady || isTrackHidden}
-          onClick={() => void togglePlayback()}
+          aria-label={isPlaying ? '暂停' : '播放'}
+          disabled={!canRender}
+          onClick={() => {
+            const video = videoRef.current
+            if (!video) return
+            if (video.paused) void video.play()
+            else video.pause()
+          }}
         >
-          {isPlaybackActive ? (
-            <Pause size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
-          ) : (
-            <Play size={18} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
-          )}
+          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
         </button>
         <div className="studio-player__controls-right">{rightControls}</div>
       </footer>

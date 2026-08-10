@@ -3,6 +3,7 @@ import { normalizeSourceRange } from './editorClipMath'
 export type MediaAssetStatus = 'loading' | 'ready' | 'error'
 export type MediaAssetKind = 'video' | 'image' | 'audio'
 export type EditorTrackKind = 'video' | 'audio' | 'text' | 'overlay'
+export type EditorTrackRole = 'main' | 'standard'
 
 export interface MediaAsset {
   id: string
@@ -10,10 +11,7 @@ export interface MediaAsset {
   url: string
   duration: number | null
   status: MediaAssetStatus
-  /**
-   * 老项目里没有 kind 字段，所以这里保持可选。
-   * 没有 kind 时按 video 处理，保证旧草稿/旧测试可以平滑迁移。
-   */
+  /** 老项目没有 kind 时按 video 处理。 */
   kind?: MediaAssetKind
   width?: number | null
   height?: number | null
@@ -28,12 +26,6 @@ export interface ClipTransform {
   rotation: number
 }
 
-/**
- * 时间线片段。
- *
- * 新创建的片段会把这些字段全部写满；之所以保留为可选，是为了兼容旧版
- * 只有 id + assetId 的项目数据。使用前通过 resolveTimelineClip() 归一化。
- */
 export interface TimelineClip {
   id: string
   assetId: string
@@ -47,6 +39,7 @@ export interface TimelineClip {
   volume?: number
   muted?: boolean
   speed?: number
+  enabled?: boolean
 }
 
 export interface ResolvedTimelineClip extends TimelineClip {
@@ -60,6 +53,7 @@ export interface ResolvedTimelineClip extends TimelineClip {
   volume: number
   muted: boolean
   speed: number
+  enabled: boolean
 }
 
 export interface TimelineComposition {
@@ -72,6 +66,7 @@ export interface EditorTrack {
   id: string
   name: string
   kind: EditorTrackKind
+  role?: EditorTrackRole
   locked: boolean
   hidden: boolean
   muted: boolean
@@ -115,28 +110,34 @@ export const DEFAULT_TIMELINE_ZOOM = 72
 export const MIN_TIMELINE_ZOOM = 24
 export const MAX_TIMELINE_ZOOM = 240
 export const MIN_CLIP_DURATION = 0.05
+export const MAIN_VISUAL_TRACK_ID = 'track-video-main'
+export const DEFAULT_OVERLAY_TRACK_ID = 'track-video-overlay'
+export const MAIN_AUDIO_TRACK_ID = 'track-audio-main'
 
 export const DEFAULT_EDITOR_TRACKS: EditorTrack[] = [
   {
-    id: 'track-video-overlay',
-    name: 'V2',
+    id: DEFAULT_OVERLAY_TRACK_ID,
+    name: '视觉层',
     kind: 'overlay',
+    role: 'standard',
     locked: false,
     hidden: false,
     muted: false
   },
   {
-    id: 'track-video-main',
-    name: 'V1',
+    id: MAIN_VISUAL_TRACK_ID,
+    name: '主视频',
     kind: 'video',
+    role: 'main',
     locked: false,
     hidden: false,
     muted: false
   },
   {
-    id: 'track-audio-main',
-    name: 'A1',
+    id: MAIN_AUDIO_TRACK_ID,
+    name: '声音',
     kind: 'audio',
+    role: 'standard',
     locked: false,
     hidden: false,
     muted: false
@@ -145,9 +146,8 @@ export const DEFAULT_EDITOR_TRACKS: EditorTrack[] = [
 
 export type EditorProjectAction =
   | { type: 'assets/imported'; asset: MediaAsset }
-  | { type: 'asset/ready'; assetId: string; duration: number }
+  | { type: 'asset/ready'; assetId: string; duration: number; width?: number; height?: number }
   | { type: 'asset/failed'; assetId: string; error: string }
-  /** 兼容旧版 UI；新 UI 正常通过 Command 添加片段。 */
   | { type: 'timeline/assetAdded'; assetId: string }
   | { type: 'timeline/clipSelected'; clipId: string | null }
   | { type: 'timeline/playheadChanged'; time: number }
@@ -184,13 +184,61 @@ export function getMediaAssetKind(asset: MediaAsset): MediaAssetKind {
   return asset.kind ?? 'video'
 }
 
+export function isVisualTrackKind(kind: EditorTrackKind): boolean {
+  return kind === 'video' || kind === 'overlay' || kind === 'text'
+}
+
+export function isVisualTrack(track: EditorTrack): boolean {
+  return isVisualTrackKind(track.kind)
+}
+
+export function getMainVisualTrack(state: EditorProjectState): EditorTrack | null {
+  return (
+    state.tracks.find((track) => track.role === 'main' && isVisualTrack(track)) ??
+    state.tracks.find((track) => track.kind === 'video') ??
+    null
+  )
+}
+
 export function getDefaultTrackIdForAsset(state: EditorProjectState, asset: MediaAsset): string {
   const kind = getMediaAssetKind(asset)
   if (kind === 'audio') {
-    return state.tracks.find((track) => track.kind === 'audio')?.id ?? 'track-audio-main'
+    return state.tracks.find((track) => track.kind === 'audio')?.id ?? MAIN_AUDIO_TRACK_ID
   }
 
-  return state.tracks.find((track) => track.kind === 'video')?.id ?? 'track-video-main'
+  return getMainVisualTrack(state)?.id ?? MAIN_VISUAL_TRACK_ID
+}
+
+export function createVisualTrack(id: string, name = '视觉层'): EditorTrack {
+  return {
+    id,
+    name,
+    kind: 'overlay',
+    role: 'standard',
+    locked: false,
+    hidden: false,
+    muted: false
+  }
+}
+
+export function createAudioTrack(id: string, name = '声音'): EditorTrack {
+  return {
+    id,
+    name,
+    kind: 'audio',
+    role: 'standard',
+    locked: false,
+    hidden: false,
+    muted: false
+  }
+}
+
+export function isDisposableTrack(track: EditorTrack): boolean {
+  return (
+    track.role !== 'main' &&
+    track.id !== DEFAULT_OVERLAY_TRACK_ID &&
+    track.id !== MAIN_AUDIO_TRACK_ID
+  )
 }
 
 export function resolveTimelineClip(
@@ -209,7 +257,7 @@ export function resolveTimelineClip(
 
   return {
     ...clip,
-    trackId: clip.trackId ?? 'track-video-main',
+    trackId: clip.trackId ?? MAIN_VISUAL_TRACK_ID,
     timelineStart: Math.max(0, finiteOr(clip.timelineStart, 0)),
     duration: Math.abs(duration - MIN_CLIP_DURATION) < 1e-9 ? MIN_CLIP_DURATION : duration,
     sourceStart: sourceRange.sourceStart,
@@ -222,9 +270,10 @@ export function resolveTimelineClip(
       rotation: finiteOr(clip.transform?.rotation, 0)
     },
     opacity: clampFinite(clip.opacity ?? 1, 0, 1),
-    volume: clampFinite(clip.volume ?? 1, 0, 2),
+    volume: clampFinite(clip.volume ?? 1, 0, 1),
     muted: Boolean(clip.muted),
-    speed
+    speed,
+    enabled: clip.enabled !== false
   }
 }
 
@@ -236,7 +285,6 @@ export function createTimelineClipFromAsset(
 ): ResolvedTimelineClip | null {
   const asset = state.assets.find((item) => item.id === assetId)
   if (!asset || asset.status !== 'ready') return null
-
   if (
     typeof asset.duration !== 'number' ||
     !Number.isFinite(asset.duration) ||
@@ -262,17 +310,12 @@ export function createTimelineClipFromAsset(
     duration: sourceRange.sourceEnd - sourceRange.sourceStart,
     sourceStart: sourceRange.sourceStart,
     sourceEnd: sourceRange.sourceEnd,
-    transform: {
-      x: 0,
-      y: 0,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0
-    },
+    transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
     opacity: 1,
     volume: 1,
     muted: false,
-    speed: 1
+    speed: 1,
+    enabled: true
   }
 }
 
@@ -293,6 +336,46 @@ export function getProjectDuration(state: EditorProjectState): number {
   }, 0)
 }
 
+export function getResolvedClips(state: EditorProjectState): ResolvedTimelineClip[] {
+  const assetsById = new Map(state.assets.map((asset) => [asset.id, asset]))
+  return state.clips.map((clip) => resolveTimelineClip(clip, assetsById.get(clip.assetId) ?? null))
+}
+
+export function getTrackClips(state: EditorProjectState, trackId: string): ResolvedTimelineClip[] {
+  return getResolvedClips(state).filter((clip) => clip.trackId === trackId)
+}
+
+export function trackHasClips(state: EditorProjectState, trackId: string): boolean {
+  return state.clips.some((clip) => (clip.trackId ?? MAIN_VISUAL_TRACK_ID) === trackId)
+}
+
+export function clipsOverlap(
+  leftStart: number,
+  leftDuration: number,
+  rightStart: number,
+  rightDuration: number,
+  epsilon = 0.0001
+): boolean {
+  const leftEnd = leftStart + leftDuration
+  const rightEnd = rightStart + rightDuration
+  return leftStart < rightEnd - epsilon && rightStart < leftEnd - epsilon
+}
+
+export function trackWouldCollide(
+  state: EditorProjectState,
+  trackId: string,
+  timelineStart: number,
+  duration: number,
+  excludeClipIds: readonly string[] = []
+): boolean {
+  const excluded = new Set(excludeClipIds)
+  return getTrackClips(state, trackId).some(
+    (clip) =>
+      !excluded.has(clip.id) &&
+      clipsOverlap(timelineStart, duration, clip.timelineStart, clip.duration)
+  )
+}
+
 export function selectCompositionAtTime(
   state: EditorProjectState,
   time: number
@@ -305,7 +388,7 @@ export function selectCompositionAtTime(
     const asset = state.assets.find((item) => item.id === rawClip.assetId) ?? null
     const resolved = resolveTimelineClip(rawClip, asset)
     const track = state.tracks.find((item) => item.id === resolved.trackId)
-    if (!track || track.hidden) continue
+    if (!track || track.hidden || !resolved.enabled) continue
     if (
       safeTime < resolved.timelineStart ||
       safeTime >= resolved.timelineStart + resolved.duration
@@ -314,9 +397,10 @@ export function selectCompositionAtTime(
     }
 
     if (track.kind === 'audio') {
-      if (!track.muted && !resolved.muted) audioByTrack.set(track.id, resolved)
-    } else if (track.kind === 'video' || track.kind === 'overlay') {
-      videoByTrack.set(track.id, track.muted ? { ...resolved, muted: true } : resolved)
+      audioByTrack.set(track.id, resolved)
+    } else if (isVisualTrackKind(track.kind)) {
+      // 同一内部层如果暂时存在重叠，后出现的 Clip 优先，保证预览结果确定。
+      videoByTrack.set(track.id, resolved)
     }
   }
 
@@ -350,7 +434,6 @@ function updateAsset(
 ): EditorProjectState {
   const assetIndex = state.assets.findIndex((asset) => asset.id === assetId)
   if (assetIndex === -1) return state
-
   const assets = state.assets.map((asset, index) => (index === assetIndex ? update(asset) : asset))
   return { ...state, assets }
 }
@@ -380,6 +463,8 @@ export function editorProjectReducer(
         const readyAsset: MediaAsset = {
           ...asset,
           duration: action.duration,
+          width: Number.isFinite(action.width) ? action.width : asset.width,
+          height: Number.isFinite(action.height) ? action.height : asset.height,
           status: 'ready'
         }
         delete readyAsset.error
@@ -396,7 +481,6 @@ export function editorProjectReducer(
     case 'timeline/assetAdded': {
       const asset = state.assets.find((item) => item.id === action.assetId)
       if (!asset || asset.status !== 'ready') return state
-
       const clip = createTimelineClipFromAsset(state, asset.id, createUniqueClipId(state, asset.id))
       if (!clip) return state
       return {
@@ -412,9 +496,7 @@ export function editorProjectReducer(
         return state.activeClipId === null ? state : { ...state, activeClipId: null }
       }
       if (!state.clips.some((clip) => clip.id === action.clipId)) return state
-      return state.activeClipId === action.clipId
-        ? state
-        : { ...state, activeClipId: action.clipId }
+      return state.activeClipId === action.clipId ? state : { ...state, activeClipId: action.clipId }
 
     case 'timeline/playheadChanged': {
       const playhead = Math.max(0, finiteOr(action.time, state.playhead))
@@ -433,7 +515,6 @@ export function editorProjectReducer(
     case 'draft/rowAdded': {
       const afterIndex = state.draftRows.findIndex((row) => row.id === action.afterRowId)
       if (afterIndex === -1 || state.draftRows.some((row) => row.id === action.rowId)) return state
-
       const draftRows = [...state.draftRows]
       draftRows.splice(afterIndex + 1, 0, createDraftRow(action.rowId))
       return { ...state, draftRows }
@@ -442,14 +523,12 @@ export function editorProjectReducer(
     case 'draft/rowUpdated': {
       const rowIndex = state.draftRows.findIndex((row) => row.id === action.rowId)
       if (rowIndex === -1) return state
-
       const changes = Object.fromEntries(
         Object.entries(action.changes).filter(
           ([key, value]) => key !== 'id' && typeof value === 'string'
         )
       ) as Partial<Omit<DraftRow, 'id'>>
       if (Object.keys(changes).length === 0) return state
-
       const draftRows = state.draftRows.map((row, index) =>
         index === rowIndex ? { ...row, ...changes } : row
       )
@@ -457,7 +536,10 @@ export function editorProjectReducer(
     }
 
     case 'draft/rowDeleted':
-      if (state.draftRows.length === 1 || !state.draftRows.some((row) => row.id === action.rowId)) {
+      if (
+        state.draftRows.length === 1 ||
+        !state.draftRows.some((row) => row.id === action.rowId)
+      ) {
         return state
       }
       return { ...state, draftRows: state.draftRows.filter((row) => row.id !== action.rowId) }
@@ -467,7 +549,6 @@ export function editorProjectReducer(
 function createUniqueClipId(state: EditorProjectState, assetId: string): string {
   const baseId = `clip-${assetId}`
   if (!state.clips.some((clip) => clip.id === baseId)) return baseId
-
   let suffix = 2
   let candidate = `${baseId}-${suffix}`
   while (state.clips.some((clip) => clip.id === candidate)) {
@@ -485,7 +566,6 @@ function getResolutionAssetDuration(clip: TimelineClip, asset: MediaAsset | null
   if (asset && typeof asset.duration === 'number') {
     return Number.isFinite(asset.duration) ? asset.duration : 0
   }
-
   const sourceStart = Math.max(0, finiteOr(clip.sourceStart, 0))
   const sourceEnd = finiteOr(clip.sourceEnd, sourceStart + 5)
   return Math.max(sourceStart + MIN_CLIP_DURATION, sourceEnd)
