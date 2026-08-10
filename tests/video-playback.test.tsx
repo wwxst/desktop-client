@@ -9,6 +9,7 @@ import {
   type MediaAsset,
   type TimelineClip
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
+import { getProjectCanvasSize, projectToViewport } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/core/editorCoordinate'
 
 const videoA: MediaAsset = {
   id: 'asset-a',
@@ -96,9 +97,14 @@ describe('Composition Preview playback', () => {
     const overlayVideo = screen.getByLabelText('overlay.mp4合成预览')
     expect(main).toBeInTheDocument()
     expect(overlayVideo).toBeInTheDocument()
+    const viewportTranslation = projectToViewport(
+      { x: 12, y: -8 },
+      getProjectCanvasSize(project.aspectRatio),
+      { width: 1, height: 1 }
+    )
     expect(overlayVideo).toHaveStyle({
       opacity: '0.5',
-      transform: 'translate(12px, -8px) scale(1.2, 0.8) rotate(10deg)'
+      transform: `translate(${viewportTranslation.x}px, ${viewportTranslation.y}px) scale(1.2, 0.8) rotate(10deg)`
     })
     expect((overlayVideo as HTMLVideoElement).playbackRate).toBe(2)
   })
@@ -124,7 +130,7 @@ describe('Composition Preview playback', () => {
     expect(video.volume).toBe(0.4)
   })
 
-  it('mutes a video track without removing its picture from the composition', () => {
+  it('applies video track mute during playback without removing its picture from the composition', () => {
     const project = createProject(
       [
         {
@@ -142,7 +148,7 @@ describe('Composition Preview playback', () => {
       )
     )
 
-    expect(selectCompositionAtTime(project, 2).videoLayers[0]?.muted).toBe(true)
+    expect(selectCompositionAtTime(project, 2).videoLayers[0]?.muted).toBe(false)
     renderComposition(project, 2)
 
     const video = screen.getByLabelText(/^a\.mp4/) as HTMLVideoElement
@@ -184,7 +190,7 @@ describe('Composition Preview playback', () => {
 
     renderComposition(project, 2)
 
-    expect(screen.getAllByText('00:00:07')).toHaveLength(1)
+    expect(screen.getAllByText('00:07.00')).toHaveLength(1)
   })
 
   it('advances the project clock across clip boundaries', () => {

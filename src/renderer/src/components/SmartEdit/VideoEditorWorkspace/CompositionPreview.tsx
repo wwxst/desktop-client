@@ -356,18 +356,18 @@ function CompositionPreview({
 
   const contextMenuItems: EditorContextMenuItem[] = contextMenu
     ? [
-        { label: '剪切', shortcut: 'Ctrl+X', onSelect: () => onCutClip?.(contextMenu.clip.id) },
-        { label: '复制', shortcut: 'Ctrl+C', onSelect: () => onCopyClip?.(contextMenu.clip.id) },
-        { label: '复制片段', shortcut: 'Ctrl+D', onSelect: () => onDuplicateClip?.(contextMenu.clip.id) },
-        { type: 'separator' },
-        { label: contextMenu.clip.muted ? '取消静音' : '静音', onSelect: () => onToggleClipMuted?.(contextMenu.clip.id) },
-        { label: contextMenu.clip.enabled ? '禁用片段' : '启用片段', onSelect: () => onToggleClipEnabled?.(contextMenu.clip.id) },
-        { type: 'separator' },
-        { label: '适应画布', onSelect: () => applyFit(contextMenu.clip) },
-        { label: '填充画布', onSelect: () => applyFill(contextMenu.clip) },
-        { label: '重置变换', onSelect: () => onResetClipTransform?.(contextMenu.clip.id) },
-        { type: 'separator' },
-        { label: '删除', shortcut: 'Delete', danger: true, onSelect: () => onDeleteClip?.(contextMenu.clip.id) }
+        { id: 'cut', label: '剪切', shortcut: 'Ctrl+X', onSelect: () => onCutClip?.(contextMenu.clip.id) },
+        { id: 'copy', label: '复制', shortcut: 'Ctrl+C', onSelect: () => onCopyClip?.(contextMenu.clip.id) },
+        { id: 'duplicate', label: '复制片段', shortcut: 'Ctrl+D', onSelect: () => onDuplicateClip?.(contextMenu.clip.id) },
+        { id: 'separator-edit', separator: true },
+        { id: 'mute', label: contextMenu.clip.muted ? '取消静音' : '静音', onSelect: () => onToggleClipMuted?.(contextMenu.clip.id) },
+        { id: 'enabled', label: contextMenu.clip.enabled ? '禁用片段' : '启用片段', onSelect: () => onToggleClipEnabled?.(contextMenu.clip.id) },
+        { id: 'separator-state', separator: true },
+        { id: 'fit', label: '适应画布', onSelect: () => applyFit(contextMenu.clip) },
+        { id: 'fill', label: '填充画布', onSelect: () => applyFill(contextMenu.clip) },
+        { id: 'reset-transform', label: '重置变换', onSelect: () => onResetClipTransform?.(contextMenu.clip.id) },
+        { id: 'separator-delete', separator: true },
+        { id: 'delete', label: '删除', shortcut: 'Delete', danger: true, onSelect: () => onDeleteClip?.(contextMenu.clip.id) }
       ]
     : []
 

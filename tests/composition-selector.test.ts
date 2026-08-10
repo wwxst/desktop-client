@@ -81,7 +81,7 @@ describe('selectCompositionAtTime', () => {
     expect(atSeven.audioLayers.map((clip) => clip.id)).toEqual(['clip-audio'])
   })
 
-  it('orders V1 below V2 and ignores hidden or muted layers', () => {
+  it('orders V1 below V2, ignores hidden layers, and retains muted audio layers', () => {
     const tracks = DEFAULT_EDITOR_TRACKS.map((track) =>
       track.id === 'track-video-overlay' ? { ...track, hidden: false } : track
     )
@@ -129,7 +129,8 @@ describe('selectCompositionAtTime', () => {
 
     const composition = selectCompositionAtTime(project, 2)
     expect(composition.videoLayers.map((clip) => clip.id)).toEqual(['clip-v1', 'clip-hidden'])
-    expect(composition.audioLayers).toEqual([])
+    expect(composition.audioLayers.map((clip) => clip.id)).toEqual(['clip-muted-audio'])
+    expect(composition.audioLayers[0]?.muted).toBe(true)
 
     const hiddenProject = {
       ...project,

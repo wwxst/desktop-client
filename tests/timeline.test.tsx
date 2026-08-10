@@ -209,7 +209,22 @@ describe('Timeline', () => {
         muted: false
       }
     ]
-    renderTimeline([row], { tracks, onMoveClip })
+    renderTimeline([row], {
+      tracks,
+      clips: [
+        clip,
+        {
+          id: 'overlay-seed',
+          assetId: asset.id,
+          trackId: 'track-video-overlay',
+          timelineStart: 20,
+          duration: 1,
+          sourceStart: 0,
+          sourceEnd: 1
+        }
+      ],
+      onMoveClip
+    })
     const rows = Array.from(document.querySelectorAll<HTMLElement>('.studio-timeline__track-row'))
     rows.forEach((trackRow, index) => {
       Object.defineProperty(trackRow, 'getBoundingClientRect', {
@@ -223,7 +238,7 @@ describe('Timeline', () => {
     fireEvent.pointerMove(window, { pointerId: 3, clientX: 72, clientY: 50 })
     fireEvent.pointerUp(window, { pointerId: 3, clientX: 72, clientY: 50 })
 
-    expect(onMoveClip).toHaveBeenCalledWith('clip-1', 1, 'track-video-overlay')
+    expect(onMoveClip).toHaveBeenCalledWith('clip-1', 1.25, 'track-video-overlay')
   })
 
   it('does not drop a video clip onto an audio or locked track', () => {
@@ -254,7 +269,31 @@ describe('Timeline', () => {
         muted: false
       }
     ]
-    renderTimeline([row], { tracks, onMoveClip })
+    renderTimeline([row], {
+      tracks,
+      clips: [
+        clip,
+        {
+          id: 'overlay-seed',
+          assetId: asset.id,
+          trackId: 'track-video-overlay',
+          timelineStart: 20,
+          duration: 1,
+          sourceStart: 0,
+          sourceEnd: 1
+        },
+        {
+          id: 'audio-seed',
+          assetId: asset.id,
+          trackId: 'track-audio-main',
+          timelineStart: 20,
+          duration: 1,
+          sourceStart: 0,
+          sourceEnd: 1
+        }
+      ],
+      onMoveClip
+    })
     const rows = Array.from(document.querySelectorAll<HTMLElement>('.studio-timeline__track-row'))
     rows.forEach((trackRow, index) => {
       Object.defineProperty(trackRow, 'getBoundingClientRect', {

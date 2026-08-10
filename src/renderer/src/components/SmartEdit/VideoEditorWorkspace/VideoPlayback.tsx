@@ -427,6 +427,7 @@ function CompositionVideoPlayback({
 
 function LegacyVideoPlayback({
   activeAsset = null,
+  activeTrack = null,
   selectedRatio,
   rightControls,
   onMediaError
@@ -437,18 +438,23 @@ function LegacyVideoPlayback({
     '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
     '--canvas-ratio-value': selectedRatio.width / selectedRatio.height
   }
-  const canRender = activeAsset?.status === 'ready'
+  const canRender = activeAsset?.status === 'ready' && !activeTrack?.hidden
 
   return (
     <>
       <div className="studio-player__stage">
-        <div className="studio-player__canvas" style={canvasStyle} aria-label={`播放器画布，画面比例 ${selectedRatio.label}`}>
+        <div
+          className="studio-player__canvas"
+          style={canvasStyle}
+          aria-label={`${canRender ? '播放器画布' : '暂无预览内容'}，画面比例 ${selectedRatio.label}`}
+        >
           {activeAsset && canRender ? (
             <video
               ref={videoRef}
               src={activeAsset.url}
               preload="auto"
               playsInline
+              muted={activeTrack?.muted === true}
               aria-label={`${activeAsset.name}播放器预览`}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}

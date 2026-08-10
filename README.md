@@ -1,41 +1,16 @@
-# desktop-client
+# Editor V2 集成修复 01
 
-基于 Electron、React 和 TypeScript 的桌面端视频编辑客户端。
+修复 `CompositionPreview.tsx` 的右键菜单类型错误：
 
-## 开发文档
+- 所有 `EditorContextMenuItem` 增加稳定 `id`
+- 旧 `{ type: 'separator' }` 改为 `{ id, separator: true }`
+- 不修改 Editor Core、Timeline、Agent、History 或测试逻辑
 
-- [开发指南与当前代码结构](docs/DEVELOPMENT.md)
-
-## 安装依赖
-
-```bash
-npm install
-```
-
-## 本地开发
+覆盖项目根目录后重新执行：
 
 ```bash
-npm run dev
-```
-
-## 质量检查
-
-```bash
-npm test
-npm run lint -- --quiet
 npm run typecheck
 npm run build
 ```
 
-## 打包
-
-```bash
-# Windows
-npm run build:win
-
-# macOS
-npm run build:mac
-
-# Linux
-npm run build:linux
-```
+这只处理当前已确认的 typecheck/build P0 阻塞；Lint 与完整测试失败需依据真实输出继续定位。

@@ -29,7 +29,10 @@ describe('media library controller', () => {
         name: 'sample.mp4',
         url: 'blob:asset-1',
         duration: null,
-        status: 'loading'
+        width: null,
+        height: null,
+        status: 'loading',
+        kind: 'video'
       }
     })
 
