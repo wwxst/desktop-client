@@ -1,6 +1,6 @@
 import type { CSSProperties, JSX, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Film, Pause, Play, Repeat2, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { Film, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import CompositionPreview from './CompositionPreview'
 import type { ClipPatch } from './editorCommands'
 import { isTextEditingTarget } from './editorInteraction'
@@ -40,7 +40,6 @@ interface VideoPlaybackProps {
   onToggleClipMuted?: (clipId: string) => void
   onToggleClipEnabled?: (clipId: string) => void
   onResetClipTransform?: (clipId: string) => void
-  previewZoom?: number
   onPreviewPanChange?: (pan: { x: number; y: number }) => void
   previewPan?: { x: number; y: number }
 }
@@ -83,7 +82,6 @@ function ControlledCompositionVideoPlayback({
   onToggleClipMuted,
   onToggleClipEnabled,
   onResetClipTransform,
-  previewZoom = 1,
   previewPan = { x: 0, y: 0 },
   onPreviewPanChange
 }: VideoPlaybackProps & { project: EditorProjectState; playbackController: EditorPlaybackController }): JSX.Element {
@@ -104,7 +102,7 @@ function ControlledCompositionVideoPlayback({
   const canvasStyle: CanvasStyle = {
     '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
     '--canvas-ratio-value': selectedRatio.width / selectedRatio.height,
-    transform: `translate(${previewPan.x}px, ${previewPan.y}px) scale(${previewZoom})`
+    transform: `translate(${previewPan.x}px, ${previewPan.y}px)`
   }
 
   useEffect(() => playbackController.setDuration(projectDuration), [playbackController, projectDuration])
@@ -165,7 +163,6 @@ function ControlledCompositionVideoPlayback({
               composition={composition}
               playhead={playback.playhead}
               isPlaying={playback.isPlaying}
-              masterVolume={playback.masterVolume}
               interactionController={interactionController}
               onMediaError={onMediaError}
               activeClipId={project.activeClipId}
@@ -206,16 +203,7 @@ function ControlledCompositionVideoPlayback({
             <SkipForward size={15} aria-hidden="true" />
           </button>
         </div>
-        <div className="studio-player__controls-right">
-          <label className="studio-player__master-volume" title="预览总音量">
-            {playback.masterVolume <= 0.001 ? <VolumeX size={15} aria-hidden="true" /> : <Volume2 size={15} aria-hidden="true" />}
-            <input type="range" min="0" max="1" step="0.01" value={playback.masterVolume} onChange={(event) => playbackController.setMasterVolume(Number(event.currentTarget.value))} aria-label="预览总音量" />
-          </label>
-          <button type="button" data-active={playback.loop ? 'true' : undefined} aria-label="循环播放" title="循环播放" onClick={() => playbackController.setLoop(!playback.loop)}>
-            <Repeat2 size={15} aria-hidden="true" />
-          </button>
-          {rightControls}
-        </div>
+        <div className="studio-player__controls-right">{rightControls}</div>
       </footer>
     </>
   )
@@ -236,7 +224,6 @@ function CompositionVideoPlayback({
   onToggleClipEnabled,
   onResetClipTransform,
   playhead = 0,
-  previewZoom = 1,
   previewPan = { x: 0, y: 0 },
   onPreviewPanChange
 }: VideoPlaybackProps & { project: EditorProjectState }): JSX.Element {
@@ -259,7 +246,7 @@ function CompositionVideoPlayback({
   const canvasStyle: CanvasStyle = {
     '--canvas-aspect-ratio': `${selectedRatio.width} / ${selectedRatio.height}`,
     '--canvas-ratio-value': selectedRatio.width / selectedRatio.height,
-    transform: `translate(${previewPan.x}px, ${previewPan.y}px) scale(${previewZoom})`
+    transform: `translate(${previewPan.x}px, ${previewPan.y}px)`
   }
 
   useEffect(() => {

@@ -36,13 +36,17 @@ describe('WorkspaceView', () => {
   it('resets an editor session after selecting another menu', async () => {
     const user = userEvent.setup()
     render(<WorkspaceView />)
+    const mainMenu = within(screen.getByRole('navigation', { name: '主菜单' }))
 
-    await user.click(screen.getByRole('button', { name: '智剪' }))
+    await user.click(mainMenu.getByRole('button', { name: '智剪' }))
     await user.click(screen.getByRole('button', { name: '新建草稿' }))
-    await user.click(screen.getByRole('button', { name: '小说推文' }))
-    expect(screen.getByRole('button', { name: '小说推文' })).toHaveAttribute('aria-current', 'page')
+    await user.click(mainMenu.getByRole('button', { name: '小说推文' }))
+    expect(mainMenu.getByRole('button', { name: '小说推文' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
 
-    await user.click(screen.getByRole('button', { name: '智剪' }))
+    await user.click(mainMenu.getByRole('button', { name: '智剪' }))
     expect(screen.getByRole('region', { name: '智剪草稿' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: '智剪编辑器' })).not.toBeInTheDocument()
   })

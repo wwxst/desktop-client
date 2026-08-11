@@ -1,12 +1,13 @@
 import {
   ArrowUp,
+  BookOpenText,
   Bot,
   ChevronDown,
+  Clapperboard,
   Cpu,
   Ellipsis,
   FileText,
   Maximize2,
-  MessageSquareText,
   Mic,
   Minimize2,
   Monitor,
@@ -15,7 +16,6 @@ import {
   Settings,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   X
 } from 'lucide-react'
 import {
@@ -65,6 +65,7 @@ function AiPanel({ onCollapse, onExpand }: AiPanelProps): JSX.Element {
 
   const attachmentName = selectedFileName ?? (autoAttachProject ? DEFAULT_CONTEXT_FILE : null)
   const activeMessages = messages[activeTab]
+  const isEmpty = activeMessages.length === 0
 
   useEffect(() => {
     if (!openPopup) return undefined
@@ -143,6 +144,11 @@ function AiPanel({ onCollapse, onExpand }: AiPanelProps): JSX.Element {
     setOpenPopup((current) => (current === popup ? null : popup))
   }
 
+  const selectStarter = (label: string): void => {
+    setComposerValue(label)
+    textareaRef.current?.focus()
+  }
+
   if (isCollapsed) {
     return (
       <section ref={panelRef} className="studio-ai-panel is-collapsed" aria-label="AI 助手">
@@ -162,7 +168,7 @@ function AiPanel({ onCollapse, onExpand }: AiPanelProps): JSX.Element {
   return (
     <section
       ref={panelRef}
-      className={isFullscreen ? 'studio-ai-panel is-fullscreen' : 'studio-ai-panel'}
+      className={`studio-ai-panel${isFullscreen ? ' is-fullscreen' : ''}${isEmpty ? ' is-empty' : ''}`}
       aria-label="AI 助手"
     >
       <header className="studio-ai-panel__header">
@@ -295,14 +301,31 @@ function AiPanel({ onCollapse, onExpand }: AiPanelProps): JSX.Element {
       </header>
 
       <div className="studio-ai-panel__conversation">
-        {activeMessages.length === 0 ? (
+        {isEmpty ? (
           <div className="studio-ai-panel__empty">
             <span className="studio-ai-panel__empty-icon" aria-hidden="true">
-              <MessageSquareText size={35} strokeWidth={1.6} />
-              <Sparkles className="studio-ai-panel__sparkle" size={17} strokeWidth={1.7} />
+              <Bot size={38} strokeWidth={1.55} />
             </span>
-            <strong>{activeTab === 'chat' ? '使用智能体构建' : '使用 Codex 协助构建'}</strong>
-            <span>AI 答案可能不准确</span>
+            <strong>欢迎使用智剪</strong>
+            <span className="studio-ai-panel__empty-subtitle">让我们开始吧</span>
+            <div className="studio-ai-panel__starter-grid" role="group" aria-label="创作类型">
+              <button
+                className="studio-ai-panel__starter-card is-novel"
+                type="button"
+                onClick={() => selectStarter('小说推文')}
+              >
+                <BookOpenText size={16} strokeWidth={1.7} aria-hidden="true" />
+                <span>小说推文</span>
+              </button>
+              <button
+                className="studio-ai-panel__starter-card is-drama"
+                type="button"
+                onClick={() => selectStarter('短剧')}
+              >
+                <Clapperboard size={16} strokeWidth={1.7} aria-hidden="true" />
+                <span>短剧</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="studio-ai-panel__messages" role="log" aria-label="当前会话">

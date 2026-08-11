@@ -27,16 +27,18 @@ describe('Editor V2 playback controller', () => {
     controller.pause()
   })
 
-  it('支持 loop 和 master volume', () => {
+  it('stops at the duration without loop or master-volume controls', () => {
     const clock = new FakeClock()
     const controller = createEditorPlaybackController(0, clock)
     controller.setDuration(2)
-    controller.setLoop(true)
-    controller.setMasterVolume(0.4)
     controller.seek(1.5)
     controller.play()
     clock.advance(1000)
-    expect(controller.getSnapshot().playhead).toBeCloseTo(0.5, 2)
-    expect(controller.getSnapshot().masterVolume).toBe(0.4)
+    expect(controller.getSnapshot().playhead).toBe(2)
+    expect(controller.getSnapshot().isPlaying).toBe(false)
+    expect(controller.getSnapshot()).not.toHaveProperty('loop')
+    expect(controller.getSnapshot()).not.toHaveProperty('masterVolume')
+    expect(controller).not.toHaveProperty('setLoop')
+    expect(controller).not.toHaveProperty('setMasterVolume')
   })
 })

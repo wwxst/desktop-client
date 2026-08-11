@@ -247,6 +247,22 @@
   transform: translateY(-3%);
 }
 
+.studio-ai-panel.is-empty .studio-ai-panel__conversation {
+  flex: 0 0 auto;
+  margin-top: auto;
+  overflow: visible;
+}
+
+.studio-ai-panel.is-empty .studio-ai-panel__empty {
+  padding: 0;
+  transform: none;
+}
+
+.studio-ai-panel.is-empty .studio-ai-panel__composer {
+  width: calc(100% - 24px);
+  margin: 20px 12px auto;
+}
+
 .studio-ai-panel__empty-icon {
   position: relative;
   display: grid;
@@ -257,25 +273,67 @@
   place-items: center;
 }
 
-.studio-ai-panel__sparkle {
-  position: absolute;
-  top: 1px;
-  right: 0;
-  color: #8a8a8a;
-  fill: var(--ai-panel-bg);
-}
-
 .studio-ai-panel__empty strong {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #3b3b3b;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
 }
 
-.studio-ai-panel__empty > span:last-child {
+.studio-ai-panel__empty-subtitle {
   font-size: 12px;
   line-height: 17px;
+}
+
+.studio-ai-panel__starter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: min(100%, 360px);
+  margin-top: 18px;
+}
+
+.studio-ai-panel__starter-card {
+  display: flex;
+  min-width: 0;
+  min-height: 86px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-direction: column;
+  padding: 12px 13px;
+  color: #30343b;
+  text-align: left;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.studio-ai-panel__starter-card:hover,
+.studio-ai-panel__starter-card:focus-visible {
+  background: #f5f6f7;
+  border-color: #c9cdd2;
+}
+
+.studio-ai-panel__starter-card.is-novel {
+  background: #f0f1f2;
+}
+
+.studio-ai-panel__starter-card.is-novel > svg {
+  color: #2d8cff;
+}
+
+.studio-ai-panel__starter-card.is-drama > svg {
+  color: #8b5cf6;
+}
+
+.studio-ai-panel__starter-card > span {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
 }
 
 .studio-ai-panel__messages {
@@ -326,12 +384,17 @@
   margin: 0 8px 0;
   background: #ffffff;
   border: 1px solid #d0d0d0;
-  border-radius: 7px;
+  border-radius: 18px;
 }
 
+/* AI 输入框聚焦时保留中性边框，不显示蓝色聚焦框。 */
 .studio-ai-panel__composer:focus-within {
-  border-color: var(--ai-panel-accent);
-  box-shadow: 0 0 0 1px rgba(0, 138, 230, 0.2);
+  border-color: #737373;
+  box-shadow: none;
+}
+
+.studio-ai-panel__composer textarea:focus-visible {
+  outline: none;
 }
 
 .studio-ai-panel__attachment {

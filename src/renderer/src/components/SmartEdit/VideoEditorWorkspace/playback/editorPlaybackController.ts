@@ -2,8 +2,6 @@ export interface EditorPlaybackSnapshot {
   playhead: number
   isPlaying: boolean
   duration: number
-  loop: boolean
-  masterVolume: number
   revision: number
 }
 
@@ -22,8 +20,6 @@ export interface EditorPlaybackController {
   pause(): void
   toggle(): void
   step(deltaSeconds: number): void
-  setLoop(loop: boolean): void
-  setMasterVolume(volume: number): void
   dispose(): void
 }
 
@@ -43,8 +39,6 @@ export function createEditorPlaybackController(
     playhead: Math.max(0, initialPlayhead),
     isPlaying: false,
     duration: 0,
-    loop: false,
-    masterVolume: 1,
     revision: 0
   }
   let frameId: number | null = null
@@ -56,9 +50,7 @@ export function createEditorPlaybackController(
     if (
       next.playhead === snapshot.playhead &&
       next.isPlaying === snapshot.isPlaying &&
-      next.duration === snapshot.duration &&
-      next.loop === snapshot.loop &&
-      next.masterVolume === snapshot.masterVolume
+      next.duration === snapshot.duration
     ) return
     snapshot = next
     listeners.forEach((listener) => listener())
@@ -79,14 +71,10 @@ export function createEditorPlaybackController(
     let next = snapshot.playhead + elapsed
 
     if (next >= snapshot.duration) {
-      if (snapshot.loop && snapshot.duration > 0) {
-        next %= snapshot.duration
-      } else {
-        next = snapshot.duration
-        publish({ playhead: next, isPlaying: false })
-        frameId = null
-        return
-      }
+      next = snapshot.duration
+      publish({ playhead: next, isPlaying: false })
+      frameId = null
+      return
     }
 
     publish({ playhead: next })
@@ -128,13 +116,6 @@ export function createEditorPlaybackController(
     step(deltaSeconds) {
       controller.pause()
       controller.seek(snapshot.playhead + deltaSeconds)
-    },
-    setLoop(loop) {
-      publish({ loop })
-    },
-    setMasterVolume(volume) {
-      const safe = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 1))
-      publish({ masterVolume: safe })
     },
     dispose() {
       stopFrame()

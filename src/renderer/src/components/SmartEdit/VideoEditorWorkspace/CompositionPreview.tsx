@@ -27,7 +27,6 @@ interface CompositionPreviewProps {
   composition: TimelineComposition
   playhead: number
   isPlaying: boolean
-  masterVolume?: number
   interactionController?: EditorInteractionController
   onMediaError: (assetId: string) => void
   activeClipId?: string | null
@@ -86,7 +85,6 @@ function CompositionPreview({
   composition,
   playhead,
   isPlaying,
-  masterVolume = 1,
   interactionController,
   onMediaError,
   activeClipId = null,
@@ -149,12 +147,12 @@ function CompositionPreview({
       const trackMuted = tracksById.get(clip.trackId)?.muted === true
       const muted = clip.muted || trackMuted
       media.muted = muted
-      media.volume = muted ? 0 : clamp(clip.volume * masterVolume, 0, 1)
+      media.volume = muted ? 0 : clamp(clip.volume, 0, 1)
       media.playbackRate = clip.speed
       const sourceTime = getSourceTime(clip, playhead)
       if (Math.abs(media.currentTime - sourceTime) > 0.04) media.currentTime = sourceTime
     }
-  }, [masterVolume, playhead, tracksById, visibleClips])
+  }, [playhead, tracksById, visibleClips])
 
   useEffect(() => {
     for (const media of mediaRefs.current.values()) {

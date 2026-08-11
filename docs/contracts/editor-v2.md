@@ -3,12 +3,12 @@
 > 状态：当前契约
 > 适用范围：`src/renderer/src/components/SmartEdit/VideoEditorWorkspace/`
 > 事实来源：`editorProject.ts`、`editorCommands.ts`、`core/`、`playback/`、`interaction/` 与 Editor V2 测试
-> 最近验证：`74cd55b` / 2026-08-10
+> 最近验证：`b3a13ea` + 本次提交 / 2026-08-11
 
 ## 状态所有权
 
 - `editorHistoryReducer` 持有可撤销的 EditorProjectState：assets、tracks、clips、activeClipId、兼容 playhead 字段、timelineZoom、aspectRatio 和 draftRows。
-- `EditorPlaybackController` 持有当前播放器使用的运行态：playhead、isPlaying、duration、loop、masterVolume 和 animation-frame 时钟。
+- `EditorPlaybackController` 持有当前播放器使用的运行态：playhead、isPlaying、duration、revision 和 animation-frame 时钟；播放到工程末尾后停止，不提供循环播放或预览总音量状态。
 - `EditorInteractionController` 持有交互运行态：当前 mode、pointerId、空格手势和 revision。
 - 组件通过 props 和回调组合这些状态，不在 `FunctionPanel`、`PlayerPanel`、`Timeline` 中创建第二份项目状态。
 

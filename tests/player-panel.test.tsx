@@ -2,12 +2,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import PlayerPanel from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/PlayerPanel'
-import type {
-  CanvasAspectRatio,
-  EditorTrack,
-  MediaAsset,
-  ResolvedTimelineClip
+import {
+  createInitialEditorProjectState,
+  type CanvasAspectRatio,
+  type EditorTrack,
+  type MediaAsset,
+  type ResolvedTimelineClip
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
+import { createEditorPlaybackController } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/playback/editorPlaybackController'
 
 const selectedRatio: CanvasAspectRatio = {
   id: '9:16',
@@ -65,6 +67,18 @@ function renderPlayer(activeAsset: MediaAsset | null = null): {
   )
 
   return { onAspectRatioChange, onMediaError }
+}
+
+function renderControlledPlayer(): void {
+  render(
+    <PlayerPanel
+      project={createInitialEditorProjectState('row-1')}
+      playbackController={createEditorPlaybackController()}
+      selectedRatio={selectedRatio}
+      onAspectRatioChange={vi.fn()}
+      onMediaError={vi.fn()}
+    />
+  )
 }
 
 describe('PlayerPanel', () => {
@@ -164,5 +178,15 @@ describe('PlayerPanel', () => {
     fireEvent.loadedData(video)
 
     expect(video.muted).toBe(true)
+  })
+
+  it('does not render preview volume, loop, or zoom controls', () => {
+    renderControlledPlayer()
+
+    expect(screen.queryByRole('slider', { name: '预览总音量' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '循环播放' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '缩小预览' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '放大预览' })).not.toBeInTheDocument()
+    expect(screen.queryByText('100%')).not.toBeInTheDocument()
   })
 })

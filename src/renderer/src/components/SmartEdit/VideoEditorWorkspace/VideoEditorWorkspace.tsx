@@ -61,7 +61,7 @@ function VideoEditorWorkspace(): JSX.Element {
     storage: localStorage
   })
   const columnLayout = useDefaultLayout({
-    groupId: 'desktop-client-editor-v2-columns',
+    groupId: 'desktop-client-editor-v2-columns-expanded',
     storage: localStorage
   })
 
@@ -414,15 +414,15 @@ function VideoEditorWorkspace(): JSX.Element {
               <Panel
                 id="function-panel"
                 className="studio-workspace__card studio-workspace__card--function"
-                defaultSize={168}
+                defaultSize={360}
                 minSize={126}
-                maxSize={300}
+                maxSize={360}
                 groupResizeBehavior="preserve-pixel-size"
               >
                 <FunctionPanel mediaItems={project.assets} onImportMedia={importMediaFiles} onAddMedia={handleAddMedia} />
               </Panel>
               <Separator id="function-panel-resize-handle" className="studio-workspace__column-resize-handle" aria-label="调整素材区宽度" />
-              <Panel id="player-panel" className="studio-workspace__card studio-workspace__card--player" minSize={300}>
+              <Panel id="player-panel" className="studio-workspace__card studio-workspace__card--player" minSize={240}>
                 <PlayerPanel
                   project={project}
                   playbackController={playbackController}
@@ -467,9 +467,9 @@ function VideoEditorWorkspace(): JSX.Element {
               <Panel
                 id="parameter-panel"
                 className="studio-workspace__card studio-workspace__card--parameter"
-                defaultSize={244}
+                defaultSize={420}
                 minSize={198}
-                maxSize={380}
+                maxSize={420}
                 groupResizeBehavior="preserve-pixel-size"
               >
                 <ParameterPanel clip={activeClip} asset={activeAsset} onUpdateClip={handleUpdateClip} />
