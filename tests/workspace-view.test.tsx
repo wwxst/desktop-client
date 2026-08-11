@@ -5,6 +5,17 @@ import WorkspaceView from '../src/renderer/src/components/Workspace/WorkspaceVie
 
 describe('WorkspaceView', () => {
   it('opens the media library with its empty state and import entry point', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        listGlobalMediaLibrary: vi.fn().mockResolvedValue({
+          success: true,
+          message: '素材库为空',
+          assets: []
+        }),
+        importGlobalMediaFiles: vi.fn()
+      }
+    })
     const user = userEvent.setup()
     render(<WorkspaceView />)
 
@@ -13,9 +24,8 @@ describe('WorkspaceView', () => {
     expect(screen.getByRole('button', { name: '媒体库' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('region', { name: '媒体库' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '媒体库' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '导入媒体' })).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent('媒体库还是空的')
-    expect(screen.getByRole('status')).toHaveTextContent('导入图片、视频或音频后，会集中显示在这里。')
+    expect(screen.getByRole('button', { name: '导入媒体' })).toBeEnabled()
+    expect(screen.getByRole('status')).toHaveTextContent('还没有已索引的素材')
   })
 
   it('opens smart edit, creates a draft, and returns to the draft list', async () => {

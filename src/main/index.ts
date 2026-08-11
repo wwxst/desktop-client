@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerTtsIpc } from './tts/registerTtsIpc'
 import { registerAgentIpc } from './agent/registerAgentIpc'
+import { registerMediaLibraryIpc } from './mediaLibrary/registerMediaLibraryIpc'
 
 import type {
   ApiResult,
@@ -238,6 +239,7 @@ app.whenReady().then(() => {
   registerSubscriptionIpc()
   registerTtsIpc()
   registerAgentIpc()
+  registerMediaLibraryIpc()
 
   createWindow()
 

@@ -23,10 +23,14 @@ import type {
   StartAgentWorkflowResponse,
   WorkflowTaskSnapshot
 } from '../shared/agent/workflow'
+import type { GlobalMediaImportResponse, GlobalMediaLibraryResponse } from '../shared/mediaLibrary'
 
 interface DesktopApi {
   login(loginRequest: LoginRequest): Promise<LoginResponse>
   getSubscription(): Promise<SubscriptionCheckResponse>
+
+  listGlobalMediaLibrary(): Promise<GlobalMediaLibraryResponse>
+  importGlobalMediaFiles(): Promise<GlobalMediaImportResponse>
 
   listTtsCatalog(): Promise<TtsCatalogResponse>
   installTtsModel(modelId: string): Promise<TtsModelActionResponse>

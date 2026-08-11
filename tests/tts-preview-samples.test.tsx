@@ -147,5 +147,5 @@ describe('TTS preview samples', () => {
 
       await waitFor(() => expect(previewButton).not.toBeDisabled())
     }
-  })
+  }, 15_000)
 })

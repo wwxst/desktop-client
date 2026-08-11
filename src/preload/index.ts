@@ -24,6 +24,7 @@ import type {
   StartAgentWorkflowResponse,
   WorkflowTaskSnapshot
 } from '../shared/agent/workflow'
+import type { GlobalMediaImportResponse, GlobalMediaLibraryResponse } from '../shared/mediaLibrary'
 
 /**
  * 只向 React 页面开放允许使用的功能。
@@ -39,6 +40,16 @@ const api = {
   /** 查询当前登录用户的订阅状态。 */
   getSubscription: (): Promise<SubscriptionCheckResponse> => {
     return ipcRenderer.invoke('subscription:get-current')
+  },
+
+  /** 加载全局素材索引并检查本地来源是否仍然有效。 */
+  listGlobalMediaLibrary: (): Promise<GlobalMediaLibraryResponse> => {
+    return ipcRenderer.invoke('media-library:list')
+  },
+
+  /** 通过系统文件选择框导入本地媒体。 */
+  importGlobalMediaFiles: (): Promise<GlobalMediaImportResponse> => {
+    return ipcRenderer.invoke('media-library:import')
   },
 
   /** 获取本地 TTS 语言、模型、安装状态和音色。 */

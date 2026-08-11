@@ -3,7 +3,7 @@
 > 状态：当前契约
 > 适用范围：`src/main`、`src/preload`、Renderer 的 `window.api`
 > 事实来源：`src/preload/index.ts`、`src/preload/index.d.ts` 和 Main IPC 注册文件
-> 最近验证：`74cd55b` / 2026-08-10
+> 最近验证：`4e53fd4` + 当前改动 / 2026-08-11
 
 ## 安全边界
 
@@ -19,6 +19,8 @@
 | --- | --- | --- |
 | `window.api.login` | `auth:login` | 调用 Java 登录接口并在 Main 保存 Token |
 | `window.api.getSubscription` | `subscription:get-current` | Main 携带 Token 查询订阅，401 时清空会话 |
+| `window.api.listGlobalMediaLibrary` | `media-library:list` | 读取全局素材索引并刷新本地来源文件状态 |
+| `window.api.importGlobalMediaFiles` | `media-library:import` | 打开原生多选文件框，将支持的媒体元数据写入全局索引 |
 | `window.api.listTtsCatalog` | `tts:catalog:list` | 查询本地 TTS 资源和音色 |
 | `window.api.installTtsModel` | `tts:model:install` | 安装本地模型 |
 | `window.api.removeTtsModel` | `tts:model:remove` | 卸载本地模型 |
@@ -45,4 +47,4 @@
 
 ## 后端边界
 
-当前开发后端地址为 `http://localhost:8080`。认证接口由 Main 调用，Renderer 不直接请求 Java 服务。真实部署地址、持久化会话和编辑器文件 IPC 属于后续能力，不能在当前文档中描述为已完成。
+当前开发后端地址为 `http://localhost:8080`。认证接口由 Main 调用，Renderer 不直接请求 Java 服务。全局素材库只开放业务级“列出/刷新”和“原生导入”能力，不开放任意文件系统或通用 IPC。真实部署地址、持久化会话和编辑器项目文件 IPC 属于后续能力，不能在当前文档中描述为已完成。
