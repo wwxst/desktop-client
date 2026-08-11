@@ -2,7 +2,7 @@
 
 > 状态：当前验证口径
 > 适用范围：提交前的 Electron/React Renderer 改动
-> 最近验证：`b3a13ea` + 本次提交 / 2026-08-11
+> 最近验证：`50b1481` + 本次提交 / 2026-08-11
 
 ## 必跑命令
 
@@ -21,9 +21,9 @@ npm run lint
 
 ## 最近基线
 
-在 `b3a13ea` 加本次提交的变更上：
+在 `50b1481` 加本次提交的变更上：
 
-- `npm test -- --reporter=dot`：41/41 测试文件通过，182/182 测试通过。
+- `npm test -- --reporter=dot`：41/41 测试文件通过，183/183 测试通过。
 - `npm run typecheck`：通过。
 - `npm run build`：通过。
 - `git diff --check`：通过。

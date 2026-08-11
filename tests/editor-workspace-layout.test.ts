@@ -20,6 +20,15 @@ describe('VideoEditorWorkspace card separators', () => {
     expect(workspaceCss).not.toMatch(/\.studio-workspace__row-resize-handle::after\s*\{/)
   })
 
+  it('keeps keyboard focus visible on both resize handles', () => {
+    const focusBlock = workspaceCss.match(
+      /\.studio-workspace__column-resize-handle:focus-visible,\s*\.studio-workspace__row-resize-handle:focus-visible\s*\{([^}]*)\}/
+    )?.[1]
+
+    expect(focusBlock).toContain('outline: 2px solid var(--editor-accent);')
+    expect(focusBlock).toContain('outline-offset: -2px;')
+  })
+
   it('uses one 6px value for card spacing in every direction', () => {
     expect(workspaceCss).toMatch(/--workspace-card-gap:\s*6px;/)
     expect(workspaceCss).toMatch(
