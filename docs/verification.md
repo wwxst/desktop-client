@@ -2,7 +2,7 @@
 
 > 状态：当前验证口径
 > 适用范围：提交前的 Electron/React Renderer 改动
-> 最近验证：`4e53fd4` + 当前改动 / 2026-08-11
+> 最近验证：`714a01d` + 当前 lint 修复 / 2026-08-12
 
 ## 必跑命令
 
@@ -21,15 +21,15 @@ npm run lint
 
 ## 最近基线
 
-在 `4e53fd4` 加当前全局素材库改动上：
+在 `714a01d` 加当前 lint 修复上：
 
-- `npm test -- --reporter=dot`：44/44 测试文件通过，190/190 测试通过。
+- `npm test -- --reporter=dot`：全量测试通过。
 - `npm run typecheck`：通过。
 - `npm run build`：通过。
 - `git diff --check`：通过。
-- `npm run lint`：失败，11 个已知错误；5 个是 `react-hooks/set-state-in-effect` 源码规则项，6 个是新 V2 测试缺少显式返回类型。
+- `npm run lint`：通过。此前 5 个 `react-hooks/set-state-in-effect` 源码错误已改为派生状态或带来源身份的异步结果，6 个 V2 测试辅助函数已补充显式返回类型。
 
-Lint 基线不是“全部通过”。修复它时应单独处理源码规则和测试类型规则，不要通过回退 V2 行为来降低错误数。
+Lint 现在是提交门禁。ESLint 只检查当前工作区的项目文件，不扫描 Git 已忽略的 `.worktrees/`、`.tts-v2-backup/` 和 `.superpowers/` 目录。
 
 ## 报告口径
 

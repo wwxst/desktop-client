@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyEditorTransactionWithResult } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorCommands'
-import { createInitialEditorProjectState } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
+import { createInitialEditorProjectState, type EditorProjectState } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
 import { planMoveClips, planPlaceAsset, type EditorIdFactory } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/core/editorPlacementPolicy'
 
 const ids: EditorIdFactory = {
@@ -9,7 +9,7 @@ const ids: EditorIdFactory = {
   audioTrack: (() => { let i = 0; return () => `audio-${++i}` })()
 }
 
-function project() {
+function project(): EditorProjectState {
   const state = createInitialEditorProjectState('draft-1')
   return {
     ...state,

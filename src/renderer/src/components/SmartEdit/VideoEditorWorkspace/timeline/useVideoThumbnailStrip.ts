@@ -26,25 +26,25 @@ export function useVideoThumbnailStrip({
     () => (url ? `${url}|${sourceStart.toFixed(3)}|${safeEnd.toFixed(3)}|${safeCount}` : ''),
     [safeCount, safeEnd, sourceStart, url]
   )
-  const [frames, setFrames] = useState<string[]>([])
+  const [result, setResult] = useState<{ key: string; frames: string[] } | null>(null)
+  const canLoad = enabled && Boolean(url) && Boolean(duration && duration > 0) && Boolean(key)
 
   useEffect(() => {
     let cancelled = false
     if (!enabled || !url || !duration || duration <= 0 || !key) {
-      setFrames([])
       return
     }
     const request = stripCache.get(key) ?? createThumbnailStrip(url, duration, sourceStart, safeEnd, safeCount)
     stripCache.set(key, request)
     void request.then((value) => {
-      if (!cancelled) setFrames(value)
+      if (!cancelled) setResult({ key, frames: value })
     })
     return () => {
       cancelled = true
     }
   }, [duration, enabled, key, safeCount, safeEnd, sourceStart, url])
 
-  return frames
+  return canLoad && result?.key === key ? result.frames : []
 }
 
 async function createThumbnailStrip(

@@ -3,25 +3,25 @@ import { useEffect, useState } from 'react'
 const thumbnailCache = new Map<string, Promise<string | null>>()
 
 export function useVideoThumbnail(url: string | null | undefined, enabled = true): string | null {
-  const [thumbnail, setThumbnail] = useState<string | null>(null)
+  const [result, setResult] = useState<{ url: string; thumbnail: string | null } | null>(null)
+  const canLoad = enabled && Boolean(url)
 
   useEffect(() => {
     let cancelled = false
     if (!url || !enabled) {
-      setThumbnail(null)
       return
     }
     const request = thumbnailCache.get(url) ?? createThumbnail(url)
     thumbnailCache.set(url, request)
     void request.then((value) => {
-      if (!cancelled) setThumbnail(value)
+      if (!cancelled) setResult({ url, thumbnail: value })
     })
     return () => {
       cancelled = true
     }
   }, [enabled, url])
 
-  return thumbnail
+  return canLoad && url && result?.url === url ? result.thumbnail : null
 }
 
 async function createThumbnail(url: string): Promise<string | null> {

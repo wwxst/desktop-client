@@ -49,7 +49,11 @@ function VideoEditorWorkspace(): JSX.Element {
     createInitialEditorHistoryState(crypto.randomUUID())
   )
   const project = history.present
-  const [selectedClipIds, setSelectedClipIds] = useState<string[]>([])
+  const [selectedClipIdsState, setSelectedClipIds] = useState<string[]>([])
+  const selectedClipIds = useMemo(
+    () => selectedClipIdsState.filter((id) => project.clips.some((clip) => clip.id === id)),
+    [project.clips, selectedClipIdsState]
+  )
   const [clipboard, setClipboard] = useState<EditorClipboardSnapshot | null>(null)
   const [snappingEnabled, setSnappingEnabled] = useState(true)
   const [magnetEnabled, setMagnetEnabled] = useState(false)
@@ -289,11 +293,6 @@ function VideoEditorWorkspace(): JSX.Element {
     }
     pendingExternalDropsRef.current = remaining
   }, [editorService, project.assets])
-
-  useEffect(() => {
-    const valid = selectedClipIds.filter((id) => project.clips.some((clip) => clip.id === id))
-    if (valid.length !== selectedClipIds.length) setSelectedClipIds(valid)
-  }, [project.clips, selectedClipIds])
 
   const agentApi = useMemo(
     () =>

@@ -5,10 +5,10 @@ class FakeClock implements PlaybackClock {
   time = 0
   nextId = 1
   callbacks = new Map<number, (time: number) => void>()
-  now = () => this.time
-  request = (callback: (time: number) => void) => { const id = this.nextId++; this.callbacks.set(id, callback); return id }
-  cancel = (id: number) => { this.callbacks.delete(id) }
-  advance(ms: number) {
+  now = (): number => this.time
+  request = (callback: (time: number) => void): number => { const id = this.nextId++; this.callbacks.set(id, callback); return id }
+  cancel = (id: number): void => { this.callbacks.delete(id) }
+  advance(ms: number): void {
     this.time += ms
     const callbacks = [...this.callbacks.values()]
     this.callbacks.clear()

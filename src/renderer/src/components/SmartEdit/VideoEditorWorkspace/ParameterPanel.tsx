@@ -1,6 +1,6 @@
 import type { JSX, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { ChevronDown, RotateCcw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ClipPatch } from './editorCommands'
 import type { MediaAsset, ResolvedTimelineClip } from './editorProject'
 import './ParameterPanel.css'
@@ -148,12 +148,17 @@ function ScrubNumber({
   disabled?: boolean
   onCommit?: (value: number) => void
 }): JSX.Element {
-  const [draft, setDraft] = useState(roundForInput(value))
-  useEffect(() => setDraft(roundForInput(value)), [value])
+  const sourceDraft = roundForInput(value)
+  const [draftState, setDraftState] = useState(() => ({
+    sourceValue: value,
+    draft: sourceDraft
+  }))
+  const draft = Object.is(draftState.sourceValue, value) ? draftState.draft : sourceDraft
+  const updateDraft = (next: number): void => setDraftState({ sourceValue: value, draft: next })
 
   const commit = (next = draft): void => {
     const bounded = clampOptional(next, min, max)
-    setDraft(roundForInput(bounded))
+    updateDraft(roundForInput(bounded))
     onCommit?.(bounded)
   }
 
@@ -165,7 +170,7 @@ function ScrubNumber({
     let latest = draft
     const move = (moveEvent: PointerEvent): void => {
       latest = clampOptional(startValue + (moveEvent.clientX - startX) * step, min, max)
-      setDraft(roundForInput(latest))
+      updateDraft(roundForInput(latest))
     }
     const up = (): void => {
       window.removeEventListener('pointermove', move)
@@ -188,7 +193,7 @@ function ScrubNumber({
           max={max}
           step={step}
           disabled={disabled}
-          onChange={(event) => setDraft(Number(event.currentTarget.value))}
+          onChange={(event) => updateDraft(Number(event.currentTarget.value))}
           onBlur={() => commit()}
           onKeyDown={(event) => {
             if (event.key === 'Enter') event.currentTarget.blur()
@@ -217,12 +222,13 @@ function InspectorSlider({
   suffix?: string
   onCommit: (value: number) => void
 }): JSX.Element {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  const [draftState, setDraftState] = useState(() => ({ sourceValue: value, draft: value }))
+  const draft = Object.is(draftState.sourceValue, value) ? draftState.draft : value
+  const updateDraft = (next: number): void => setDraftState({ sourceValue: value, draft: next })
   return (
     <label className="studio-parameter-panel__slider-row">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={draft} onChange={(event) => setDraft(Number(event.currentTarget.value))} onPointerUp={() => onCommit(draft)} onKeyUp={() => onCommit(draft)} />
+      <input type="range" min={min} max={max} step={step} value={draft} onChange={(event) => updateDraft(Number(event.currentTarget.value))} onPointerUp={() => onCommit(draft)} onKeyUp={() => onCommit(draft)} />
       <output>{roundForInput(draft)}{suffix}</output>
     </label>
   )

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { editorHistoryReducer, createInitialEditorHistoryState } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorHistory'
+import type { MediaAsset } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
 
-function readyAsset(id = 'asset-a') {
+function readyAsset(id = 'asset-a'): MediaAsset {
   return {
     id,
     name: `${id}.mp4`,
