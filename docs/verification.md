@@ -2,7 +2,7 @@
 
 > 状态：当前验证口径
 > 适用范围：提交前的 Electron/React Renderer 改动
-> 最近验证：`e4a63ef` + 当前 AI 对话工具调用改动 / 2026-08-12
+> 最近验证：`0a1a967` + 当前 AI 聊天布局及模型持久化改动 / 2026-08-12
 
 ## 必跑命令
 
@@ -21,9 +21,9 @@ npm run lint
 
 ## 最近基线
 
-在 `e4a63ef` 加当前 AI 对话工具调用改动上：
+在 `0a1a967` 加当前 AI 聊天布局及模型持久化改动上：
 
-- `npm test -- --reporter=dot`：52/52 测试文件、259/259 测试通过；jsdom 仍输出 4 条 `HTMLMediaElement.load()` 未实现提示，不影响退出码。模型目录回退测试会记录 1 条预期的 Main warning，不影响退出码。
+- `npm test -- --reporter=dot`：53/53 测试文件、266/266 测试通过；jsdom 仍输出 4 条 `HTMLMediaElement.load()` 未实现提示，不影响退出码。模型目录回退测试会记录 1 条预期的 Main warning，不影响退出码。
 - `npm run typecheck`：通过。
 - `npm run build`：通过。
 - `git diff --check`：通过。

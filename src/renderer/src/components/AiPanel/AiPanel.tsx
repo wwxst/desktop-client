@@ -5,6 +5,10 @@ import {
   ChevronDown,
   Clapperboard,
   Cpu,
+  Check,
+  CircleAlert,
+  CircleCheck,
+  Copy,
   Ellipsis,
   FileText,
   Maximize2,
@@ -46,9 +50,26 @@ interface ConversationMessage {
   id: number
   role: 'user' | 'assistant' | 'tool'
   text: string
+  createdAt: string
+  toolName?: string
+  success?: boolean
 }
 
 const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
+
+const TOOL_LABELS: Record<string, string> = {
+  get_editor_context: '读取工程',
+  delete_selected_clips: '删除所选片段',
+  split_selected_clip: '分割所选片段'
+}
+
+function formatMessageTime(date = new Date()): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date)
+}
 
 function AiPanel({
   onCollapse,
@@ -73,7 +94,9 @@ function AiPanel({
   const [selectedConfigId, setSelectedConfigId] = useState('')
   const [modelError, setModelError] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null)
   const panelRef = useRef<HTMLElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const nextMessageIdRef = useRef(1)
@@ -131,6 +154,11 @@ function AiPanel({
     }
   }, [modelRefreshKey])
 
+  useEffect(() => {
+    const container = messagesRef.current
+    if (container) container.scrollTop = container.scrollHeight
+  }, [activeMessages.length, isSending])
+
   const resetConversation = (): void => {
     setMessages((current) => ({ ...current, [activeTab]: [] }))
     chatHistoryRef.current[activeTab] = []
@@ -145,10 +173,32 @@ function AiPanel({
     setMessages((current) => ({ ...current, [tab]: [...current[tab], ...next] }))
   }
 
-  const createMessage = (role: ConversationMessage['role'], text: string): ConversationMessage => {
-    const message = { id: nextMessageIdRef.current, role, text }
+  const createMessage = (
+    role: ConversationMessage['role'],
+    text: string,
+    metadata: Pick<ConversationMessage, 'toolName' | 'success'> = {}
+  ): ConversationMessage => {
+    const message = {
+      id: nextMessageIdRef.current,
+      role,
+      text,
+      createdAt: formatMessageTime(),
+      ...metadata
+    }
     nextMessageIdRef.current += 1
     return message
+  }
+
+  const copyMessage = async (message: ConversationMessage): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(message.text)
+      setCopiedMessageId(message.id)
+      window.setTimeout(() => {
+        setCopiedMessageId((current) => (current === message.id ? null : current))
+      }, 1_500)
+    } catch {
+      setCopiedMessageId(null)
+    }
   }
 
   const runChat = async (tab: AiPanelTab, history: AgentChatMessage[]): Promise<void> => {
@@ -182,7 +232,12 @@ function AiPanel({
           const result = executeAgentToolCall(call, getActiveEditorAgentApi())
           const content = JSON.stringify(result)
           toolMessages.push({ role: 'tool', content, toolCallId: call.id, name: call.name })
-          renderedTools.push(createMessage('tool', result.message))
+          renderedTools.push(
+            createMessage('tool', result.message, {
+              toolName: TOOL_LABELS[call.name] ?? call.name,
+              success: result.success
+            })
+          )
         }
         appendMessages(tab, renderedTools)
         conversation = [...conversation, ...toolMessages]
@@ -415,19 +470,63 @@ function AiPanel({
             </div>
           </div>
         ) : (
-          <div className="studio-ai-panel__messages" role="log" aria-label="当前会话">
-            {activeMessages.map((message) => (
-              <article key={message.id} className={`studio-ai-panel__message is-${message.role}`}>
-                <span>
-                  {message.role === 'user' ? '你' : message.role === 'assistant' ? 'AI' : '工具'}
-                </span>
-                <p>{message.text}</p>
-              </article>
-            ))}
+          <div
+            ref={messagesRef}
+            className="studio-ai-panel__messages"
+            role="log"
+            aria-label="当前会话"
+          >
+            {activeMessages.map((message) => {
+              if (message.role === 'tool') {
+                const ToolStatusIcon = message.success ? CircleCheck : CircleAlert
+                return (
+                  <article
+                    key={message.id}
+                    className={`studio-ai-panel__message is-tool ${message.success ? 'is-success' : 'is-failure'}`}
+                    data-layout="tool-result"
+                  >
+                    <ToolStatusIcon size={15} strokeWidth={1.8} aria-hidden="true" />
+                    <div>
+                      <strong>{message.toolName ?? '工具调用'}</strong>
+                      <p>{message.text}</p>
+                    </div>
+                  </article>
+                )
+              }
+
+              const copied = copiedMessageId === message.id
+              return (
+                <article
+                  key={message.id}
+                  className={`studio-ai-panel__message is-${message.role}`}
+                  data-layout={message.role === 'user' ? 'bubble' : 'prose'}
+                >
+                  <div className="studio-ai-panel__message-body">
+                    <p>{message.text}</p>
+                  </div>
+                  <div className="studio-ai-panel__message-meta">
+                    <time>{message.createdAt}</time>
+                    <button
+                      type="button"
+                      aria-label={copied ? '已复制' : '复制消息'}
+                      title={copied ? '已复制' : '复制消息'}
+                      onClick={() => void copyMessage(message)}
+                    >
+                      {copied ? (
+                        <Check size={12} strokeWidth={1.8} aria-hidden="true" />
+                      ) : (
+                        <Copy size={12} strokeWidth={1.7} aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
             {isSending && (
-              <p className="studio-ai-panel__pending" role="status">
-                AI 正在处理...
-              </p>
+              <div className="studio-ai-panel__pending" role="status">
+                <span aria-hidden="true" />
+                <p>AI 正在处理...</p>
+              </div>
             )}
           </div>
         )}

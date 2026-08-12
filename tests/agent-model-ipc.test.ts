@@ -137,6 +137,83 @@ describe('Agent model IPC', () => {
     ).toMatchObject({ configurations: [] })
   })
 
+  it('waits for persistent storage before returning successful mutations', async () => {
+    const services = createAgentModelServices()
+    const persist = vi.spyOn(services, 'persist').mockRejectedValue(new Error('disk unavailable'))
+    registerAgentIpc({ services, loadRemoteCatalog: vi.fn() })
+
+    await expect(
+      getHandler('agent:model-config:create')({ sender: {} }, {
+        kind: 'custom',
+        baseUrl: 'https://gateway.example.test/v1',
+        modelId: 'chat-model',
+        apiKey: 'secret'
+      } as never)
+    ).resolves.toEqual({ success: false, message: 'disk unavailable' })
+    expect(persist).toHaveBeenCalledOnce()
+    expect(services.registry.list()).toEqual([])
+  })
+
+  it('waits for persisted configurations before running chat', async () => {
+    const services = createAgentModelServices()
+    let finishRestore: (() => void) | undefined
+    vi.spyOn(services, 'restore').mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRestore = () => {
+            services.registry.create({
+              kind: 'custom',
+              baseUrl: 'https://gateway.example.test/v1',
+              modelId: 'chat-model',
+              apiKey: 'secret'
+            })
+            resolve()
+          }
+        })
+    )
+    const chat = vi.spyOn(services.gateway, 'chat').mockResolvedValue({
+      content: '已恢复模型配置',
+      toolCalls: []
+    })
+    registerAgentIpc({ services, loadRemoteCatalog: vi.fn() })
+
+    const response = getHandler('agent:chat:run')({ sender: {} }, {
+      configId: 'config-1',
+      messages: [{ role: 'user', content: '你好' }]
+    } as never)
+    expect(chat).not.toHaveBeenCalled()
+    finishRestore?.()
+
+    await expect(response).resolves.toMatchObject({ success: true })
+    expect(chat).toHaveBeenCalledWith('config-1', [{ role: 'user', content: '你好' }])
+  })
+
+  it('reports restore failures and does not overwrite the saved file', async () => {
+    const services = createAgentModelServices()
+    vi.spyOn(services, 'restore').mockRejectedValue(new Error('decrypt failed'))
+    const persist = vi.spyOn(services, 'persist')
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    registerAgentIpc({ services, loadRemoteCatalog: vi.fn() })
+
+    await expect(getHandler('agent:model-config:list')({ sender: {} })).resolves.toEqual({
+      success: false,
+      message: '已保存的模型配置加载失败',
+      configurations: []
+    })
+    await expect(
+      getHandler('agent:model-config:create')({ sender: {} }, {
+        kind: 'custom',
+        baseUrl: 'https://gateway.example.test/v1',
+        modelId: 'chat-model',
+        apiKey: 'secret'
+      } as never)
+    ).resolves.toEqual({
+      success: false,
+      message: '已保存的模型配置加载失败，未覆盖原存储文件'
+    })
+    expect(persist).not.toHaveBeenCalled()
+  })
+
   it('returns Main validation errors without leaking registry state', async () => {
     registerAgentIpc({ services: createAgentModelServices(), loadRemoteCatalog: vi.fn() })
 

@@ -3,7 +3,7 @@
 > 状态：当前契约
 > 适用范围：`src/main`、`src/preload`、Renderer 的 `window.api`
 > 事实来源：`src/preload/index.ts`、`src/preload/index.d.ts` 和 Main IPC 注册文件
-> 最近验证：`e4a63ef` + 当前 AI 对话工具调用改动 / 2026-08-12
+> 最近验证：`0a1a967` + 当前模型持久化改动 / 2026-08-12
 
 ## 安全边界
 
@@ -33,10 +33,10 @@
 | `window.api.cancelTtsJob`                  | `tts:job:cancel`                           | 取消配音任务                                                                                                               |
 | `window.api.saveTtsJob`                    | `tts:job:save`                             | 保存已完成的 WAV                                                                                                           |
 | `window.api.listAgentModelCatalog`         | `agent:model-catalog:list`                 | Main 验证 Java 后台模型目录；失败或无效时返回内置目录，公开结果不含服务商 Base URL                                         |
-| `window.api.listAgentModelConfigurations`  | `agent:model-config:list`                  | 列出 Main 内存中的模型配置，不返回 API Key                                                                                 |
-| `window.api.createAgentModelConfiguration` | `agent:model-config:create`                | 添加服务商或自定义模型配置；服务商 Base URL 由 Main 解析                                                                   |
-| `window.api.updateAgentModelConfiguration` | `agent:model-config:update`                | 更新模型配置；API Key 留空时保留原密钥                                                                                     |
-| `window.api.deleteAgentModelConfiguration` | `agent:model-config:delete`                | 删除指定配置 ID，不维护默认模型                                                                                            |
+| `window.api.listAgentModelConfigurations`  | `agent:model-config:list`                  | 列出 Main 从本地安全存储恢复的模型配置，不返回 API Key                                                                     |
+| `window.api.createAgentModelConfiguration` | `agent:model-config:create`                | 添加并持久化服务商或自定义模型配置；服务商 Base URL 由 Main 解析                                                           |
+| `window.api.updateAgentModelConfiguration` | `agent:model-config:update`                | 更新并持久化模型配置；API Key 留空时保留原密钥                                                                             |
+| `window.api.deleteAgentModelConfiguration` | `agent:model-config:delete`                | 删除指定配置 ID 并持久化，不维护默认模型                                                                                   |
 | `window.api.runAgentChat`                  | `agent:chat:run`                           | 使用用户显式选择的模型配置运行一轮兼容 Chat Completions 的对话或工具决策；Main 持有 API Key，Renderer 执行白名单编辑器工具 |
 | `window.api.runNovelDecompression`         | `agent:workflow:novel-decompression:start` | 启动多 Agent 工作流                                                                                                        |
 | `window.api.getAgentTask`                  | `agent:workflow:get`                       | 查询长任务状态                                                                                                             |
@@ -54,7 +54,7 @@
 
 ## 后端边界
 
-当前开发后端地址为 `http://localhost:8080`。认证和模型目录接口由 Main 调用，Renderer 不直接请求 Java 服务。模型目录响应必须经过 Main 严格验证；服务商官方 Base URL 只进入 Main 内部目录，Renderer 仅获得公开目录字段。模型配置注册表和 API Key 只保存在 Main 内存，列表、变更和对话响应都不返回密钥；自定义配置固定使用 OpenAI Chat Completions 兼容协议。模型配置没有启用、停用或默认状态，AI 对话和具体工作流必须显式提供配置 ID。
+当前开发后端地址为 `http://localhost:8080`。认证和模型目录接口由 Main 调用，Renderer 不直接请求 Java 服务。模型目录响应必须经过 Main 严格验证；服务商官方 Base URL 只进入 Main 内部目录，Renderer 仅获得公开目录字段。模型配置元数据持久化到 Electron `userData/agent/model-configurations.json`，API Key 经 `safeStorage` 加密后以 Base64 密文保存；列表、变更和对话响应都不返回密钥。存储写入采用临时文件原子替换，变更在 IPC 返回成功前完成落盘，失败时回滚内存状态；损坏或无法解密的存储不会被新配置覆盖。自定义配置固定使用 OpenAI Chat Completions 兼容协议。模型配置没有启用、停用或默认状态，AI 对话和具体工作流必须显式提供配置 ID。
 
 AI 对话只允许 `user`、`assistant` 和 `tool` 消息，并限制消息数量和单条长度。Main 仅向模型声明 `get_editor_context`、`delete_selected_clips`、`split_selected_clip` 三个白名单工具；工具实际在 Renderer 的当前编辑器上下文中执行，结果通过下一轮对话回传给模型。Main 不接收可执行代码或任意 IPC 通道名。
 

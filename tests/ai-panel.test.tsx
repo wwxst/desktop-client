@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import AiPanel from '../src/renderer/src/components/AiPanel/AiPanel'
@@ -65,6 +65,51 @@ describe('AiPanel', () => {
     )
     expect(composer).toHaveValue('')
     expect(screen.getByRole('button', { name: '发送' })).toBeDisabled()
+  })
+
+  it('renders the conversation as right-aligned user bubbles and assistant prose', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    })
+    const runAgentChat = vi.fn().mockResolvedValue({
+      success: true,
+      message: '对话完成',
+      assistant: { content: '我会先读取工程，再给出剪辑建议。', toolCalls: [] }
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: [{ id: 'config-1', kind: 'custom', modelId: 'chat-model' }]
+        }),
+        runAgentChat
+      }
+    })
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'chat-model' })
+    await user.selectOptions(screen.getByRole('combobox', { name: '模型' }), 'config-1')
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '帮我整理时间线')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    const userMessage = screen.getByText('帮我整理时间线').closest('article')
+    const assistantMessage = await screen.findByText('我会先读取工程，再给出剪辑建议。')
+    expect(userMessage).toHaveClass('is-user')
+    expect(userMessage).toHaveAttribute('data-layout', 'bubble')
+    const copyButton = within(userMessage as HTMLElement).getByRole('button', {
+      name: '复制消息'
+    })
+    expect(copyButton).toBeVisible()
+    await user.click(copyButton)
+    expect(writeText).toHaveBeenCalledWith('帮我整理时间线')
+    expect(within(userMessage as HTMLElement).getByRole('button', { name: '已复制' })).toBeVisible()
+    expect(assistantMessage.closest('article')).toHaveClass('is-assistant')
+    expect(assistantMessage.closest('article')).toHaveAttribute('data-layout', 'prose')
   })
 
   it('loads model configurations and renders the assistant response', async () => {
@@ -146,6 +191,10 @@ describe('AiPanel', () => {
     await user.click(screen.getByRole('button', { name: '发送' }))
 
     expect(await screen.findByText('当前没有打开剪辑工程。')).toBeInTheDocument()
+    const toolResult = screen.getByText('当前没有打开剪辑工程').closest('article')
+    expect(toolResult).toHaveClass('is-tool', 'is-failure')
+    expect(toolResult).toHaveAttribute('data-layout', 'tool-result')
+    expect(toolResult).toHaveTextContent('读取工程')
     expect(runAgentChat).toHaveBeenCalledTimes(2)
     expect(runAgentChat.mock.calls[1][0].messages).toEqual([
       { role: 'user', content: '读取工程' },

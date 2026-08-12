@@ -12,6 +12,8 @@ interface StoredModelConfiguration {
   apiKey: string
 }
 
+export type ModelRegistrySnapshot = StoredModelConfiguration[]
+
 type ProviderResolver = (providerId: string) => InternalAgentModelProvider | undefined
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -50,6 +52,46 @@ export class ModelRegistry {
 
   list(): AgentModelRegistryItem[] {
     return Array.from(this.configurations.values(), ({ item }) => ({ ...item }))
+  }
+
+  exportSnapshot(): ModelRegistrySnapshot {
+    return Array.from(this.configurations.values(), ({ item, apiKey }) => ({
+      item: { ...item },
+      apiKey
+    }))
+  }
+
+  restore(snapshot: ModelRegistrySnapshot): void {
+    const restored = new Map<string, StoredModelConfiguration>()
+    for (const { item, apiKey } of snapshot) {
+      const id = requireValue(item.id, '模型配置 ID 不能为空')
+      const modelId = requireValue(item.modelId, '大模型名称不能为空')
+      const secret = requireValue(apiKey, '大模型 API Key 不能为空')
+      if (restored.has(id)) throw new Error('模型配置 ID 重复')
+
+      if (item.kind === 'custom') {
+        restored.set(id, {
+          item: { id, kind: 'custom', baseUrl: validateBaseUrl(item.baseUrl ?? ''), modelId },
+          apiKey: secret
+        })
+        continue
+      }
+
+      restored.set(id, {
+        item: {
+          id,
+          kind: 'provider',
+          providerId: requireValue(item.providerId ?? '', '模型服务商不能为空'),
+          providerName: requireValue(item.providerName ?? '', '模型服务商名称不能为空'),
+          modelId,
+          modelName: requireValue(item.modelName ?? '', '模型名称不能为空')
+        },
+        apiKey: secret
+      })
+    }
+
+    this.configurations.clear()
+    for (const [id, configuration] of restored) this.configurations.set(id, configuration)
   }
 
   create(request: AgentModelCreateRequest): AgentModelRegistryItem {

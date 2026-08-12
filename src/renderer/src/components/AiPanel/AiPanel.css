@@ -322,72 +322,186 @@
 
 .studio-ai-panel__messages {
   width: 100%;
-  padding: 16px 12px 24px;
+  padding: 18px 14px 28px;
   overflow: auto;
   scrollbar-color: #bfbfbf transparent;
   scrollbar-width: thin;
 }
 
 .studio-ai-panel__message {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-  margin-bottom: 16px;
+  display: flex;
+  min-width: 0;
+  margin-bottom: 20px;
 }
 
-.studio-ai-panel__message > span {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
-  background: #3f6f8f;
-  border-radius: 3px;
-  place-items: center;
+.studio-ai-panel__message-body {
+  min-width: 0;
 }
 
-.studio-ai-panel__message.is-assistant > span {
-  background: #4d6b57;
-}
-
-.studio-ai-panel__message.is-tool > span {
-  color: #555555;
-  font-size: 8px;
-  background: #dedede;
-}
-
+.studio-ai-panel__message-body p,
 .studio-ai-panel__message.is-tool p {
-  color: #666666;
-  font-size: 12px;
-}
-
-.studio-ai-panel__message p {
-  padding-top: 2px;
   margin: 0;
-  color: #333333;
-  font-size: 13px;
-  line-height: 20px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.studio-ai-panel__pending,
-.studio-ai-panel__error {
+.studio-ai-panel__message.is-user {
+  max-width: min(88%, 420px);
+  align-items: flex-end;
+  align-self: flex-end;
+  flex-direction: column;
+  margin-left: auto;
+}
+
+.studio-ai-panel__message.is-user .studio-ai-panel__message-body {
+  padding: 9px 12px;
+  color: #333333;
+  background: #e4e4e4;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+}
+
+.studio-ai-panel__message.is-user p {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.studio-ai-panel__message.is-assistant {
+  width: 100%;
+  flex-direction: column;
+}
+
+.studio-ai-panel__message.is-assistant .studio-ai-panel__message-body {
+  width: 100%;
+  padding: 0 2px;
+  color: #333333;
+}
+
+.studio-ai-panel__message.is-assistant p {
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.studio-ai-panel__message-meta {
+  display: flex;
+  height: 20px;
+  align-items: center;
+  gap: 3px;
+  margin-top: 3px;
+  color: #777777;
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.studio-ai-panel__message.is-user .studio-ai-panel__message-meta {
+  justify-content: flex-end;
+  opacity: 1;
+}
+
+.studio-ai-panel__message:hover .studio-ai-panel__message-meta,
+.studio-ai-panel__message:focus-within .studio-ai-panel__message-meta {
+  opacity: 1;
+}
+
+.studio-ai-panel__message-meta button {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: #777777;
+  cursor: pointer;
+  background: transparent;
+  border-radius: 3px;
+  place-items: center;
+}
+
+.studio-ai-panel__message-meta button:hover,
+.studio-ai-panel__message-meta button:focus-visible {
+  color: #333333;
+  background: #e4e4e4;
+}
+
+.studio-ai-panel__message.is-tool {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 7px;
+  width: 100%;
+  padding: 9px 10px;
+  color: #676767;
+  background: #eeeeee;
+  border: 1px solid #dedede;
+  border-radius: 6px;
+}
+
+.studio-ai-panel__message.is-tool > svg {
+  margin-top: 1px;
+}
+
+.studio-ai-panel__message.is-tool.is-success > svg {
+  color: #3f7657;
+}
+
+.studio-ai-panel__message.is-tool.is-failure > svg {
+  color: #a8644b;
+}
+
+.studio-ai-panel__message.is-tool strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #444444;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.studio-ai-panel__message.is-tool p {
+  color: #666666;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.studio-ai-panel__pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   color: #777777;
   font-size: 11px;
   line-height: 18px;
 }
 
-.studio-ai-panel__pending {
-  padding-left: 32px;
+.studio-ai-panel__pending > span {
+  width: 7px;
+  height: 7px;
+  background: #777777;
+  border-radius: 50%;
+  animation: studio-ai-panel-pulse 1.2s ease-in-out infinite;
+}
+
+.studio-ai-panel__pending p {
+  margin: 0;
 }
 
 .studio-ai-panel__error {
+  margin: 0;
   padding: 5px 12px 0;
   color: #b42318;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+@keyframes studio-ai-panel-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .studio-ai-panel__composer {

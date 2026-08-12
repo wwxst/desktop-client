@@ -1,4 +1,5 @@
-import { ipcMain, net } from 'electron'
+import { app, ipcMain, net, safeStorage } from 'electron'
+import { join } from 'node:path'
 import type {
   AgentChatMessage,
   AgentChatRequest,
@@ -24,6 +25,7 @@ import {
 import { AgentRuntime } from './runtime/AgentRuntime'
 import { ModelGateway } from './runtime/ModelGateway'
 import { ModelRegistry } from './runtime/ModelRegistry'
+import { ModelRegistryStore } from './runtime/ModelRegistryStore'
 import { WorkflowRunner } from './runtime/WorkflowRunner'
 import { EditorTool } from './tools/EditorTool'
 import { ExportTool } from './tools/ExportTool'
@@ -39,6 +41,8 @@ export interface AgentModelServices {
   gateway: ModelGateway
   runner: WorkflowRunner
   setRemoteProviders: (providers: InternalAgentModelProvider[]) => void
+  restore: () => Promise<void>
+  persist: () => Promise<void>
 }
 
 interface RegisterAgentIpcOptions {
@@ -46,7 +50,13 @@ interface RegisterAgentIpcOptions {
   loadRemoteCatalog?: () => Promise<unknown>
 }
 
-export function createAgentModelServices(): AgentModelServices {
+interface CreateAgentModelServicesOptions {
+  store?: ModelRegistryStore
+}
+
+export function createAgentModelServices(
+  options: CreateAgentModelServicesOptions = {}
+): AgentModelServices {
   let remoteProviders: InternalAgentModelProvider[] = []
   const resolveProvider = (providerId: string): InternalAgentModelProvider | undefined =>
     remoteProviders.find((provider) => provider.id === providerId) ??
@@ -74,11 +84,34 @@ export function createAgentModelServices(): AgentModelServices {
         ...provider,
         models: provider.models.map((model) => ({ ...model }))
       }))
+    },
+    restore: async () => {
+      if (options.store) registry.restore(await options.store.load())
+    },
+    persist: async () => {
+      if (options.store) await options.store.save(registry.exportSnapshot())
     }
   }
 }
 
-const defaultServices = createAgentModelServices()
+function createPersistentAgentModelServices(): AgentModelServices {
+  const store = new ModelRegistryStore(
+    join(app.getPath('userData'), 'agent', 'model-configurations.json'),
+    {
+      encrypt: (value) => {
+        if (!safeStorage.isEncryptionAvailable())
+          throw new Error('系统安全存储不可用，无法保存 API Key')
+        return safeStorage.encryptString(value)
+      },
+      decrypt: (value) => {
+        if (!safeStorage.isEncryptionAvailable())
+          throw new Error('系统安全存储不可用，无法读取 API Key')
+        return safeStorage.decryptString(value)
+      }
+    }
+  )
+  return createAgentModelServices({ store })
+}
 
 async function loadRemoteCatalog(): Promise<unknown> {
   const response = await net.fetch(MODEL_CATALOG_URL, {
@@ -180,8 +213,34 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
-  const services = options.services ?? defaultServices
+  const services = options.services ?? createPersistentAgentModelServices()
   const requestRemoteCatalog = options.loadRemoteCatalog ?? loadRemoteCatalog
+  let restoreError: unknown = null
+  const ready = services.restore().catch((error) => {
+    restoreError = error
+    console.warn('加载已保存的模型配置失败：', error)
+  })
+  let mutationQueue = Promise.resolve()
+  const mutate = <T>(operation: () => T): Promise<T> => {
+    const result = mutationQueue.then(async () => {
+      await ready
+      if (restoreError) throw new Error('已保存的模型配置加载失败，未覆盖原存储文件')
+      const previous = services.registry.exportSnapshot()
+      try {
+        const value = operation()
+        await services.persist()
+        return value
+      } catch (error) {
+        services.registry.restore(previous)
+        throw error
+      }
+    })
+    mutationQueue = result.then(
+      () => undefined,
+      () => undefined
+    )
+    return result
+  }
   const channels = [
     'agent:model-catalog:list',
     'agent:model-config:list',
@@ -220,11 +279,22 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
     }
   })
 
-  ipcMain.handle('agent:model-config:list', async (): Promise<AgentModelRegistryResponse> => ({
-    success: true,
-    message: '模型配置加载成功',
-    configurations: services.registry.list()
-  }))
+  ipcMain.handle('agent:model-config:list', async (): Promise<AgentModelRegistryResponse> => {
+    await ready
+    await mutationQueue
+    if (restoreError) {
+      return {
+        success: false,
+        message: '已保存的模型配置加载失败',
+        configurations: []
+      }
+    }
+    return {
+      success: true,
+      message: '模型配置加载成功',
+      configurations: services.registry.list()
+    }
+  })
 
   ipcMain.handle(
     'agent:model-config:create',
@@ -233,7 +303,7 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
         return {
           success: true,
           message: '模型配置添加成功',
-          configuration: services.registry.create(request)
+          configuration: await mutate(() => services.registry.create(request))
         }
       } catch (error) {
         return { success: false, message: errorMessage(error, '模型配置添加失败') }
@@ -246,6 +316,8 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
     async (_event, request: AgentChatRequest): Promise<AgentChatResponse> => {
       if (!isChatRequest(request)) return { success: false, message: '无效的 AI 对话请求' }
       try {
+        await ready
+        await mutationQueue
         return {
           success: true,
           message: '对话完成',
@@ -264,7 +336,7 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
         return {
           success: true,
           message: '模型配置更新成功',
-          configuration: services.registry.update(request)
+          configuration: await mutate(() => services.registry.update(request))
         }
       } catch (error) {
         return { success: false, message: errorMessage(error, '模型配置更新失败') }
@@ -274,10 +346,15 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
 
   ipcMain.handle(
     'agent:model-config:delete',
-    async (_event, configId: string): Promise<AgentModelMutationResponse> =>
-      services.registry.delete(configId)
-        ? { success: true, message: '模型配置已删除' }
-        : { success: false, message: '模型配置不存在' }
+    async (_event, configId: string): Promise<AgentModelMutationResponse> => {
+      try {
+        return (await mutate(() => services.registry.delete(configId)))
+          ? { success: true, message: '模型配置已删除' }
+          : { success: false, message: '模型配置不存在' }
+      } catch (error) {
+        return { success: false, message: errorMessage(error, '模型配置删除失败') }
+      }
+    }
   )
 
   ipcMain.handle(
