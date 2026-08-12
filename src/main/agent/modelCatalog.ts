@@ -13,68 +13,76 @@ const INTERNAL_MODEL_PROVIDERS: readonly InternalAgentModelProvider[] = [
     id: 'openai',
     name: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
-    recommendedModelId: 'gpt-4o-mini',
+    recommendedModelId: 'gpt-5.6-terra',
     models: [
-      { id: 'gpt-4o-mini', name: 'GPT-4o mini', description: '轻量通用模型' },
-      { id: 'gpt-4.1-mini', name: 'GPT-4.1 mini', description: '指令与代码任务' }
+      { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', description: '高能力推理与复杂任务' },
+      { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', description: '均衡通用模型' },
+      { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', description: '快速高吞吐模型' }
     ]
   },
   {
     id: 'deepseek',
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com',
-    recommendedModelId: 'deepseek-chat',
+    recommendedModelId: 'deepseek-v4-flash',
     models: [
-      { id: 'deepseek-chat', name: 'DeepSeek Chat', description: '通用对话模型' },
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', description: '推理模型' }
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', description: '快速推理模型' },
+      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', description: '旗舰推理模型' }
     ]
   },
   {
     id: 'qwen',
     name: '通义千问',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    recommendedModelId: 'qwen-plus',
+    recommendedModelId: 'qwen3.7-plus',
     models: [
-      { id: 'qwen-plus', name: 'Qwen Plus', description: '均衡通用模型' },
-      { id: 'qwen-max', name: 'Qwen Max', description: '高能力通用模型' },
-      { id: 'qwen-turbo', name: 'Qwen Turbo', description: '快速轻量模型' }
+      { id: 'qwen3.8-max', name: 'Qwen3.8 Max', description: '旗舰智能体模型' },
+      { id: 'qwen3.7-plus', name: 'Qwen3.7 Plus', description: '均衡多模态智能体模型' },
+      { id: 'qwen3.7-flash', name: 'Qwen3.7 Flash', description: '快速多模态模型' }
     ]
   },
   {
     id: 'zhipu',
     name: '智谱 GLM',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    recommendedModelId: 'glm-4-flash',
+    recommendedModelId: 'glm-5.2',
     models: [
-      { id: 'glm-4-flash', name: 'GLM-4-Flash', description: '快速通用模型' },
-      { id: 'glm-4-plus', name: 'GLM-4-Plus', description: '高能力通用模型' }
+      { id: 'glm-5.2', name: 'GLM-5.2', description: '新一代旗舰模型' },
+      { id: 'glm-5.1', name: 'GLM-5.1', description: '高能力通用模型' },
+      { id: 'glm-5-turbo', name: 'GLM-5 Turbo', description: '低延迟通用模型' }
     ]
   },
   {
     id: 'kimi',
     name: '月之暗面 Kimi',
     baseUrl: 'https://api.moonshot.cn/v1',
-    recommendedModelId: 'moonshot-v1-8k',
+    recommendedModelId: 'kimi-k3',
     models: [
-      { id: 'moonshot-v1-8k', name: 'Moonshot v1 8K', description: '通用对话模型' },
-      { id: 'moonshot-v1-32k', name: 'Moonshot v1 32K', description: '长上下文模型' }
+      { id: 'kimi-k3', name: 'Kimi K3', description: '旗舰推理与智能体模型' },
+      { id: 'kimi-k2.7-code', name: 'Kimi K2.7 Code', description: '代码与智能体任务' },
+      { id: 'kimi-k2.6', name: 'Kimi K2.6', description: '通用推理模型' }
     ]
   },
   {
     id: 'doubao',
     name: '字节豆包',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    recommendedModelId: 'doubao-seed-1-6-flash-250715',
+    recommendedModelId: 'doubao-seed-2-1-pro-260628',
     models: [
       {
-        id: 'doubao-seed-1-6-flash-250715',
-        name: '豆包 Seed 1.6 Flash',
-        description: '快速通用模型'
+        id: 'doubao-seed-2-1-pro-260628',
+        name: '豆包 Seed 2.1 Pro',
+        description: '旗舰智能体与多模态模型'
       },
       {
-        id: 'doubao-seed-1-6-250615',
-        name: '豆包 Seed 1.6',
-        description: '高能力通用模型'
+        id: 'doubao-seed-2-1-turbo-260628',
+        name: '豆包 Seed 2.1 Turbo',
+        description: '低延迟智能体与多模态模型'
+      },
+      {
+        id: 'doubao-seed-evolving',
+        name: '豆包 Seed Evolving',
+        description: '持续迭代的 Coding 与 Agent 模型'
       }
     ]
   }

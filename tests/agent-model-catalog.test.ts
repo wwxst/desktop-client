@@ -22,6 +22,49 @@ describe('Agent model catalog', () => {
     }
   })
 
+  it('uses the current generation of provider models in the fallback catalog', () => {
+    expect(
+      Object.fromEntries(
+        FALLBACK_MODEL_CATALOG.providers.map((provider) => [
+          provider.id,
+          {
+            recommendedModelId: provider.recommendedModelId,
+            modelIds: provider.models.map((model) => model.id)
+          }
+        ])
+      )
+    ).toEqual({
+      openai: {
+        recommendedModelId: 'gpt-5.6-terra',
+        modelIds: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
+      },
+      deepseek: {
+        recommendedModelId: 'deepseek-v4-flash',
+        modelIds: ['deepseek-v4-flash', 'deepseek-v4-pro']
+      },
+      qwen: {
+        recommendedModelId: 'qwen3.7-plus',
+        modelIds: ['qwen3.8-max', 'qwen3.7-plus', 'qwen3.7-flash']
+      },
+      zhipu: {
+        recommendedModelId: 'glm-5.2',
+        modelIds: ['glm-5.2', 'glm-5.1', 'glm-5-turbo']
+      },
+      kimi: {
+        recommendedModelId: 'kimi-k3',
+        modelIds: ['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.6']
+      },
+      doubao: {
+        recommendedModelId: 'doubao-seed-2-1-pro-260628',
+        modelIds: [
+          'doubao-seed-2-1-pro-260628',
+          'doubao-seed-2-1-turbo-260628',
+          'doubao-seed-evolving'
+        ]
+      }
+    })
+  })
+
   it('resolves provider-only metadata in Main without exposing Base URLs publicly', () => {
     expect(findInternalModelProvider('deepseek')).toMatchObject({
       id: 'deepseek',

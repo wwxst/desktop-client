@@ -100,14 +100,14 @@ describe('Agent model IPC', () => {
     const created = (await getHandler('agent:model-config:create')({ sender: {} }, {
       kind: 'provider',
       providerId: 'deepseek',
-      modelId: 'deepseek-chat',
+      modelId: 'deepseek-v4-flash',
       apiKey: 'initial-secret'
     } as never)) as AgentModelMutationResponse
     const id = created.configuration?.id
 
     expect(created).toMatchObject({
       success: true,
-      configuration: { kind: 'provider', providerId: 'deepseek', modelId: 'deepseek-chat' }
+      configuration: { kind: 'provider', providerId: 'deepseek', modelId: 'deepseek-v4-flash' }
     })
     expect(JSON.stringify(created)).not.toContain('initial-secret')
 

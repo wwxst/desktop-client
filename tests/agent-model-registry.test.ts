@@ -9,7 +9,7 @@ describe('Agent model registry', () => {
     const provider = registry.create({
       kind: 'provider',
       providerId: 'deepseek',
-      modelId: 'deepseek-chat',
+      modelId: 'deepseek-v4-flash',
       apiKey: 'provider-secret'
     })
 
@@ -18,8 +18,8 @@ describe('Agent model registry', () => {
       kind: 'provider',
       providerId: 'deepseek',
       providerName: 'DeepSeek',
-      modelId: 'deepseek-chat',
-      modelName: 'DeepSeek Chat'
+      modelId: 'deepseek-v4-flash',
+      modelName: 'DeepSeek V4 Flash'
     })
     expect(provider).not.toHaveProperty('apiKey')
     expect(provider).not.toHaveProperty('baseUrl')
@@ -74,7 +74,7 @@ describe('Agent model registry', () => {
     registry.create({
       kind: 'provider',
       providerId: 'openai',
-      modelId: 'gpt-4o-mini',
+      modelId: 'gpt-5.6-terra',
       apiKey: 'secret'
     })
     registry.create({

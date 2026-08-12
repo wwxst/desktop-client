@@ -26,7 +26,7 @@ describe('Agent model preload methods', () => {
     const createRequest = {
       kind: 'provider' as const,
       providerId: 'openai',
-      modelId: 'gpt-4o-mini',
+      modelId: 'gpt-5.6-terra',
       apiKey: 'secret'
     }
     const updateRequest = { ...createRequest, id: 'config-1', apiKey: '' }
