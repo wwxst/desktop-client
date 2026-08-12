@@ -1,4 +1,12 @@
-import { FileWarning, Image as ImageIcon, Music2, RefreshCw, Upload, Video } from 'lucide-react'
+import {
+  FileWarning,
+  Image as ImageIcon,
+  Music2,
+  RefreshCw,
+  Trash2,
+  Upload,
+  Video
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react'
 import type {
   GlobalMediaAsset,
@@ -48,8 +56,9 @@ function MediaKindIcon({ kind }: { kind: GlobalMediaKind }): JSX.Element {
 function MediaLibraryView(): JSX.Element {
   const [assets, setAssets] = useState<GlobalMediaAsset[]>([])
   const [activeFilter, setActiveFilter] = useState<MediaFilter>('all')
+  const [activeTag, setActiveTag] = useState('')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [busyAction, setBusyAction] = useState<'import' | 'refresh' | null>(null)
+  const [busyAction, setBusyAction] = useState<'import' | 'refresh' | string | null>(null)
   const [feedback, setFeedback] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -61,6 +70,11 @@ function MediaLibraryView(): JSX.Element {
     }
 
     setAssets(response.assets)
+    setActiveTag((currentTag) =>
+      currentTag && !response.assets.some((asset) => asset.tags.includes(currentTag))
+        ? ''
+        : currentTag
+    )
     setErrorMessage('')
     setLoadState('ready')
   }, [])
@@ -84,9 +98,22 @@ function MediaLibraryView(): JSX.Element {
     }
   }, [applyResponse])
 
+  const availableTags = useMemo(
+    () =>
+      [...new Set(assets.flatMap((asset) => asset.tags ?? []))].sort((left, right) =>
+        left.localeCompare(right, 'zh-CN')
+      ),
+    [assets]
+  )
+  const effectiveActiveTag = activeTag && availableTags.includes(activeTag) ? activeTag : ''
   const filteredAssets = useMemo(
-    () => (activeFilter === 'all' ? assets : assets.filter((asset) => asset.kind === activeFilter)),
-    [activeFilter, assets]
+    () =>
+      assets.filter((asset) => {
+        const matchesKind = activeFilter === 'all' || asset.kind === activeFilter
+        const matchesTag = !effectiveActiveTag || (asset.tags ?? []).includes(effectiveActiveTag)
+        return matchesKind && matchesTag
+      }),
+    [activeFilter, effectiveActiveTag, assets]
   )
   const missingCount = assets.filter((asset) => asset.availability === 'missing').length
 
@@ -115,6 +142,68 @@ function MediaLibraryView(): JSX.Element {
     } catch {
       setErrorMessage('导入素材失败，请稍后重试')
       setLoadState('error')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const updateTags = (response: GlobalMediaLibraryResponse): void => {
+    if (!response.success) {
+      setErrorMessage(response.message)
+      return
+    }
+    applyResponse(response)
+    setFeedback(response.message)
+  }
+
+  const handleAddTag = async (assetId: string, tag: string): Promise<boolean> => {
+    const normalizedTag = tag.trim()
+    if (!normalizedTag) return false
+    setBusyAction(`tag:${assetId}`)
+    setFeedback('')
+    setErrorMessage('')
+    try {
+      const response = await window.api.addGlobalMediaTag(assetId, normalizedTag)
+      updateTags(response)
+      return response.success
+    } catch {
+      setFeedback('')
+      setErrorMessage('更新素材标签失败，请稍后重试')
+      return false
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleRemoveTag = async (assetId: string, tag: string): Promise<void> => {
+    setBusyAction(`tag:${assetId}`)
+    setFeedback('')
+    setErrorMessage('')
+    try {
+      updateTags(await window.api.removeGlobalMediaTag(assetId, tag))
+    } catch {
+      setFeedback('')
+      setErrorMessage('更新素材标签失败，请稍后重试')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleRelocate = async (assetId: string): Promise<void> => {
+    setBusyAction(`relocate:${assetId}`)
+    setFeedback('')
+    setErrorMessage('')
+    try {
+      const response = await window.api.relocateGlobalMediaAsset(assetId)
+      if (!response.success) {
+        setErrorMessage(response.message)
+        return
+      }
+      applyResponse(response)
+      if (!response.canceled) setFeedback(response.message)
+    } catch {
+      setFeedback('')
+      setErrorMessage('重新定位素材失败，请稍后重试')
     } finally {
       setBusyAction(null)
     }
@@ -172,11 +261,32 @@ function MediaLibraryView(): JSX.Element {
               <span className="media-library__missing-count">{missingCount} 个失效</span>
             )}
           </div>
+          <label className="media-library__tag-filter">
+            <span>标签</span>
+            <select
+              aria-label="标签筛选"
+              value={effectiveActiveTag}
+              onChange={(event) => setActiveTag(event.currentTarget.value)}
+            >
+              <option value="">全部标签</option>
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {feedback && (
           <div className="media-library__feedback" role="status">
             {feedback}
+          </div>
+        )}
+
+        {errorMessage && loadState !== 'error' && (
+          <div className="media-library__feedback media-library__feedback--error" role="alert">
+            {errorMessage}
           </div>
         )}
 
@@ -237,6 +347,47 @@ function MediaLibraryView(): JSX.Element {
                   <span className="media-library__path" title={asset.sourcePath}>
                     {asset.sourcePath}
                   </span>
+                  <div className="media-library__tags" aria-label={`${asset.name} 标签`}>
+                    {(asset.tags ?? []).map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className="media-library__tag"
+                        aria-label={`删除标签 ${tag}`}
+                        disabled={busyAction !== null}
+                        onClick={() => void handleRemoveTag(asset.id, tag)}
+                      >
+                        {tag}
+                        <Trash2 size={11} aria-hidden="true" />
+                      </button>
+                    ))}
+                    <input
+                      className="media-library__tag-input"
+                      type="text"
+                      aria-label="添加标签"
+                      placeholder="添加标签"
+                      disabled={busyAction !== null}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return
+                        event.preventDefault()
+                        const input = event.currentTarget
+                        const value = input.value
+                        void handleAddTag(asset.id, value).then((success) => {
+                          if (success) input.value = ''
+                        })
+                      }}
+                    />
+                  </div>
+                  {asset.availability === 'missing' && (
+                    <button
+                      type="button"
+                      className="media-library__relocate"
+                      disabled={busyAction !== null}
+                      onClick={() => void handleRelocate(asset.id)}
+                    >
+                      {busyAction === `relocate:${asset.id}` ? '正在重新定位' : '重新定位'}
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

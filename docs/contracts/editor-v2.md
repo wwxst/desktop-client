@@ -45,3 +45,9 @@
 - 旧版缺少 `kind`、尺寸或轨道字段时由解析/选择器提供兼容默认值。
 - 旧版播放器仍可显示单个 active clip；V2 Composition Preview 负责按项目时间解析可见视觉层和音频层。
 - 真实项目保存/加载、编辑器文件 IPC、完整 Ripple 行为、音频波形、字幕和关键帧不属于当前契约。
+
+## 素材身份边界
+
+- Editor V2 的 `MediaAsset.id` 只在当前 `VideoEditorWorkspace` 内有效；`MediaAsset.url` 是运行时 `blob:` URL，随工作区卸载而失效。
+- 全局素材库的 `GlobalMediaAsset.id` 是 Main 持久化索引身份。文件重新定位只更新 `sourcePath` 和文件元数据，不改变该 ID。
+- 当前两套素材模型没有项目持久化映射，因此不能从编辑器临时 Clip 计算跨项目引用次数；该能力保持未实现。

@@ -24,7 +24,11 @@ import type {
   StartAgentWorkflowResponse,
   WorkflowTaskSnapshot
 } from '../shared/agent/workflow'
-import type { GlobalMediaImportResponse, GlobalMediaLibraryResponse } from '../shared/mediaLibrary'
+import type {
+  GlobalMediaImportResponse,
+  GlobalMediaLibraryResponse,
+  GlobalMediaRelocationResponse
+} from '../shared/mediaLibrary'
 
 /**
  * 只向 React 页面开放允许使用的功能。
@@ -50,6 +54,15 @@ const api = {
   /** 通过系统文件选择框导入本地媒体。 */
   importGlobalMediaFiles: (): Promise<GlobalMediaImportResponse> => {
     return ipcRenderer.invoke('media-library:import')
+  },
+  addGlobalMediaTag: (assetId: string, tag: string): Promise<GlobalMediaLibraryResponse> => {
+    return ipcRenderer.invoke('media-library:tags:add', assetId, tag)
+  },
+  removeGlobalMediaTag: (assetId: string, tag: string): Promise<GlobalMediaLibraryResponse> => {
+    return ipcRenderer.invoke('media-library:tags:remove', assetId, tag)
+  },
+  relocateGlobalMediaAsset: (assetId: string): Promise<GlobalMediaRelocationResponse> => {
+    return ipcRenderer.invoke('media-library:relocate', assetId)
   },
 
   /** 获取本地 TTS 语言、模型、安装状态和音色。 */

@@ -21,4 +21,19 @@ describe('global media library IPC contract', () => {
     expect(preloadTypes).toContain('listGlobalMediaLibrary(')
     expect(preloadTypes).toContain('importGlobalMediaFiles(')
   })
+
+  it('registers tag and relocation business channels', () => {
+    expect(mainSource).toContain("'media-library:tags:add'")
+    expect(mainSource).toContain("'media-library:tags:remove'")
+    expect(mainSource).toContain("'media-library:relocate'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('media-library:tags:add'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('media-library:tags:remove'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('media-library:relocate'")
+  })
+
+  it('declares tag and relocation renderer API methods', () => {
+    expect(preloadTypes).toContain('addGlobalMediaTag(')
+    expect(preloadTypes).toContain('removeGlobalMediaTag(')
+    expect(preloadTypes).toContain('relocateGlobalMediaAsset(')
+  })
 })

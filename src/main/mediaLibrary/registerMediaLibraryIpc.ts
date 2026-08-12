@@ -3,7 +3,8 @@ import { join } from 'node:path'
 
 import type {
   GlobalMediaImportResponse,
-  GlobalMediaLibraryResponse
+  GlobalMediaLibraryResponse,
+  GlobalMediaRelocationResponse
 } from '../../shared/mediaLibrary'
 import { GlobalMediaLibraryStore } from './mediaLibraryStore'
 
@@ -40,6 +41,9 @@ export function registerMediaLibraryIpc(): void {
 
   ipcMain.removeHandler('media-library:list')
   ipcMain.removeHandler('media-library:import')
+  ipcMain.removeHandler('media-library:tags:add')
+  ipcMain.removeHandler('media-library:tags:remove')
+  ipcMain.removeHandler('media-library:relocate')
 
   ipcMain.handle('media-library:list', async (): Promise<GlobalMediaLibraryResponse> => {
     try {
@@ -112,4 +116,70 @@ export function registerMediaLibraryIpc(): void {
       }
     }
   })
+
+  const updateTag = async (
+    assetId: string,
+    tag: string,
+    operation: 'add' | 'remove'
+  ): Promise<GlobalMediaLibraryResponse> => {
+    try {
+      const assets =
+        operation === 'add' ? await store.addTag(assetId, tag) : await store.removeTag(assetId, tag)
+      return { success: true, message: '素材标签已更新', assets }
+    } catch (error) {
+      console.error('更新素材标签失败：', error)
+      return { success: false, message: '更新素材标签失败，请稍后重试', assets: [] }
+    }
+  }
+
+  ipcMain.handle(
+    'media-library:tags:add',
+    async (_event, assetId: string, tag: string): Promise<GlobalMediaLibraryResponse> =>
+      updateTag(assetId, tag, 'add')
+  )
+  ipcMain.handle(
+    'media-library:tags:remove',
+    async (_event, assetId: string, tag: string): Promise<GlobalMediaLibraryResponse> =>
+      updateTag(assetId, tag, 'remove')
+  )
+
+  ipcMain.handle(
+    'media-library:relocate',
+    async (event, assetId: string): Promise<GlobalMediaRelocationResponse> => {
+      try {
+        const options: OpenDialogOptions = {
+          title: '重新定位失效素材',
+          properties: ['openFile'],
+          filters: [MEDIA_FILE_FILTER]
+        }
+        const owner = BrowserWindow.fromWebContents(event.sender)
+        const selection = owner
+          ? await dialog.showOpenDialog(owner, options)
+          : await dialog.showOpenDialog(options)
+        if (selection.canceled || selection.filePaths.length === 0) {
+          return {
+            success: true,
+            message: '已取消重新定位',
+            assets: await store.list(),
+            canceled: true
+          }
+        }
+        await store.relocateAsset(assetId, selection.filePaths[0])
+        return {
+          success: true,
+          message: '素材已重新定位',
+          assets: await store.list(),
+          canceled: false
+        }
+      } catch (error) {
+        console.error('重新定位素材失败：', error)
+        return {
+          success: false,
+          message: '重新定位素材失败，请检查文件后重试',
+          assets: [],
+          canceled: false
+        }
+      }
+    }
+  )
 }

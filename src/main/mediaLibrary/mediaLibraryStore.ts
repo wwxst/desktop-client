@@ -7,6 +7,7 @@ import type { GlobalMediaAsset, GlobalMediaKind } from '../../shared/mediaLibrar
 interface MediaLibraryIndex {
   version: 1
   assets: GlobalMediaAsset[]
+  needsMigration?: boolean
 }
 
 interface MediaLibraryStoreDependencies {
@@ -47,6 +48,10 @@ function getPathKey(filePath: string): string {
   return process.platform === 'win32' ? normalizedPath.toLocaleLowerCase('en-US') : normalizedPath
 }
 
+function normalizeTags(tags: readonly string[]): string[] {
+  return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))]
+}
+
 function isGlobalMediaAsset(value: unknown): value is GlobalMediaAsset {
   if (!value || typeof value !== 'object') return false
   const asset = value as Partial<GlobalMediaAsset>
@@ -59,7 +64,9 @@ function isGlobalMediaAsset(value: unknown): value is GlobalMediaAsset {
     typeof asset.sizeBytes === 'number' &&
     typeof asset.fileModifiedAt === 'string' &&
     typeof asset.importedAt === 'string' &&
-    (asset.availability === 'available' || asset.availability === 'missing')
+    (asset.availability === 'available' || asset.availability === 'missing') &&
+    (asset.tags === undefined ||
+      (Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === 'string')))
   )
 }
 
@@ -74,7 +81,21 @@ function parseIndex(source: string): MediaLibraryIndex {
     throw new Error('素材库索引格式无效')
   }
 
-  return { version: 1, assets: parsed.assets }
+  const needsMigration = parsed.assets.some((asset) => {
+    const originalTags = asset.tags
+    const normalizedTags = normalizeTags(originalTags ?? [])
+    return (
+      originalTags === undefined ||
+      normalizedTags.length !== originalTags.length ||
+      normalizedTags.some((tag, index) => tag !== originalTags[index])
+    )
+  })
+
+  return {
+    version: 1,
+    assets: parsed.assets.map((asset) => ({ ...asset, tags: normalizeTags(asset.tags ?? []) })),
+    needsMigration
+  }
 }
 
 export class GlobalMediaLibraryStore {
@@ -101,6 +122,7 @@ export class GlobalMediaLibraryStore {
 
             const refreshedAsset: GlobalMediaAsset = {
               ...asset,
+              tags: normalizeTags(asset.tags),
               sizeBytes: fileStats.size,
               fileModifiedAt: fileStats.mtime.toISOString(),
               availability: 'available'
@@ -108,7 +130,9 @@ export class GlobalMediaLibraryStore {
             if (
               refreshedAsset.sizeBytes !== asset.sizeBytes ||
               refreshedAsset.fileModifiedAt !== asset.fileModifiedAt ||
-              refreshedAsset.availability !== asset.availability
+              refreshedAsset.availability !== asset.availability ||
+              refreshedAsset.tags.length !== asset.tags.length ||
+              refreshedAsset.tags.some((tag, index) => tag !== asset.tags[index])
             ) {
               changed = true
             }
@@ -120,7 +144,9 @@ export class GlobalMediaLibraryStore {
         })
       )
 
-      if (changed) await this.writeIndex({ version: 1, assets })
+      if (changed || index.needsMigration) {
+        await this.writeIndex({ version: 1, assets })
+      }
       return assets
     })
   }
@@ -171,7 +197,8 @@ export class GlobalMediaLibraryStore {
           sizeBytes: fileStats.size,
           fileModifiedAt: fileStats.mtime.toISOString(),
           importedAt: this.dependencies.now().toISOString(),
-          availability: 'available'
+          availability: 'available',
+          tags: []
         }
         assets.push(asset)
         assetsByPath.set(pathKey, asset)
@@ -179,9 +206,68 @@ export class GlobalMediaLibraryStore {
         changed = true
       }
 
-      if (changed) await this.writeIndex({ version: 1, assets })
+      if (changed || index.needsMigration) {
+        await this.writeIndex({ version: 1, assets })
+      }
 
       return { assets, importedCount, duplicateCount, unsupportedCount }
+    })
+  }
+
+  addTag(assetId: string, tag: string): Promise<GlobalMediaAsset[]> {
+    return this.updateTags(assetId, (tags) => normalizeTags([...tags, tag]))
+  }
+
+  removeTag(assetId: string, tag: string): Promise<GlobalMediaAsset[]> {
+    return this.updateTags(assetId, (tags) => tags.filter((item) => item !== tag.trim()))
+  }
+
+  relocateAsset(assetId: string, sourcePath: string): Promise<GlobalMediaAsset> {
+    return this.enqueue(async () => {
+      const index = await this.readIndex()
+      const asset = index.assets.find((item) => item.id === assetId)
+      if (!asset) throw new Error('素材记录不存在')
+      if (asset.availability !== 'missing') throw new Error('只能重新定位失效素材')
+      const pathKey = getPathKey(sourcePath)
+      const duplicate = index.assets.find(
+        (item) => item.id !== assetId && getPathKey(item.sourcePath) === pathKey
+      )
+      if (duplicate) throw new Error('素材路径已被其他记录使用')
+      const kind = getMediaKind(sourcePath)
+      if (!kind) throw new Error('重新定位的文件类型不受支持')
+      const fileStats = await stat(sourcePath)
+      if (!fileStats.isFile()) throw new Error('素材来源不是文件')
+      const relocatedAsset: GlobalMediaAsset = {
+        ...asset,
+        name: basename(sourcePath),
+        sourcePath,
+        kind,
+        sizeBytes: fileStats.size,
+        fileModifiedAt: fileStats.mtime.toISOString(),
+        availability: 'available',
+        tags: normalizeTags(asset.tags)
+      }
+      const assets = index.assets.map((item) => (item.id === assetId ? relocatedAsset : item))
+      await this.writeIndex({ version: 1, assets })
+      return relocatedAsset
+    })
+  }
+
+  private updateTags(
+    assetId: string,
+    update: (tags: string[]) => string[]
+  ): Promise<GlobalMediaAsset[]> {
+    return this.enqueue(async () => {
+      const index = await this.readIndex()
+      let found = false
+      const assets = index.assets.map((asset) => {
+        if (asset.id !== assetId) return asset
+        found = true
+        return { ...asset, tags: update(normalizeTags(asset.tags)) }
+      })
+      if (!found) throw new Error('素材记录不存在')
+      await this.writeIndex({ version: 1, assets })
+      return assets
     })
   }
 

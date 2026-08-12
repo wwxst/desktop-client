@@ -133,6 +133,26 @@
   white-space: nowrap;
 }
 
+.media-library__tag-filter {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  color: #687382;
+  font-size: 12px;
+}
+
+.media-library__tag-filter select {
+  min-width: 112px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #d2d7de;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #374250;
+  font: inherit;
+}
+
 .media-library__missing-count {
   color: #9b4f32;
 }
@@ -141,6 +161,10 @@
   margin-top: 12px;
   color: #286f5f;
   font-size: 13px;
+}
+
+.media-library__feedback--error {
+  color: #9b4f32;
 }
 
 .media-library__state {
@@ -261,6 +285,78 @@
   text-align: left;
 }
 
+.media-library__tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.media-library__tag,
+.media-library__tag-input {
+  min-height: 24px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.media-library__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid #b7d4ca;
+  background: #eff7f3;
+  color: #286f5f;
+}
+
+.media-library__tag:hover {
+  border-color: #8ebba9;
+  background: #e5f2ec;
+}
+
+.media-library__tag:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.media-library__tag-input {
+  width: 88px;
+  padding: 0 6px;
+  border: 1px dashed #c8ced6;
+  background: #fbfcfd;
+  color: #374250;
+}
+
+.media-library__tag-input::placeholder {
+  color: #9aa3ae;
+}
+
+.media-library__relocate {
+  align-self: flex-start;
+  min-height: 30px;
+  margin-top: 3px;
+  padding: 0 9px;
+  border: 1px solid #d6a48f;
+  border-radius: 5px;
+  background: #fff8f4;
+  color: #914328;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.media-library__relocate:hover:not(:disabled) {
+  background: #fff0e9;
+}
+
+.media-library__relocate:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 @media (max-width: 720px) {
   .media-library {
     padding: 24px 18px;
@@ -283,6 +379,16 @@
   .media-library__filters button {
     flex: 1;
     min-width: 0;
+  }
+
+  .media-library__tag-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .media-library__tag-filter select {
+    flex: 1;
+    max-width: 240px;
   }
 
   .media-library__grid {

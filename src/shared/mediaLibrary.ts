@@ -11,6 +11,7 @@ export interface GlobalMediaAsset {
   fileModifiedAt: string
   importedAt: string
   availability: GlobalMediaAvailability
+  tags: string[]
 }
 
 export interface GlobalMediaLibraryResponse {
@@ -24,4 +25,8 @@ export interface GlobalMediaImportResponse extends GlobalMediaLibraryResponse {
   importedCount: number
   duplicateCount: number
   unsupportedCount: number
+}
+
+export interface GlobalMediaRelocationResponse extends GlobalMediaLibraryResponse {
+  canceled: boolean
 }
