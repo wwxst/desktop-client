@@ -1,9 +1,5 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
-import type {
-  LoginRequest,
-  LoginResponse,
-  SubscriptionCheckResponse
-} from '../shared/auth'
+import type { LoginRequest, LoginResponse, SubscriptionCheckResponse } from '../shared/auth'
 import type {
   TtsCatalogResponse,
   TtsCreateJobResponse,
@@ -16,8 +12,11 @@ import type {
 } from '../shared/tts'
 import type {
   AgentActionResponse,
-  AgentModelConfig,
-  AgentModelStatus,
+  AgentModelCatalogResponse,
+  AgentModelCreateRequest,
+  AgentModelMutationResponse,
+  AgentModelRegistryResponse,
+  AgentModelUpdateRequest,
   AgentWorkflowProgress,
   NovelDecompressionRequest,
   StartAgentWorkflowResponse,
@@ -49,15 +48,20 @@ interface DesktopApi {
   cancelTtsJob(jobId: string): Promise<TtsJobActionResponse>
   saveTtsJob(jobId: string): Promise<TtsJobActionResponse>
 
-  configureAgentModel(config: AgentModelConfig): Promise<AgentActionResponse>
-  getAgentModelStatus(): Promise<AgentModelStatus>
+  listAgentModelCatalog(): Promise<AgentModelCatalogResponse>
+  listAgentModelConfigurations(): Promise<AgentModelRegistryResponse>
+  createAgentModelConfiguration(
+    request: AgentModelCreateRequest
+  ): Promise<AgentModelMutationResponse>
+  updateAgentModelConfiguration(
+    request: AgentModelUpdateRequest
+  ): Promise<AgentModelMutationResponse>
+  deleteAgentModelConfiguration(configId: string): Promise<AgentModelMutationResponse>
   runNovelDecompression(request: NovelDecompressionRequest): Promise<StartAgentWorkflowResponse>
   getAgentTask(taskId: string): Promise<WorkflowTaskSnapshot | null>
   cancelAgentTask(taskId: string): Promise<AgentActionResponse>
   onAgentWorkflowProgress(callback: (progress: AgentWorkflowProgress) => void): () => void
-  onTtsModelDownloadProgress(
-    callback: (progress: TtsModelDownloadProgress) => void
-  ): () => void
+  onTtsModelDownloadProgress(callback: (progress: TtsModelDownloadProgress) => void): () => void
   onTtsJobProgress(callback: (progress: TtsJobProgress) => void): () => void
 }
 

@@ -14,6 +14,82 @@ export interface AgentModelStatus {
   model?: string
 }
 
+export interface AgentCatalogModel {
+  id: string
+  name: string
+  description?: string
+}
+
+export interface AgentModelProvider {
+  id: string
+  name: string
+  recommendedModelId: string
+  models: AgentCatalogModel[]
+}
+
+export interface AgentModelCatalog {
+  providers: AgentModelProvider[]
+}
+
+export interface AgentModelCatalogResponse extends AgentActionResponse {
+  catalog: AgentModelCatalog | null
+  source: 'remote' | 'fallback' | 'unavailable'
+}
+
+export interface AgentModelRegistryItem {
+  id: string
+  kind: 'provider' | 'custom'
+  modelId: string
+  providerId?: string
+  providerName?: string
+  modelName?: string
+  baseUrl?: string
+}
+
+export interface AgentModelRegistryResponse extends AgentActionResponse {
+  configurations: AgentModelRegistryItem[]
+}
+
+export interface ProviderAgentModelCreateRequest {
+  kind: 'provider'
+  providerId: string
+  modelId: string
+  apiKey: string
+}
+
+export interface CustomAgentModelCreateRequest {
+  kind: 'custom'
+  baseUrl: string
+  modelId: string
+  apiKey: string
+}
+
+export type AgentModelCreateRequest =
+  ProviderAgentModelCreateRequest | CustomAgentModelCreateRequest
+
+export interface ProviderAgentModelUpdateRequest {
+  id: string
+  kind: 'provider'
+  providerId: string
+  modelId: string
+  apiKey?: string
+}
+
+export interface CustomAgentModelUpdateRequest {
+  id: string
+  kind: 'custom'
+  baseUrl: string
+  modelId: string
+  apiKey?: string
+}
+
+export type AgentModelUpdateRequest =
+  ProviderAgentModelUpdateRequest | CustomAgentModelUpdateRequest
+
+export interface AgentModelMutationResponse extends AgentActionResponse {
+  configuration?: AgentModelRegistryItem
+}
+
 export type AgentModelMode = 'required' | 'prefer' | 'disabled'
 
 export interface NovelTtsOptions {

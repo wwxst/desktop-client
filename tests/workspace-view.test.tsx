@@ -8,8 +8,20 @@ describe('WorkspaceView', () => {
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
-        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
-        configureAgentModel: vi.fn()
+        listAgentModelCatalog: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型目录加载成功',
+          source: 'remote',
+          catalog: { providers: [] }
+        }),
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: []
+        }),
+        createAgentModelConfiguration: vi.fn(),
+        updateAgentModelConfiguration: vi.fn(),
+        deleteAgentModelConfiguration: vi.fn()
       }
     })
     const user = userEvent.setup()
@@ -32,8 +44,20 @@ describe('WorkspaceView', () => {
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
-        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
-        configureAgentModel: vi.fn()
+        listAgentModelCatalog: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型目录加载成功',
+          source: 'remote',
+          catalog: { providers: [] }
+        }),
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: []
+        }),
+        createAgentModelConfiguration: vi.fn(),
+        updateAgentModelConfiguration: vi.fn(),
+        deleteAgentModelConfiguration: vi.fn()
       }
     })
     const user = userEvent.setup()
@@ -49,8 +73,20 @@ describe('WorkspaceView', () => {
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
-        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
-        configureAgentModel: vi.fn()
+        listAgentModelCatalog: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型目录加载成功',
+          source: 'remote',
+          catalog: { providers: [] }
+        }),
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: []
+        }),
+        createAgentModelConfiguration: vi.fn(),
+        updateAgentModelConfiguration: vi.fn(),
+        deleteAgentModelConfiguration: vi.fn()
       }
     })
     const user = userEvent.setup()
@@ -68,8 +104,20 @@ describe('WorkspaceView', () => {
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
-        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
-        configureAgentModel: vi.fn()
+        listAgentModelCatalog: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型目录加载成功',
+          source: 'remote',
+          catalog: { providers: [] }
+        }),
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: []
+        }),
+        createAgentModelConfiguration: vi.fn(),
+        updateAgentModelConfiguration: vi.fn(),
+        deleteAgentModelConfiguration: vi.fn()
       }
     })
     const user = userEvent.setup()

@@ -1,10 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type {
-  LoginRequest,
-  LoginResponse,
-  SubscriptionCheckResponse
-} from '../shared/auth'
+import type { LoginRequest, LoginResponse, SubscriptionCheckResponse } from '../shared/auth'
 import type {
   TtsCatalogResponse,
   TtsCreateJobResponse,
@@ -17,8 +13,11 @@ import type {
 } from '../shared/tts'
 import type {
   AgentActionResponse,
-  AgentModelConfig,
-  AgentModelStatus,
+  AgentModelCatalogResponse,
+  AgentModelCreateRequest,
+  AgentModelMutationResponse,
+  AgentModelRegistryResponse,
+  AgentModelUpdateRequest,
   AgentWorkflowProgress,
   NovelDecompressionRequest,
   StartAgentWorkflowResponse,
@@ -105,16 +104,31 @@ const api = {
     return ipcRenderer.invoke('tts:job:save', jobId)
   },
 
-  /** 将大模型配置加载到 Electron 主进程内存。 */
-  configureAgentModel: (config: AgentModelConfig): Promise<AgentActionResponse> => {
-    return ipcRenderer.invoke('agent:model:configure', config)
+  /** 加载经过 Main 验证的服务商与模型目录。 */
+  listAgentModelCatalog: (): Promise<AgentModelCatalogResponse> => {
+    return ipcRenderer.invoke('agent:model-catalog:list')
   },
-  /** 查询 Agent 当前使用的大模型，不返回 API Key。 */
-  getAgentModelStatus: (): Promise<AgentModelStatus> => {
-    return ipcRenderer.invoke('agent:model:status')
+  /** 列出 Main 内存中的模型配置，不返回 API Key。 */
+  listAgentModelConfigurations: (): Promise<AgentModelRegistryResponse> => {
+    return ipcRenderer.invoke('agent:model-config:list')
+  },
+  createAgentModelConfiguration: (
+    request: AgentModelCreateRequest
+  ): Promise<AgentModelMutationResponse> => {
+    return ipcRenderer.invoke('agent:model-config:create', request)
+  },
+  updateAgentModelConfiguration: (
+    request: AgentModelUpdateRequest
+  ): Promise<AgentModelMutationResponse> => {
+    return ipcRenderer.invoke('agent:model-config:update', request)
+  },
+  deleteAgentModelConfiguration: (configId: string): Promise<AgentModelMutationResponse> => {
+    return ipcRenderer.invoke('agent:model-config:delete', configId)
   },
   /** 启动“解压类小说推文”多 Agent 工作流。 */
-  runNovelDecompression: (request: NovelDecompressionRequest): Promise<StartAgentWorkflowResponse> => {
+  runNovelDecompression: (
+    request: NovelDecompressionRequest
+  ): Promise<StartAgentWorkflowResponse> => {
     return ipcRenderer.invoke('agent:workflow:novel-decompression:start', request)
   },
   /** 查询 Agent 长任务状态和最终结果。 */
@@ -137,7 +151,10 @@ const api = {
   onTtsModelDownloadProgress: (
     callback: (progress: TtsModelDownloadProgress) => void
   ): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, progress: TtsModelDownloadProgress): void => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      progress: TtsModelDownloadProgress
+    ): void => {
       callback(progress)
     }
 

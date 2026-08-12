@@ -5,22 +5,24 @@ import { describe, expect, it } from 'vitest'
 const preloadSource = readFileSync(resolve(process.cwd(), 'src/preload/index.ts'), 'utf8')
 const preloadTypes = readFileSync(resolve(process.cwd(), 'src/preload/index.d.ts'), 'utf8')
 
-describe('Agent preload contract', () => {
-  it('exposes model and workflow IPC methods', () => {
-    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model:configure'")
-    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model:status'")
+describe('Agent model preload contract', () => {
+  it('exposes the catalog and registry IPC methods', () => {
+    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model-catalog:list'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model-config:list'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model-config:create'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model-config:update'")
+    expect(preloadSource).toContain("ipcRenderer.invoke('agent:model-config:delete'")
     expect(preloadSource).toContain("ipcRenderer.invoke('agent:workflow:novel-decompression:start'")
-    expect(preloadSource).toContain("ipcRenderer.invoke('agent:workflow:get'")
-    expect(preloadSource).toContain("ipcRenderer.invoke('agent:workflow:cancel'")
     expect(preloadSource).toContain("ipcRenderer.on('agent:workflow:progress'")
   })
 
   it('declares the same methods on Window.api', () => {
-    expect(preloadTypes).toContain('configureAgentModel(')
-    expect(preloadTypes).toContain('getAgentModelStatus(')
+    expect(preloadTypes).toContain('listAgentModelCatalog(')
+    expect(preloadTypes).toContain('listAgentModelConfigurations(')
+    expect(preloadTypes).toContain('createAgentModelConfiguration(')
+    expect(preloadTypes).toContain('updateAgentModelConfiguration(')
+    expect(preloadTypes).toContain('deleteAgentModelConfiguration(')
     expect(preloadTypes).toContain('runNovelDecompression(')
-    expect(preloadTypes).toContain('getAgentTask(')
-    expect(preloadTypes).toContain('cancelAgentTask(')
     expect(preloadTypes).toContain('onAgentWorkflowProgress(')
   })
 })

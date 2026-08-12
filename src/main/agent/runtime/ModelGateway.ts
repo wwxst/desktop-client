@@ -1,4 +1,5 @@
 import type { AgentModelConfig, AgentModelStatus } from '../../../shared/agent/workflow'
+import { ModelRegistry } from './ModelRegistry'
 
 export interface JsonCompletionRequest {
   system: string
@@ -15,12 +16,6 @@ interface ChatCompletionResponse {
   error?: {
     message?: string
   }
-}
-
-function normalizeBaseUrl(baseUrl: string): string {
-  return String(baseUrl ?? '')
-    .trim()
-    .replace(/\/+$/, '')
 }
 
 function stripCodeFence(value: string): string {
@@ -46,67 +41,38 @@ function extractJsonObject(value: string): string {
 }
 
 export class ModelGateway {
-  private config: AgentModelConfig | null = null
+  private selectedConfigId: string | null = null
 
-  configure(config: AgentModelConfig): void {
-    if (!config || typeof config !== 'object')
-      throw new Error('Model configuration must be an object')
-    const baseUrl = normalizeBaseUrl(config.baseUrl)
-    const apiKey = String(config.apiKey ?? '').trim()
-    const model = String(config.model ?? '').trim()
+  constructor(private readonly registry: ModelRegistry) {}
 
-    let parsedUrl: URL
-    try {
-      parsedUrl = new URL(baseUrl)
-    } catch {
-      throw new Error('Model Base URL must be a valid HTTP(S) URL')
+  select(configId: string): void {
+    const normalizedId = String(configId ?? '').trim()
+    if (!normalizedId || !this.registry.getRuntimeConfig(normalizedId)) {
+      throw new Error('模型配置不存在')
     }
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      throw new Error('Model Base URL must use HTTP or HTTPS')
-    }
-
-    const timeoutMs = config.timeoutMs ?? 90_000
-    if (!Number.isFinite(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 600_000) {
-      throw new Error('Model timeout must be between 1000 and 600000 milliseconds')
-    }
-    const temperature = config.temperature ?? 0.2
-    if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
-      throw new Error('Model temperature must be between 0 and 2')
-    }
-
-    if (!baseUrl) throw new Error('大模型 Base URL 不能为空')
-    if (!apiKey) throw new Error('大模型 API Key 不能为空')
-    if (!model) throw new Error('大模型名称不能为空')
-
-    this.config = {
-      ...config,
-      baseUrl,
-      apiKey,
-      model,
-      temperature,
-      timeoutMs
-    }
+    this.selectedConfigId = normalizedId
   }
 
   clear(): void {
-    this.config = null
+    this.selectedConfigId = null
   }
 
   getStatus(): AgentModelStatus {
-    if (!this.config) return { configured: false }
+    const config = this.getSelectedConfig()
+    if (!config) return { configured: false }
     return {
       configured: true,
-      baseUrl: this.config.baseUrl,
-      model: this.config.model
+      baseUrl: config.baseUrl,
+      model: config.model
     }
   }
 
   isConfigured(): boolean {
-    return this.config !== null
+    return this.getSelectedConfig() !== null
   }
 
   async completeJson<T>(request: JsonCompletionRequest): Promise<T> {
-    const config = this.config
+    const config = this.getSelectedConfig()
     if (!config) throw new Error('尚未配置大模型，请先配置 Model Gateway')
 
     const timeoutController = new AbortController()
@@ -145,5 +111,9 @@ export class ModelGateway {
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  private getSelectedConfig(): AgentModelConfig | null {
+    return this.selectedConfigId ? this.registry.getRuntimeConfig(this.selectedConfigId) : null
   }
 }
