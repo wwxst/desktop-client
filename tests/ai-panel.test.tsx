@@ -67,17 +67,15 @@ describe('AiPanel', () => {
     expect(screen.getByRole('button', { name: '发送' })).toBeDisabled()
   })
 
-  it('opens settings and can remove the automatic project context', async () => {
+  it('opens the global settings page from the settings button', async () => {
     const user = userEvent.setup()
-    render(<AiPanel />)
+    const onOpenSettings = vi.fn()
+    render(<AiPanel onOpenSettings={onOpenSettings} />)
 
     await user.click(screen.getByRole('button', { name: 'AI 面板设置' }))
-    const autoAttach = screen.getByRole('checkbox', { name: '自动附加当前项目' })
-    expect(autoAttach).toBeChecked()
 
-    await user.click(autoAttach)
-
-    expect(screen.queryByText('桌面端自动剪辑产品PRD.md')).not.toBeInTheDocument()
+    expect(onOpenSettings).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog', { name: 'AI 面板设置' })).not.toBeInTheDocument()
   })
 
   it('collapses and restores the right panel', async () => {

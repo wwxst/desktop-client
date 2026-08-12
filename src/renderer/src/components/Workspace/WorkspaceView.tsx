@@ -1,15 +1,17 @@
-import { useReducer, useRef, type JSX } from 'react'
+import { useReducer, useRef, useState, type JSX } from 'react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 import AiPanel from '../AiPanel/AiPanel'
 import MediaLibraryView from '../MediaLibrary/MediaLibraryView'
 import NovelPromotionSidePanel from '../NovelPromotion/NovelPromotionSidePanel'
 import NovelPromotionView from '../NovelPromotion/NovelPromotionView'
 import PluginsView from '../Plugins/PluginsView'
+import SettingsView from '../Settings/SettingsView'
 import Sidebar from '../Sidebar/Sidebar'
 import SmartEditDraftView from '../SmartEdit/SmartEditDraftView'
 import SmartEditEditorView from '../SmartEdit/SmartEditEditorView'
 import TtsVoiceoverView from '../TtsVoiceover/TtsVoiceoverView'
 import Layout from '../../layouts/Layout'
+import './WorkspaceView.css'
 import {
   initialWorkspaceNavigationState,
   workspaceNavigationReducer,
@@ -26,6 +28,15 @@ function WorkspaceView(): JSX.Element {
   )
   const smartEditEnabled = import.meta.env.DEV
   const aiPanelRef = useRef<PanelImperativeHandle>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const openSettings = (): void => {
+    setSettingsOpen(true)
+  }
+
+  const closeSettings = (): void => {
+    setSettingsOpen(false)
+  }
 
   const handleSidebarItemSelect = (menu: WorkspaceMenu): void => {
     dispatchNavigation({
@@ -38,12 +49,7 @@ function WorkspaceView(): JSX.Element {
     navigation.activeMenu === 'smart-edit' && !smartEditEnabled ? 'home' : navigation.activeMenu
 
   let workspaceContent: JSX.Element = <div className="workspace-empty-page" aria-hidden="true" />
-  let rightPanel: JSX.Element = (
-    <AiPanel
-      onCollapse={() => aiPanelRef.current?.collapse()}
-      onExpand={() => aiPanelRef.current?.expand()}
-    />
-  )
+  let useNovelPromotionPanel = false
 
   if (smartEditEnabled && navigation.activeMenu === 'smart-edit') {
     workspaceContent =
@@ -58,7 +64,7 @@ function WorkspaceView(): JSX.Element {
 
   if (navigation.activeMenu === 'novel-promotion') {
     workspaceContent = <NovelPromotionView />
-    rightPanel = <NovelPromotionSidePanel />
+    useNovelPromotionPanel = true
   }
 
   if (navigation.activeMenu === 'tts-voiceover') {
@@ -82,18 +88,34 @@ function WorkspaceView(): JSX.Element {
   }
 
   return (
-    <Layout
-      sidebar={
-        <Sidebar
-          activeItem={activeSidebarItem}
-          showSmartEdit={smartEditEnabled}
-          onItemSelect={handleSidebarItemSelect}
+    <div className="workspace-view">
+      <div className="workspace-view__application" hidden={settingsOpen}>
+        <Layout
+          sidebar={
+            <Sidebar
+              activeItem={activeSidebarItem}
+              showSmartEdit={smartEditEnabled}
+              onItemSelect={handleSidebarItemSelect}
+              onSettingsSelect={openSettings}
+            />
+          }
+          content={workspaceContent}
+          aiPanel={
+            useNovelPromotionPanel ? (
+              <NovelPromotionSidePanel />
+            ) : (
+              <AiPanel
+                onCollapse={() => aiPanelRef.current?.collapse()}
+                onExpand={() => aiPanelRef.current?.expand()}
+                onOpenSettings={openSettings}
+              />
+            )
+          }
+          aiPanelRef={aiPanelRef}
         />
-      }
-      content={workspaceContent}
-      aiPanel={rightPanel}
-      aiPanelRef={aiPanelRef}
-    />
+      </div>
+      {settingsOpen && <SettingsView onBack={closeSettings} />}
+    </div>
   )
 }
 

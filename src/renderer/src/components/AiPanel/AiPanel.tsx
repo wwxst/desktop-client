@@ -30,11 +30,12 @@ import {
 import './AiPanel.css'
 
 type AiPanelTab = 'chat' | 'codex'
-type PopupName = 'history' | 'settings' | 'more' | null
+type PopupName = 'history' | 'more' | null
 
 interface AiPanelProps {
   onCollapse?: () => void
   onExpand?: () => void
+  onOpenSettings?: () => void
 }
 
 interface ConversationMessage {
@@ -44,7 +45,7 @@ interface ConversationMessage {
 
 const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
 
-function AiPanel({ onCollapse, onExpand }: AiPanelProps): JSX.Element {
+function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<AiPanelTab>('chat')
   const [composerValue, setComposerValue] = useState('')
   const [messages, setMessages] = useState<Record<AiPanelTab, ConversationMessage[]>>({
@@ -216,35 +217,14 @@ function AiPanel({ onCollapse, onExpand }: AiPanelProps): JSX.Element {
               </div>
             )}
           </div>
-          <div className="studio-ai-panel__popup-anchor">
-            <button
-              type="button"
-              aria-label="AI 面板设置"
-              title="AI 面板设置"
-              aria-haspopup="dialog"
-              aria-expanded={openPopup === 'settings'}
-              onClick={() => togglePopup('settings')}
-            >
-              <Settings size={17} strokeWidth={1.55} aria-hidden="true" />
-            </button>
-            {openPopup === 'settings' && (
-              <div
-                className="studio-ai-panel__popover studio-ai-panel__popover--settings"
-                role="dialog"
-                aria-label="AI 面板设置"
-              >
-                <strong>面板设置</strong>
-                <label>
-                  <span>自动附加当前项目</span>
-                  <input
-                    type="checkbox"
-                    checked={autoAttachProject}
-                    onChange={(event) => setAutoAttachProject(event.target.checked)}
-                  />
-                </label>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            aria-label="AI 面板设置"
+            title="AI 面板设置"
+            onClick={onOpenSettings}
+          >
+            <Settings size={17} strokeWidth={1.55} aria-hidden="true" />
+          </button>
           <div className="studio-ai-panel__popup-anchor">
             <button
               type="button"

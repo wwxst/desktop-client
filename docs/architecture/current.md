@@ -3,7 +3,7 @@
 > 状态：当前事实
 > 适用范围：Electron 应用、Renderer 工作区和 Editor V2
 > 事实来源：`src/main`、`src/preload`、`src/shared`、`src/renderer/src` 与对应测试
-> 最近验证：`714a01d` + 当前全局素材库标签与重新定位改动 / 2026-08-12
+> 最近验证：`2a9c40e` + 当前 AI 模型设置页改动 / 2026-08-12
 
 ## 总体边界
 
@@ -28,7 +28,7 @@ Java 后端
 
 ### Renderer
 
-Renderer 负责 React 页面、总工作区、全局素材库、TTS/插件界面和视频编辑器界面。全局素材库通过 `window.api` 加载持久化索引、调用原生文件选择并按类型/标签筛选；它不直接读取文件系统。视频编辑器当前运行在 Renderer 中，项目草稿和媒体预览仍是工作区生命周期内的临时状态；真实项目保存、加载和编辑器项目媒体 IPC 尚未实现。
+Renderer 负责 React 页面、总工作区、设置页、全局素材库、TTS/插件界面和视频编辑器界面。全局素材库通过 `window.api` 加载持久化索引、调用原生文件选择并按类型/标签筛选；它不直接读取文件系统。视频编辑器当前运行在 Renderer 中，项目草稿和媒体预览仍是工作区生命周期内的临时状态；真实项目保存、加载和编辑器项目媒体 IPC 尚未实现。
 
 ## Renderer 工作区
 
@@ -46,6 +46,10 @@ App
 ```
 
 `WorkspaceView` 的 `workspaceNavigationReducer` 只管理一级菜单和智剪页面状态。`VideoEditorWorkspace` 通过 `editorHistoryReducer` 管理编辑项目状态。两者不共享第二份导航或项目状态，也不能由编辑器内部直接修改外层菜单和布局。
+
+### 设置工作区
+
+侧栏账户区齿轮和 `AiPanel` 的设置按钮进入同一个独立设置工作区；进入后隐藏普通主侧栏和 AI 右栏，但保持原工作区挂载，“返回应用”恢复原一级页面、智剪编辑状态和 AI 会话状态。当前设置页只开放 AI 模型的 Base URL、API Key、模型名称、配置状态和保存操作，复用 `window.api.getAgentModelStatus` 与 `window.api.configureAgentModel`。API Key 只作为本次表单输入发送到 Main，不由状态接口返回，也不持久化在 Renderer。
 
 ## Editor V2 状态分层
 

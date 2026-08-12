@@ -4,6 +4,89 @@ import { describe, expect, it, vi } from 'vitest'
 import WorkspaceView from '../src/renderer/src/components/Workspace/WorkspaceView'
 
 describe('WorkspaceView', () => {
+  it('opens the settings workspace from the account gear and returns to the app', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
+        configureAgentModel: vi.fn()
+      }
+    })
+    const user = userEvent.setup()
+    render(<WorkspaceView />)
+
+    await user.click(screen.getByRole('button', { name: '设置' }))
+
+    expect(screen.getByRole('region', { name: '设置' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AI 模型' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: '主菜单' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'AI 助手' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '返回应用' }))
+
+    expect(screen.getByRole('navigation', { name: '主菜单' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'AI 助手' })).toBeInTheDocument()
+  })
+
+  it('opens the same settings workspace from the AI panel', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
+        configureAgentModel: vi.fn()
+      }
+    })
+    const user = userEvent.setup()
+    render(<WorkspaceView />)
+
+    await user.click(screen.getByRole('button', { name: 'AI 面板设置' }))
+
+    expect(screen.getByRole('region', { name: '设置' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AI 模型' })).toBeInTheDocument()
+  })
+
+  it('returns to an active smart edit session after visiting settings', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
+        configureAgentModel: vi.fn()
+      }
+    })
+    const user = userEvent.setup()
+    render(<WorkspaceView />)
+
+    await user.click(screen.getByRole('button', { name: '智剪' }))
+    await user.click(screen.getByRole('button', { name: '新建草稿' }))
+    await user.click(screen.getByRole('button', { name: '设置' }))
+    await user.click(screen.getByRole('button', { name: '返回应用' }))
+
+    expect(screen.getByRole('region', { name: '智剪编辑器' })).toBeInTheDocument()
+  })
+
+  it('keeps the current AI conversation after visiting settings', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        getAgentModelStatus: vi.fn().mockResolvedValue({ configured: false }),
+        configureAgentModel: vi.fn()
+      }
+    })
+    const user = userEvent.setup()
+    render(<WorkspaceView />)
+    const aiPanel = screen.getByRole('region', { name: 'AI 助手' })
+
+    await user.click(screen.getByRole('button', { name: '短剧' }))
+    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '发送' }))
+    expect(screen.getByRole('region', { name: 'AI 助手' })).toBe(aiPanel)
+    expect(screen.getByRole('log', { name: '当前会话' })).toHaveTextContent('短剧')
+    await user.click(screen.getByRole('button', { name: 'AI 面板设置' }))
+    await user.click(screen.getByRole('button', { name: '返回应用' }))
+
+    expect(screen.getByRole('log', { name: '当前会话' })).toHaveTextContent('短剧')
+  })
+
   it('opens the media library with its empty state and import entry point', async () => {
     Object.defineProperty(window, 'api', {
       configurable: true,

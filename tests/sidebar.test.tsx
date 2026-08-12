@@ -13,14 +13,7 @@ describe('Sidebar', () => {
         .getAllByRole('button')
         .filter((button) => button.classList.contains('studio-sidebar__menu-item'))
         .map((button) => button.textContent)
-    ).toEqual([
-      '首页',
-      '插件',
-      '媒体库',
-      '智剪',
-      '小说推文',
-      'TTS 配音'
-    ])
+    ).toEqual(['首页', '插件', '媒体库', '智剪', '小说推文', 'TTS 配音'])
   })
 
   it('renders the account and only shows smart edit when enabled', () => {
@@ -53,5 +46,22 @@ describe('Sidebar', () => {
     expect(onItemSelect).toHaveBeenNthCalledWith(1, 'novel-promotion')
     expect(onItemSelect).toHaveBeenNthCalledWith(2, 'plugins')
     expect(onItemSelect).toHaveBeenNthCalledWith(3, 'smart-edit')
+  })
+
+  it('reports settings selection from the account gear', async () => {
+    const user = userEvent.setup()
+    const onSettingsSelect = vi.fn()
+    render(
+      <Sidebar
+        activeItem="home"
+        showSmartEdit
+        onItemSelect={vi.fn()}
+        onSettingsSelect={onSettingsSelect}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: '设置' }))
+
+    expect(onSettingsSelect).toHaveBeenCalledTimes(1)
   })
 })

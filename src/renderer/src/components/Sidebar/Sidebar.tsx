@@ -22,6 +22,7 @@ interface SidebarProps {
   activeItem: WorkspaceMenu
   showSmartEdit: boolean
   onItemSelect: (item: WorkspaceMenu) => void
+  onSettingsSelect?: () => void
 }
 
 const menuItems: SidebarMenuItem[] = [
@@ -36,7 +37,12 @@ const menuItems: SidebarMenuItem[] = [
 /**
  * 工作台左侧的主菜单。
  */
-function Sidebar({ activeItem, showSmartEdit, onItemSelect }: SidebarProps): JSX.Element {
+function Sidebar({
+  activeItem,
+  showSmartEdit,
+  onItemSelect,
+  onSettingsSelect
+}: SidebarProps): JSX.Element {
   const visibleMenuItems = menuItems.filter((item) => item.id !== 'smart-edit' || showSmartEdit)
 
   return (
@@ -71,7 +77,13 @@ function Sidebar({ activeItem, showSmartEdit, onItemSelect }: SidebarProps): JSX
           <span className="studio-sidebar__plan">Plus</span>
         </div>
 
-        <button className="studio-sidebar__settings" type="button" aria-label="设置" title="设置">
+        <button
+          className="studio-sidebar__settings"
+          type="button"
+          aria-label="设置"
+          title="设置"
+          onClick={() => onSettingsSelect?.()}
+        >
           <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
