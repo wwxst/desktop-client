@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEditorAgentApi } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorAgentApi'
+import { executeAgentToolCall } from '../src/renderer/src/components/AiPanel/agentChatTools'
 import {
   applyEditorCommand,
   applyEditorCommandsWithResult
@@ -82,5 +83,39 @@ describe('EditorAgentApi execution results', () => {
     expect(batch.success).toBe(false)
     expect(batch.code).toBe('NO_CHANGE')
     expect(batch.results.map((result) => result.code)).toEqual(['OK', 'NO_CHANGE'])
+  })
+
+  it('executes chat tools through EditorService capabilities', () => {
+    const deleteClips = vi.fn().mockReturnValue({
+      success: true,
+      changed: true,
+      code: 'OK',
+      message: '删除片段',
+      state: createProject(),
+      results: []
+    })
+    const api = createEditorAgentApi({
+      getProject: createProject,
+      getSelection: () => ['clip-1'],
+      getPlayhead: () => 3,
+      execute: (command) => applyEditorCommand(createProject(), command),
+      executeBatch: (commands) => applyEditorCommandsWithResult(createProject(), commands),
+      executeTransaction: (commands) => applyEditorCommandsWithResult(createProject(), commands),
+      service: { deleteClips } as never,
+      undo: vi.fn(),
+      redo: vi.fn()
+    })
+
+    expect(
+      executeAgentToolCall(
+        {
+          id: 'call-1',
+          name: 'delete_selected_clips',
+          arguments: { magnetMainTrack: true }
+        },
+        api
+      )
+    ).toMatchObject({ success: true, message: '已删除 1 个片段' })
+    expect(deleteClips).toHaveBeenCalledWith(['clip-1'], { magnetMainTrack: true })
   })
 })

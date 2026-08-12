@@ -3,7 +3,7 @@
 > 状态：当前契约
 > 适用范围：`src/renderer/src/components/SmartEdit/VideoEditorWorkspace/`
 > 事实来源：`editorProject.ts`、`editorCommands.ts`、`core/`、`playback/`、`interaction/` 与 Editor V2 测试
-> 最近验证：`b3a13ea` + 本次提交 / 2026-08-11
+> 最近验证：`e4a63ef` + 当前 AI 对话工具调用改动 / 2026-08-12
 
 ## 状态所有权
 
@@ -24,6 +24,8 @@
 - `paste`
 
 这些能力通过 `EditorPlacementPolicy` 规划轨道、碰撞和磁吸行为，再以 `executeTransaction` 提交。低层 `EditorCommand` 仍保留给已有 Agent 和兼容调用，但新自动化不应绕过 Placement Policy 直接拼接移动/放置规则。
+
+AI 面板通过已注册的 `EditorAgentApi` 读取当前工程摘要并执行白名单工具。当前工具包括读取工程摘要、删除当前选中片段、在播放头处分割当前唯一选中片段；删除和分割分别调用 `EditorService.deleteClips` 与 `EditorService.splitClip`，仍形成单个可撤销事务。模型不能直接持有 Project 状态或派发 reducer action。
 
 ## 不变量
 

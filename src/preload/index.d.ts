@@ -12,6 +12,8 @@ import type {
 } from '../shared/tts'
 import type {
   AgentActionResponse,
+  AgentChatRequest,
+  AgentChatResponse,
   AgentModelCatalogResponse,
   AgentModelCreateRequest,
   AgentModelMutationResponse,
@@ -57,6 +59,7 @@ interface DesktopApi {
     request: AgentModelUpdateRequest
   ): Promise<AgentModelMutationResponse>
   deleteAgentModelConfiguration(configId: string): Promise<AgentModelMutationResponse>
+  runAgentChat(request: AgentChatRequest): Promise<AgentChatResponse>
   runNovelDecompression(request: NovelDecompressionRequest): Promise<StartAgentWorkflowResponse>
   getAgentTask(taskId: string): Promise<WorkflowTaskSnapshot | null>
   cancelAgentTask(taskId: string): Promise<AgentActionResponse>

@@ -348,6 +348,21 @@
   place-items: center;
 }
 
+.studio-ai-panel__message.is-assistant > span {
+  background: #4d6b57;
+}
+
+.studio-ai-panel__message.is-tool > span {
+  color: #555555;
+  font-size: 8px;
+  background: #dedede;
+}
+
+.studio-ai-panel__message.is-tool p {
+  color: #666666;
+  font-size: 12px;
+}
+
 .studio-ai-panel__message p {
   padding-top: 2px;
   margin: 0;
@@ -356,6 +371,23 @@
   line-height: 20px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.studio-ai-panel__pending,
+.studio-ai-panel__error {
+  margin: 0;
+  color: #777777;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.studio-ai-panel__pending {
+  padding-left: 32px;
+}
+
+.studio-ai-panel__error {
+  padding: 5px 12px 0;
+  color: #b42318;
 }
 
 .studio-ai-panel__composer {

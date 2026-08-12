@@ -27,6 +27,9 @@ import {
   type JSX,
   type KeyboardEvent
 } from 'react'
+import type { AgentChatMessage, AgentModelRegistryItem } from '../../../../shared/agent/workflow'
+import { getActiveEditorAgentApi } from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
+import { executeAgentToolCall } from './agentChatTools'
 import './AiPanel.css'
 
 type AiPanelTab = 'chat' | 'codex'
@@ -36,16 +39,23 @@ interface AiPanelProps {
   onCollapse?: () => void
   onExpand?: () => void
   onOpenSettings?: () => void
+  modelRefreshKey?: number
 }
 
 interface ConversationMessage {
   id: number
+  role: 'user' | 'assistant' | 'tool'
   text: string
 }
 
 const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
 
-function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.Element {
+function AiPanel({
+  onCollapse,
+  onExpand,
+  onOpenSettings,
+  modelRefreshKey = 0
+}: AiPanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<AiPanelTab>('chat')
   const [composerValue, setComposerValue] = useState('')
   const [messages, setMessages] = useState<Record<AiPanelTab, ConversationMessage[]>>({
@@ -59,12 +69,18 @@ function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.El
   const [thinkingMode, setThinkingMode] = useState('平衡')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [modelConfigurations, setModelConfigurations] = useState<AgentModelRegistryItem[]>([])
+  const [selectedConfigId, setSelectedConfigId] = useState('')
+  const [modelError, setModelError] = useState('')
+  const [isSending, setIsSending] = useState(false)
   const panelRef = useRef<HTMLElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const nextMessageIdRef = useRef(1)
+  const chatHistoryRef = useRef<Record<AiPanelTab, AgentChatMessage[]>>({ chat: [], codex: [] })
 
   const attachmentName = selectedFileName ?? (autoAttachProject ? DEFAULT_CONTEXT_FILE : null)
+  const chatAvailable = typeof window.api?.runAgentChat === 'function'
   const activeMessages = messages[activeTab]
   const isEmpty = activeMessages.length === 0
 
@@ -88,8 +104,36 @@ function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.El
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isFullscreen, openPopup])
 
+  useEffect(() => {
+    const listConfigurations = window.api?.listAgentModelConfigurations
+    if (!listConfigurations) return undefined
+    let cancelled = false
+    void listConfigurations()
+      .then((response) => {
+        if (cancelled) return
+        if (!response.success) {
+          setModelError(response.message || '模型配置加载失败')
+          return
+        }
+        setModelConfigurations(response.configurations)
+        setSelectedConfigId((current) =>
+          response.configurations.some((configuration) => configuration.id === current)
+            ? current
+            : ''
+        )
+        setModelError(response.configurations.length ? '' : '请先在设置中添加模型')
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setModelError(error instanceof Error ? error.message : '模型配置加载失败')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [modelRefreshKey])
+
   const resetConversation = (): void => {
     setMessages((current) => ({ ...current, [activeTab]: [] }))
+    chatHistoryRef.current[activeTab] = []
     setComposerValue('')
     setSelectedFileName(null)
     setOpenPopup(null)
@@ -97,19 +141,82 @@ function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.El
     textareaRef.current?.focus()
   }
 
+  const appendMessages = (tab: AiPanelTab, next: ConversationMessage[]): void => {
+    setMessages((current) => ({ ...current, [tab]: [...current[tab], ...next] }))
+  }
+
+  const createMessage = (role: ConversationMessage['role'], text: string): ConversationMessage => {
+    const message = { id: nextMessageIdRef.current, role, text }
+    nextMessageIdRef.current += 1
+    return message
+  }
+
+  const runChat = async (tab: AiPanelTab, history: AgentChatMessage[]): Promise<void> => {
+    const chatApi = window.api?.runAgentChat
+    if (!chatApi) return
+    if (!selectedConfigId) {
+      setModelError('请选择模型')
+      return
+    }
+    setIsSending(true)
+    setModelError('')
+    let conversation = history
+    try {
+      for (let turn = 0; turn < 6; turn += 1) {
+        const response = await chatApi({ configId: selectedConfigId, messages: conversation })
+        if (!response.success || !response.assistant) {
+          throw new Error(response.message || 'AI 对话失败')
+        }
+        const assistant = response.assistant
+        conversation = [
+          ...conversation,
+          { role: 'assistant', content: assistant.content, toolCalls: assistant.toolCalls }
+        ]
+        chatHistoryRef.current[tab] = conversation
+        if (assistant.content) appendMessages(tab, [createMessage('assistant', assistant.content)])
+        if (assistant.toolCalls.length === 0) return
+
+        const toolMessages: AgentChatMessage[] = []
+        const renderedTools: ConversationMessage[] = []
+        for (const call of assistant.toolCalls) {
+          const result = executeAgentToolCall(call, getActiveEditorAgentApi())
+          const content = JSON.stringify(result)
+          toolMessages.push({ role: 'tool', content, toolCallId: call.id, name: call.name })
+          renderedTools.push(createMessage('tool', result.message))
+        }
+        appendMessages(tab, renderedTools)
+        conversation = [...conversation, ...toolMessages]
+        chatHistoryRef.current[tab] = conversation
+      }
+      throw new Error('AI 工具调用次数过多，已停止执行')
+    } catch (error) {
+      appendMessages(tab, [
+        createMessage('assistant', error instanceof Error ? error.message : 'AI 对话失败')
+      ])
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
     const text = composerValue.trim()
-    if (!text) return
+    if (!text || isSending) return
+    if (chatAvailable && !selectedConfigId) {
+      setModelError('请选择模型')
+      return
+    }
 
-    const message = { id: nextMessageIdRef.current, text }
-    nextMessageIdRef.current += 1
-    setMessages((current) => ({
-      ...current,
-      [activeTab]: [...current[activeTab], message]
-    }))
+    const message = createMessage('user', text)
+    const history = [
+      ...chatHistoryRef.current[activeTab],
+      { role: 'user', content: text } as AgentChatMessage
+    ]
+    chatHistoryRef.current[activeTab] = history
+    appendMessages(activeTab, [message])
     setComposerValue('')
     if (textareaRef.current) textareaRef.current.style.height = ''
+    void runChat(activeTab, history)
   }
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -310,11 +417,18 @@ function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.El
         ) : (
           <div className="studio-ai-panel__messages" role="log" aria-label="当前会话">
             {activeMessages.map((message) => (
-              <article key={message.id} className="studio-ai-panel__message">
-                <span>你</span>
+              <article key={message.id} className={`studio-ai-panel__message is-${message.role}`}>
+                <span>
+                  {message.role === 'user' ? '你' : message.role === 'assistant' ? 'AI' : '工具'}
+                </span>
                 <p>{message.text}</p>
               </article>
             ))}
+            {isSending && (
+              <p className="studio-ai-panel__pending" role="status">
+                AI 正在处理...
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -390,10 +504,22 @@ function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.El
           </label>
           <label className="studio-ai-panel__select" title="选择模型">
             <Cpu size={13} strokeWidth={1.7} aria-hidden="true" />
-            <select aria-label="模型" defaultValue="Models">
-              <option>Models</option>
-              <option>本地模型</option>
-              <option>规则模式</option>
+            <select
+              aria-label="模型"
+              value={selectedConfigId}
+              onChange={(event) => {
+                setSelectedConfigId(event.target.value)
+                setModelError('')
+              }}
+            >
+              <option value="">选择模型</option>
+              {modelConfigurations.map((configuration) => (
+                <option key={configuration.id} value={configuration.id}>
+                  {configuration.providerName
+                    ? `${configuration.providerName} / ${configuration.modelName ?? configuration.modelId}`
+                    : configuration.modelId}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -421,12 +547,20 @@ function AiPanel({ onCollapse, onExpand, onOpenSettings }: AiPanelProps): JSX.El
             type="submit"
             aria-label="发送"
             title="发送"
-            disabled={!composerValue.trim()}
+            disabled={
+              !composerValue.trim() || isSending || Boolean(chatAvailable && !selectedConfigId)
+            }
           >
             <ArrowUp size={16} strokeWidth={1.8} aria-hidden="true" />
           </button>
         </div>
       </form>
+
+      {modelError && (
+        <p className="studio-ai-panel__error" role="alert">
+          {modelError}
+        </p>
+      )}
 
       <footer className="studio-ai-panel__statusbar">
         <span>

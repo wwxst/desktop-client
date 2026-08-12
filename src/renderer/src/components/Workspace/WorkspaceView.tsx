@@ -29,6 +29,7 @@ function WorkspaceView(): JSX.Element {
   const smartEditEnabled = import.meta.env.DEV
   const aiPanelRef = useRef<PanelImperativeHandle>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [modelRefreshKey, setModelRefreshKey] = useState(0)
 
   const openSettings = (): void => {
     setSettingsOpen(true)
@@ -36,6 +37,7 @@ function WorkspaceView(): JSX.Element {
 
   const closeSettings = (): void => {
     setSettingsOpen(false)
+    setModelRefreshKey((current) => current + 1)
   }
 
   const handleSidebarItemSelect = (menu: WorkspaceMenu): void => {
@@ -105,6 +107,7 @@ function WorkspaceView(): JSX.Element {
               <NovelPromotionSidePanel />
             ) : (
               <AiPanel
+                modelRefreshKey={modelRefreshKey}
                 onCollapse={() => aiPanelRef.current?.collapse()}
                 onExpand={() => aiPanelRef.current?.expand()}
                 onOpenSettings={openSettings}

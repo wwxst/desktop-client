@@ -152,4 +152,68 @@ describe('Agent model IPC', () => {
       message: 'Model Base URL must be a valid HTTP(S) URL'
     })
   })
+
+  it('runs chat with an explicit model configuration and rejects malformed requests', async () => {
+    const services = createAgentModelServices()
+    services.registry.create({
+      kind: 'custom',
+      baseUrl: 'https://gateway.example.test/v1',
+      modelId: 'chat-model',
+      apiKey: 'secret'
+    })
+    vi.spyOn(services.gateway, 'chat').mockResolvedValue({
+      content: '',
+      toolCalls: [{ id: 'call-1', name: 'get_editor_context', arguments: {} }]
+    })
+    registerAgentIpc({ services, loadRemoteCatalog: vi.fn() })
+
+    await expect(
+      getHandler('agent:chat:run')({ sender: {} }, {
+        configId: services.registry.list()[0].id,
+        messages: [{ role: 'user', content: '读取工程' }]
+      } as never)
+    ).resolves.toMatchObject({
+      success: true,
+      assistant: {
+        toolCalls: [{ id: 'call-1', name: 'get_editor_context', arguments: {} }]
+      }
+    })
+    await expect(
+      getHandler('agent:chat:run')({ sender: {} }, {
+        configId: '',
+        messages: []
+      } as never)
+    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
+    await expect(
+      getHandler('agent:chat:run')({ sender: {} }, {
+        configId: services.registry.list()[0].id,
+        messages: [
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                id: 'call-2',
+                name: 'split_selected_clip',
+                arguments: { command: 'arbitrary' }
+              }
+            ]
+          }
+        ]
+      } as never)
+    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
+    await expect(
+      getHandler('agent:chat:run')({ sender: {} }, {
+        configId: services.registry.list()[0].id,
+        messages: [
+          {
+            role: 'assistant',
+            content: '',
+            executable: 'arbitrary',
+            toolCalls: [{ id: 'call-3', name: 'get_editor_context', arguments: {} }]
+          }
+        ]
+      } as never)
+    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
+  })
 })

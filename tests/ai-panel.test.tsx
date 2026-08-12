@@ -67,6 +67,161 @@ describe('AiPanel', () => {
     expect(screen.getByRole('button', { name: '发送' })).toBeDisabled()
   })
 
+  it('loads model configurations and renders the assistant response', async () => {
+    const user = userEvent.setup()
+    const runAgentChat = vi.fn().mockResolvedValue({
+      success: true,
+      message: '对话完成',
+      assistant: { content: '我已读取当前工程。', toolCalls: [] }
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: [
+            {
+              id: 'config-1',
+              kind: 'provider',
+              providerId: 'openai',
+              providerName: 'OpenAI',
+              modelId: 'gpt-5.6-terra',
+              modelName: 'GPT-5.6 Terra'
+            }
+          ]
+        }),
+        runAgentChat
+      }
+    })
+    render(<AiPanel />)
+
+    expect(
+      await screen.findByRole('option', { name: 'OpenAI / GPT-5.6 Terra' })
+    ).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: '模型' }), 'config-1')
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '看看当前工程')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(runAgentChat).toHaveBeenCalledWith({
+      configId: 'config-1',
+      messages: [{ role: 'user', content: '看看当前工程' }]
+    })
+    expect(await screen.findByText('我已读取当前工程。')).toBeInTheDocument()
+  })
+
+  it('returns tool results to the model before rendering the final response', async () => {
+    const user = userEvent.setup()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: {
+          content: '',
+          toolCalls: [{ id: 'call-1', name: 'get_editor_context', arguments: {} }]
+        }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '当前没有打开剪辑工程。', toolCalls: [] }
+      })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: [{ id: 'config-1', kind: 'custom', modelId: 'chat-model' }]
+        }),
+        runAgentChat
+      }
+    })
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'chat-model' })
+    await user.selectOptions(screen.getByRole('combobox', { name: '模型' }), 'config-1')
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '读取工程')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText('当前没有打开剪辑工程。')).toBeInTheDocument()
+    expect(runAgentChat).toHaveBeenCalledTimes(2)
+    expect(runAgentChat.mock.calls[1][0].messages).toEqual([
+      { role: 'user', content: '读取工程' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'call-1', name: 'get_editor_context', arguments: {} }]
+      },
+      {
+        role: 'tool',
+        name: 'get_editor_context',
+        toolCallId: 'call-1',
+        content: JSON.stringify({ success: false, message: '当前没有打开剪辑工程' })
+      }
+    ])
+  })
+
+  it('keeps structured tool history when the user sends a follow-up message', async () => {
+    const user = userEvent.setup()
+    const toolCall = { id: 'call-1', name: 'get_editor_context', arguments: {} } as const
+    const toolResult = JSON.stringify({ success: false, message: '当前没有打开剪辑工程' })
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '', toolCalls: [toolCall] }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '当前没有打开剪辑工程。', toolCalls: [] }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '请先打开一个剪辑工程。', toolCalls: [] }
+      })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        listAgentModelConfigurations: vi.fn().mockResolvedValue({
+          success: true,
+          message: '模型配置加载成功',
+          configurations: [{ id: 'config-1', kind: 'custom', modelId: 'chat-model' }]
+        }),
+        runAgentChat
+      }
+    })
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'chat-model' })
+    await user.selectOptions(screen.getByRole('combobox', { name: '模型' }), 'config-1')
+    const composer = screen.getByRole('textbox', { name: '描述要构建的内容' })
+    await user.type(composer, '读取工程')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+    await screen.findByText('当前没有打开剪辑工程。')
+
+    await user.type(composer, '那我应该怎么办？')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText('请先打开一个剪辑工程。')).toBeInTheDocument()
+    expect(runAgentChat.mock.calls[2][0].messages).toEqual([
+      { role: 'user', content: '读取工程' },
+      { role: 'assistant', content: '', toolCalls: [toolCall] },
+      {
+        role: 'tool',
+        name: 'get_editor_context',
+        toolCallId: 'call-1',
+        content: toolResult
+      },
+      { role: 'assistant', content: '当前没有打开剪辑工程。', toolCalls: [] },
+      { role: 'user', content: '那我应该怎么办？' }
+    ])
+  })
+
   it('opens the global settings page from the settings button', async () => {
     const user = userEvent.setup()
     const onOpenSettings = vi.fn()

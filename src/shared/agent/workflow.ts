@@ -90,6 +90,31 @@ export interface AgentModelMutationResponse extends AgentActionResponse {
   configuration?: AgentModelRegistryItem
 }
 
+export interface AgentToolCall {
+  id: string
+  name: 'get_editor_context' | 'delete_selected_clips' | 'split_selected_clip'
+  arguments: Record<string, unknown>
+}
+
+export type AgentChatMessage =
+  | { role: 'user'; content: string }
+  | { role: 'assistant'; content: string; toolCalls?: AgentToolCall[] }
+  | { role: 'tool'; content: string; toolCallId: string; name: AgentToolCall['name'] }
+
+export interface AgentChatRequest {
+  configId: string
+  messages: AgentChatMessage[]
+}
+
+export interface AgentChatAssistantMessage {
+  content: string
+  toolCalls: AgentToolCall[]
+}
+
+export interface AgentChatResponse extends AgentActionResponse {
+  assistant?: AgentChatAssistantMessage
+}
+
 export type AgentModelMode = 'required' | 'prefer' | 'disabled'
 
 export interface NovelTtsOptions {

@@ -36,6 +36,10 @@ describe('Agent model preload methods', () => {
     await window.api.createAgentModelConfiguration(createRequest)
     await window.api.updateAgentModelConfiguration(updateRequest)
     await window.api.deleteAgentModelConfiguration('config-1')
+    await window.api.runAgentChat({
+      configId: 'config-1',
+      messages: [{ role: 'user', content: '你好' }]
+    })
 
     expect(electronMocks.invoke).toHaveBeenNthCalledWith(1, 'agent:model-catalog:list')
     expect(electronMocks.invoke).toHaveBeenNthCalledWith(2, 'agent:model-config:list')
@@ -50,5 +54,9 @@ describe('Agent model preload methods', () => {
       updateRequest
     )
     expect(electronMocks.invoke).toHaveBeenNthCalledWith(5, 'agent:model-config:delete', 'config-1')
+    expect(electronMocks.invoke).toHaveBeenNthCalledWith(6, 'agent:chat:run', {
+      configId: 'config-1',
+      messages: [{ role: 'user', content: '你好' }]
+    })
   })
 })

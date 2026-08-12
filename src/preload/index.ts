@@ -13,6 +13,8 @@ import type {
 } from '../shared/tts'
 import type {
   AgentActionResponse,
+  AgentChatRequest,
+  AgentChatResponse,
   AgentModelCatalogResponse,
   AgentModelCreateRequest,
   AgentModelMutationResponse,
@@ -124,6 +126,10 @@ const api = {
   },
   deleteAgentModelConfiguration: (configId: string): Promise<AgentModelMutationResponse> => {
     return ipcRenderer.invoke('agent:model-config:delete', configId)
+  },
+  /** 使用显式选择的模型配置运行一轮 AI 对话。 */
+  runAgentChat: (request: AgentChatRequest): Promise<AgentChatResponse> => {
+    return ipcRenderer.invoke('agent:chat:run', request)
   },
   /** 启动“解压类小说推文”多 Agent 工作流。 */
   runNovelDecompression: (
