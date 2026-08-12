@@ -242,6 +242,10 @@ describe('SettingsView model management', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('大模型 API Key 不能为空')
     expect(within(dialog).getByRole('combobox', { name: '大模型厂商' })).toHaveValue('openai')
     expect(within(dialog).getByRole('combobox', { name: '模型' })).toHaveValue('gpt-4o-mini')
+
+    await user.click(within(dialog).getByRole('button', { name: '关闭' }))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('does not refill API keys when editing and keeps the old key when left blank', async () => {

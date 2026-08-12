@@ -87,7 +87,8 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
   const [catalogLoading, setCatalogLoading] = useState(agentApi !== null)
   const [configurationsLoading, setConfigurationsLoading] = useState(agentApi !== null)
   const [fallbackNotice, setFallbackNotice] = useState('')
-  const [errorMessage, setErrorMessage] = useState(agentApi ? '' : 'AI 模型管理接口不可用')
+  const [pageErrorMessage, setPageErrorMessage] = useState(agentApi ? '' : 'AI 模型管理接口不可用')
+  const [editorErrorMessage, setEditorErrorMessage] = useState('')
   const [searchValue, setSearchValue] = useState('')
   const [editorOpen, setEditorOpen] = useState(false)
   const [editor, setEditor] = useState<ModelEditorState>(initialEditorState)
@@ -107,7 +108,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
         if (!active) return
         if (!response.success || !response.catalog?.providers.length) {
           setCatalog(null)
-          setErrorMessage(response.message || '模型目录不可用')
+          setPageErrorMessage(response.message || '模型目录不可用')
           return
         }
         setCatalog(response.catalog)
@@ -116,7 +117,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
       .catch((error: unknown) => {
         if (!active) return
         setCatalog(null)
-        setErrorMessage(error instanceof Error ? error.message : '模型目录不可用')
+        setPageErrorMessage(error instanceof Error ? error.message : '模型目录不可用')
       })
       .finally(() => {
         if (active) setCatalogLoading(false)
@@ -127,14 +128,14 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
       .then((response) => {
         if (!active) return
         if (!response.success) {
-          setErrorMessage(response.message)
+          setPageErrorMessage(response.message)
           return
         }
         setConfigurations(response.configurations)
       })
       .catch((error: unknown) => {
         if (active) {
-          setErrorMessage(error instanceof Error ? error.message : '模型配置加载失败')
+          setPageErrorMessage(error instanceof Error ? error.message : '模型配置加载失败')
         }
       })
       .finally(() => {
@@ -160,7 +161,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
       providerId: firstProvider?.id ?? '',
       modelId: firstProvider?.recommendedModelId ?? ''
     })
-    setErrorMessage('')
+    setEditorErrorMessage('')
     setEditorOpen(true)
   }
 
@@ -174,7 +175,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
       baseUrl: item.baseUrl ?? '',
       apiKey: ''
     })
-    setErrorMessage('')
+    setEditorErrorMessage('')
     setEditorOpen(true)
   }
 
@@ -182,6 +183,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
     if (saving) return
     setEditorOpen(false)
     setEditor(initialEditorState())
+    setEditorErrorMessage('')
   }
 
   const changeMode = (mode: EditorMode): void => {
@@ -194,7 +196,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
       baseUrl: '',
       apiKey: ''
     }))
-    setErrorMessage('')
+    setEditorErrorMessage('')
   }
 
   const handleProviderChange = (nextProviderId: string): void => {
@@ -226,7 +228,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
             apiKey: editor.apiKey
           }
     setSaving(true)
-    setErrorMessage('')
+    setEditorErrorMessage('')
 
     try {
       const response = editor.editingId
@@ -237,7 +239,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
         : await agentApi.createAgentModelConfiguration(fields as AgentModelCreateRequest)
 
       if (!response.success) {
-        setErrorMessage(response.message)
+        setEditorErrorMessage(response.message)
         return
       }
 
@@ -253,7 +255,7 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
       setEditorOpen(false)
       setEditor(initialEditorState())
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : '模型配置保存失败')
+      setEditorErrorMessage(error instanceof Error ? error.message : '模型配置保存失败')
     } finally {
       setSaving(false)
     }
@@ -262,18 +264,18 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
   const handleDelete = async (item: AgentModelRegistryItem): Promise<void> => {
     if (!agentApi || deletingId) return
     setDeletingId(item.id)
-    setErrorMessage('')
+    setPageErrorMessage('')
     try {
       const response = await agentApi.deleteAgentModelConfiguration(item.id)
       if (!response.success) {
-        setErrorMessage(response.message)
+        setPageErrorMessage(response.message)
         return
       }
       setConfigurations((current) =>
         current.filter((configuration) => configuration.id !== item.id)
       )
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : '模型配置删除失败')
+      setPageErrorMessage(error instanceof Error ? error.message : '模型配置删除失败')
     } finally {
       setDeletingId(null)
     }
@@ -335,9 +337,9 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
               {fallbackNotice}
             </p>
           )}
-          {errorMessage && !editorOpen && (
+          {pageErrorMessage && !editorOpen && (
             <p className="studio-settings__error" role="alert">
-              {errorMessage}
+              {pageErrorMessage}
             </p>
           )}
 
@@ -530,9 +532,9 @@ function SettingsView({ onBack }: SettingsViewProps): JSX.Element {
                 </>
               )}
 
-              {errorMessage && (
+              {(editorErrorMessage || pageErrorMessage) && (
                 <p className="studio-settings__error" role="alert">
-                  {errorMessage}
+                  {editorErrorMessage || pageErrorMessage}
                 </p>
               )}
 
