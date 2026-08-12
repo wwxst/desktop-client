@@ -81,7 +81,7 @@ App
 
 ## 当前非目标
 
-- 编辑器草稿尚未写入磁盘或数据库。
+- 编辑器草稿尚未写入磁盘或数据库；未来项目/草稿持久化边界记录在 [`superpowers/specs/2026-08-12-project-persistence-boundary.md`](../superpowers/specs/2026-08-12-project-persistence-boundary.md)，该文档为计划，不代表功能已实现。
 - 全局素材索引尚未与编辑器项目素材、时间线引用和使用次数打通；当前编辑器项目状态仍是工作区生命周期内临时状态。
 - 编辑器尚未通过 Main/Preload 提供“显示项目文件夹内容”或“从项目移除文件”的 IPC。
 - 完整 Ripple Insert/Ripple Trim、音频波形、字幕、关键帧和复杂转场不属于当前已实现边界。
