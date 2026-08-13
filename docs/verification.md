@@ -2,7 +2,7 @@
 
 > 状态：当前验证口径
 > 适用范围：提交前的 Electron/React Renderer 改动
-> 最近验证：`0a1a967` + 当前 AI 聊天布局及模型持久化改动 / 2026-08-12
+> 最近验证：`a828271` + 当前 AI 对话模型偏好改动 / 2026-08-13
 
 ## 必跑命令
 
@@ -21,13 +21,13 @@ npm run lint
 
 ## 最近基线
 
-在 `0a1a967` 加当前 AI 聊天布局及模型持久化改动上：
+在 `a828271` 加当前 AI 对话模型偏好改动上：
 
-- `npm test -- --reporter=dot`：53/53 测试文件、266/266 测试通过；jsdom 仍输出 4 条 `HTMLMediaElement.load()` 未实现提示，不影响退出码。模型目录回退测试会记录 1 条预期的 Main warning，不影响退出码。
+- `npm test -- --reporter=dot`：54/54 测试文件、275/275 测试通过；jsdom 仍输出 4 条 `HTMLMediaElement.load()` 未实现提示，不影响退出码。模型目录回退测试会记录 1 条预期的 Main warning，不影响退出码。
 - `npm run typecheck`：通过。
 - `npm run build`：通过。
 - `git diff --check`：通过。
-- `npm run lint`：通过，0 个 error、878 个 Prettier warning。此前 5 个 `react-hooks/set-state-in-effect` 源码错误已改为派生状态或带来源身份的异步结果，6 个 V2 测试辅助函数已补充显式返回类型。
+- `npm run lint`：通过，0 个 error、351 个 warning，其中 350 个可由 `--fix` 自动修复。此前 5 个 `react-hooks/set-state-in-effect` 源码错误已改为派生状态或带来源身份的异步结果，6 个 V2 测试辅助函数已补充显式返回类型。
 
 Lint 现在是提交门禁。ESLint 只检查当前工作区的项目文件，不扫描 Git 已忽略的 `.worktrees/`、`.tts-v2-backup/` 和 `.superpowers/` 目录。
 
