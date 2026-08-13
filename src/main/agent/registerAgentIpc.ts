@@ -1,10 +1,9 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
 import { join } from 'node:path'
+import { isAgentChatRequest } from '../../shared/agent/chatContract'
 import type {
-  AgentChatMessage,
   AgentChatRequest,
   AgentChatResponse,
-  AgentToolCall,
   AgentModelCatalogResponse,
   AgentModelCreateRequest,
   AgentModelMutationResponse,
@@ -124,73 +123,6 @@ async function loadRemoteCatalog(): Promise<unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function isChatMessage(value: unknown): value is AgentChatMessage {
-  if (!isRecord(value) || typeof value.content !== 'string' || value.content.length > 20_000) {
-    return false
-  }
-  if (value.role === 'user')
-    return Object.keys(value).every((key) => ['role', 'content'].includes(key))
-  if (value.role === 'assistant') {
-    return (
-      Object.keys(value).every((key) => ['role', 'content', 'toolCalls'].includes(key)) &&
-      (value.toolCalls === undefined ||
-        (Array.isArray(value.toolCalls) &&
-          value.toolCalls.length <= 12 &&
-          value.toolCalls.every(
-            (call) =>
-              isRecord(call) &&
-              Object.keys(call).every((key) => ['id', 'name', 'arguments'].includes(key)) &&
-              typeof call.id === 'string' &&
-              call.id.trim().length > 0 &&
-              call.id.length <= 200 &&
-              isToolName(call.name) &&
-              isToolArguments(call.name, call.arguments)
-          )))
-    )
-  }
-  return (
-    value.role === 'tool' &&
-    typeof value.toolCallId === 'string' &&
-    value.toolCallId.trim().length > 0 &&
-    value.toolCallId.length <= 200 &&
-    isToolName(value.name) &&
-    Object.keys(value).every((key) => ['role', 'content', 'toolCallId', 'name'].includes(key))
-  )
-}
-
-function isToolName(value: unknown): value is AgentToolCall['name'] {
-  return (
-    value === 'get_editor_context' ||
-    value === 'delete_selected_clips' ||
-    value === 'split_selected_clip'
-  )
-}
-
-function isToolArguments(name: AgentToolCall['name'], value: unknown): boolean {
-  if (!isRecord(value)) return false
-  const keys = Object.keys(value)
-  if (name === 'delete_selected_clips') {
-    return (
-      keys.every((key) => key === 'magnetMainTrack') &&
-      (value.magnetMainTrack === undefined || typeof value.magnetMainTrack === 'boolean')
-    )
-  }
-  return keys.length === 0
-}
-
-function isChatRequest(value: unknown): value is AgentChatRequest {
-  return (
-    isRecord(value) &&
-    typeof value.configId === 'string' &&
-    value.configId.trim().length > 0 &&
-    value.configId.length <= 200 &&
-    Array.isArray(value.messages) &&
-    value.messages.length > 0 &&
-    value.messages.length <= 60 &&
-    value.messages.every(isChatMessage)
-  )
 }
 
 function isWorkflowRequest(value: unknown): value is NovelDecompressionRequest {
@@ -314,14 +246,19 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
   ipcMain.handle(
     'agent:chat:run',
     async (_event, request: AgentChatRequest): Promise<AgentChatResponse> => {
-      if (!isChatRequest(request)) return { success: false, message: '无效的 AI 对话请求' }
+      if (!isAgentChatRequest(request)) return { success: false, message: '无效的 AI 对话请求' }
       try {
         await ready
         await mutationQueue
         return {
           success: true,
           message: '对话完成',
-          assistant: await services.gateway.chat(request.configId, request.messages)
+          assistant: await services.gateway.chat(
+            request.configId,
+            request.messages,
+            request.mode,
+            request.approvalMode
+          )
         }
       } catch (error) {
         return { success: false, message: errorMessage(error, 'AI 对话失败') }

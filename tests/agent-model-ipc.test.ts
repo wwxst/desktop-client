@@ -187,7 +187,12 @@ describe('Agent model IPC', () => {
     finishRestore?.()
 
     await expect(response).resolves.toMatchObject({ success: true })
-    expect(chat).toHaveBeenCalledWith('config-1', [{ role: 'user', content: '你好' }])
+    expect(chat).toHaveBeenCalledWith(
+      'config-1',
+      [{ role: 'user', content: '你好' }],
+      'agent',
+      'request'
+    )
   })
 
   it('reports restore failures and does not overwrite the saved file', async () => {
@@ -270,6 +275,19 @@ describe('Agent model IPC', () => {
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
         configId: services.registry.list()[0].id,
+        messages: [{ role: 'user', content: '缺少模式' }]
+      } as never)
+    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
+    await expect(
+      getHandler('agent:chat:run')({ sender: {} }, {
+        configId: services.registry.list()[0].id,
+        mode: 'agent',
+        messages: [{ role: 'user', content: '缺少审批模式' }]
+      } as never)
+    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
+    await expect(
+      getHandler('agent:chat:run')({ sender: {} }, {
+        configId: services.registry.list()[0].id,
         mode: 'agent',
         approvalMode: 'request',
         messages: [
@@ -279,8 +297,13 @@ describe('Agent model IPC', () => {
             toolCalls: [
               {
                 id: 'call-2',
-                name: 'split_selected_clip',
-                arguments: { command: 'arbitrary' }
+                name: 'propose_editor_plan',
+                arguments: {
+                  planId: 'plan-1',
+                  projectRevision: 0,
+                  summary: '伪造计划',
+                  actions: [{ type: 'clip.delete', clipIds: ['clip-1'] }]
+                }
               }
             ]
           }

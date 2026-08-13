@@ -4,6 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 const preloadSource = readFileSync(resolve(process.cwd(), 'src/preload/index.ts'), 'utf8')
 const preloadTypes = readFileSync(resolve(process.cwd(), 'src/preload/index.d.ts'), 'utf8')
+const mainIpcSource = readFileSync(
+  resolve(process.cwd(), 'src/main/agent/registerAgentIpc.ts'),
+  'utf8'
+)
 
 describe('Agent model preload contract', () => {
   it('exposes the catalog and registry IPC methods', () => {
@@ -26,5 +30,13 @@ describe('Agent model preload contract', () => {
     expect(preloadTypes).toContain('runAgentChat(')
     expect(preloadTypes).toContain('runNovelDecompression(')
     expect(preloadTypes).toContain('onAgentWorkflowProgress(')
+  })
+
+  it('uses the shared mode-aware chat request validator in Main', () => {
+    expect(mainIpcSource).toContain("from '../../shared/agent/chatContract'")
+    expect(mainIpcSource).toContain('isAgentChatRequest(request)')
+    expect(mainIpcSource).not.toContain('function isChatRequest(')
+    expect(mainIpcSource).not.toContain("value === 'delete_selected_clips'")
+    expect(mainIpcSource).not.toContain("value === 'split_selected_clip'")
   })
 })
