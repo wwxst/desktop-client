@@ -124,7 +124,7 @@ export interface AgentEditorPlan {
   actions: AgentEditorPlanAction[]
 }
 
-export type AgentToolExecutionCode =
+export type AgentToolResultCode =
   | 'OK'
   | 'AWAITING_APPROVAL'
   | 'REJECTED'
@@ -136,22 +136,18 @@ export type AgentToolExecutionCode =
 
 export interface AgentToolExecutionResult {
   success: boolean
-  code: AgentToolExecutionCode
+  code: AgentToolResultCode
   message: string
   changed: boolean
   affectedClipIds: string[]
   data?: unknown
 }
 
-export interface AgentToolCall {
-  id: string
-  name:
-    | 'get_editor_context'
-    | 'propose_editor_plan'
-    | 'delete_selected_clips'
-    | 'split_selected_clip'
-  arguments: Record<string, unknown>
-}
+export type AgentToolCall =
+  | { id: string; name: 'get_editor_context'; arguments: Record<string, never> }
+  | { id: string; name: 'propose_editor_plan'; arguments: AgentEditorPlan }
+  | { id: string; name: 'delete_selected_clips'; arguments: { magnetMainTrack?: boolean } }
+  | { id: string; name: 'split_selected_clip'; arguments: Record<string, never> }
 
 export type AgentChatMessage =
   | { role: 'user'; content: string }

@@ -4,7 +4,7 @@ import type {
   AgentEditorPlan,
   AgentEditorPlanAction,
   AgentToolCall,
-  AgentToolExecutionCode,
+  AgentToolResultCode,
   AgentToolExecutionResult
 } from './workflow'
 
@@ -91,10 +91,7 @@ function normalizeAction(value: unknown): AgentEditorPlanAction | null {
   const clipId = normalizeId(value.clipId)
   if (!clipId) return null
   if (value.type === 'clip.split') {
-    if (
-      !hasExactKeys(value, ['type', 'clipId', 'at']) ||
-      !isFiniteInRange(value.at, 0, 86_400)
-    ) {
+    if (!hasExactKeys(value, ['type', 'clipId', 'at']) || !isFiniteInRange(value.at, 0, 86_400)) {
       return null
     }
     return { type: 'clip.split', clipId, at: value.at }
@@ -129,10 +126,7 @@ function normalizeAction(value: unknown): AgentEditorPlanAction | null {
   if (patch.enabled !== undefined && typeof patch.enabled !== 'boolean') return null
   const transform = patch.transform === undefined ? undefined : normalizeTransform(patch.transform)
   if (patch.transform !== undefined && !transform) return null
-  const normalizedPatch: Extract<
-    AgentEditorPlanAction,
-    { type: 'clip.update' }
-  >['patch'] = {}
+  const normalizedPatch: Extract<AgentEditorPlanAction, { type: 'clip.update' }>['patch'] = {}
   if (patch.opacity !== undefined) normalizedPatch.opacity = patch.opacity as number
   if (patch.volume !== undefined) normalizedPatch.volume = patch.volume as number
   if (patch.muted !== undefined) normalizedPatch.muted = patch.muted as boolean
@@ -177,27 +171,26 @@ function normalizePlan(value: unknown): AgentEditorPlan | null {
   }
 }
 
-export function parseAgentToolCall(mode: AgentChatMode, value: unknown): AgentToolCall | null {
-  if (!isRecord(value) || !hasExactKeys(value, ['id', 'name', 'arguments'])) return null
+export function parseAgentToolCall(mode: AgentChatMode, value: unknown): AgentToolCall {
+  if (!isRecord(value) || !hasExactKeys(value, ['id', 'name', 'arguments'])) {
+    throw new Error('Invalid Agent tool call')
+  }
   const id = normalizeId(value.id)
-  if (!id || !isRecord(value.arguments)) return null
+  if (!id || !isRecord(value.arguments)) throw new Error('Invalid Agent tool call')
   if (value.name === 'get_editor_context') {
-    return Object.keys(value.arguments).length === 0
-      ? { id, name: 'get_editor_context', arguments: {} }
-      : null
+    if (Object.keys(value.arguments).length !== 0) throw new Error('Invalid Agent tool call')
+    return { id, name: 'get_editor_context', arguments: {} }
   }
-  if (
-    mode !== 'agent' ||
-    value.name !== 'propose_editor_plan' ||
-    !hasExactKeys(value.arguments, ['plan'])
-  ) {
-    return null
+  if (value.name !== 'propose_editor_plan') {
+    throw new Error(`Unsupported Agent tool: ${String(value.name)}`)
   }
-  const plan = normalizePlan(value.arguments.plan)
-  return plan ? { id, name: 'propose_editor_plan', arguments: { plan } } : null
+  if (mode !== 'agent') throw new Error('Editor plans are not allowed in assistant mode')
+  const plan = normalizePlan(value.arguments)
+  if (!plan) throw new Error('Invalid Agent editor plan')
+  return { id, name: 'propose_editor_plan', arguments: plan }
 }
 
-const executionCodes = new Set<AgentToolExecutionCode>([
+const executionCodes = new Set<AgentToolResultCode>([
   'OK',
   'AWAITING_APPROVAL',
   'REJECTED',
@@ -211,16 +204,12 @@ const executionCodes = new Set<AgentToolExecutionCode>([
 export function isAgentToolExecutionResult(value: unknown): value is AgentToolExecutionResult {
   if (
     !isRecord(value) ||
-    !hasExactKeys(
-      value,
-      ['success', 'code', 'message', 'changed', 'affectedClipIds'],
-      ['data']
-    )
+    !hasExactKeys(value, ['success', 'code', 'message', 'changed', 'affectedClipIds'], ['data'])
   ) {
     return false
   }
   if (typeof value.success !== 'boolean' || typeof value.changed !== 'boolean') return false
-  if (typeof value.code !== 'string' || !executionCodes.has(value.code as AgentToolExecutionCode)) {
+  if (typeof value.code !== 'string' || !executionCodes.has(value.code as AgentToolResultCode)) {
     return false
   }
   if (typeof value.message !== 'string' || value.message.length > MAX_MESSAGE_CONTENT_LENGTH) {
@@ -240,16 +229,16 @@ function isMessage(mode: AgentChatMode, value: unknown): boolean {
   if (value.role === 'user') return hasExactKeys(value, ['role', 'content'])
   if (value.role === 'assistant') {
     if (!hasExactKeys(value, ['role', 'content'], ['toolCalls'])) return false
-    return (
-      value.toolCalls === undefined ||
-      (Array.isArray(value.toolCalls) &&
-        value.toolCalls.every((call) => parseAgentToolCall(mode, call) !== null))
-    )
+    if (value.toolCalls === undefined) return true
+    if (!Array.isArray(value.toolCalls)) return false
+    try {
+      value.toolCalls.forEach((call) => parseAgentToolCall(mode, call))
+      return true
+    } catch {
+      return false
+    }
   }
-  if (
-    value.role !== 'tool' ||
-    !hasExactKeys(value, ['role', 'content', 'toolCallId', 'name'])
-  ) {
+  if (value.role !== 'tool' || !hasExactKeys(value, ['role', 'content', 'toolCallId', 'name'])) {
     return false
   }
   if (
@@ -267,10 +256,7 @@ function isMessage(mode: AgentChatMode, value: unknown): boolean {
 }
 
 export function isAgentChatRequest(value: unknown): value is AgentChatRequest {
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(value, ['configId', 'mode', 'approvalMode', 'messages'])
-  ) {
+  if (!isRecord(value) || !hasExactKeys(value, ['configId', 'mode', 'approvalMode', 'messages'])) {
     return false
   }
   if (!normalizeId(value.configId) || (value.mode !== 'agent' && value.mode !== 'assistant')) {
@@ -295,8 +281,13 @@ export function isAgentChatRequest(value: unknown): value is AgentChatRequest {
     if (!isMessage(value.mode as AgentChatMode, message)) return false
     if (isRecord(message) && message.role === 'assistant' && Array.isArray(message.toolCalls)) {
       for (const call of message.toolCalls) {
-        const parsed = parseAgentToolCall(value.mode as AgentChatMode, call)
-        if (!parsed || pendingCalls.has(parsed.id)) return false
+        let parsed: AgentToolCall
+        try {
+          parsed = parseAgentToolCall(value.mode as AgentChatMode, call)
+        } catch {
+          return false
+        }
+        if (pendingCalls.has(parsed.id)) return false
         pendingCalls.set(parsed.id, parsed.name)
       }
     }

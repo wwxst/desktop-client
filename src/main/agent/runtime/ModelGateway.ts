@@ -118,7 +118,20 @@ function parseToolCalls(
             typeof argumentsRecord.magnetMainTrack === 'boolean')
         : keys.length === 0
     if (!valid) throw new Error(`工具 ${name} 的参数无效`)
-    calls.push({ id, name, arguments: argumentsRecord })
+    if (name === 'delete_selected_clips') {
+      calls.push({
+        id,
+        name,
+        arguments:
+          argumentsRecord.magnetMainTrack === undefined
+            ? {}
+            : { magnetMainTrack: argumentsRecord.magnetMainTrack as boolean }
+      })
+    } else if (name === 'get_editor_context') {
+      calls.push({ id, name, arguments: {} })
+    } else if (name === 'split_selected_clip') {
+      calls.push({ id, name, arguments: {} })
+    }
   }
   return calls
 }

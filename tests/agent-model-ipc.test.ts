@@ -179,6 +179,8 @@ describe('Agent model IPC', () => {
 
     const response = getHandler('agent:chat:run')({ sender: {} }, {
       configId: 'config-1',
+      mode: 'agent',
+      approvalMode: 'request',
       messages: [{ role: 'user', content: '你好' }]
     } as never)
     expect(chat).not.toHaveBeenCalled()
