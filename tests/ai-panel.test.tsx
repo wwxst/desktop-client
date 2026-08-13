@@ -169,6 +169,8 @@ describe('AiPanel', () => {
 
     expect(runAgentChat).toHaveBeenCalledWith({
       configId: 'config-1',
+      mode: 'agent',
+      approvalMode: 'request',
       messages: [{ role: 'user', content: '看看当前工程' }]
     })
     expect(await screen.findByText('我已读取当前工程。')).toBeInTheDocument()

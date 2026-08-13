@@ -38,6 +38,8 @@ describe('Agent model preload methods', () => {
     await window.api.deleteAgentModelConfiguration('config-1')
     await window.api.runAgentChat({
       configId: 'config-1',
+      mode: 'agent',
+      approvalMode: 'request',
       messages: [{ role: 'user', content: '你好' }]
     })
 
@@ -56,6 +58,8 @@ describe('Agent model preload methods', () => {
     expect(electronMocks.invoke).toHaveBeenNthCalledWith(5, 'agent:model-config:delete', 'config-1')
     expect(electronMocks.invoke).toHaveBeenNthCalledWith(6, 'agent:chat:run', {
       configId: 'config-1',
+      mode: 'agent',
+      approvalMode: 'request',
       messages: [{ role: 'user', content: '你好' }]
     })
   })

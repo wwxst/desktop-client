@@ -90,9 +90,66 @@ export interface AgentModelMutationResponse extends AgentActionResponse {
   configuration?: AgentModelRegistryItem
 }
 
+export type AgentChatMode = 'agent' | 'assistant'
+
+export type AgentApprovalMode = 'request' | 'smart' | 'full'
+
+export type AgentEditorPlanAction =
+  | { type: 'clip.delete'; clipIds: string[]; magnetMainTrack?: boolean }
+  | { type: 'clip.split'; clipId: string; at: number }
+  | { type: 'clip.move'; clipId: string; timelineStart: number; trackId?: string }
+  | {
+      type: 'clip.update'
+      clipId: string
+      patch: {
+        opacity?: number
+        volume?: number
+        muted?: boolean
+        speed?: number
+        enabled?: boolean
+        transform?: {
+          x?: number
+          y?: number
+          scaleX?: number
+          scaleY?: number
+          rotation?: number
+        }
+      }
+    }
+
+export interface AgentEditorPlan {
+  planId: string
+  projectRevision: number
+  summary: string
+  actions: AgentEditorPlanAction[]
+}
+
+export type AgentToolExecutionCode =
+  | 'OK'
+  | 'AWAITING_APPROVAL'
+  | 'REJECTED'
+  | 'STALE_CONTEXT'
+  | 'INVALID_PLAN'
+  | 'UNSUPPORTED_ACTION'
+  | 'EDITOR_UNAVAILABLE'
+  | 'EXECUTION_FAILED'
+
+export interface AgentToolExecutionResult {
+  success: boolean
+  code: AgentToolExecutionCode
+  message: string
+  changed: boolean
+  affectedClipIds: string[]
+  data?: unknown
+}
+
 export interface AgentToolCall {
   id: string
-  name: 'get_editor_context' | 'delete_selected_clips' | 'split_selected_clip'
+  name:
+    | 'get_editor_context'
+    | 'propose_editor_plan'
+    | 'delete_selected_clips'
+    | 'split_selected_clip'
   arguments: Record<string, unknown>
 }
 
@@ -103,6 +160,8 @@ export type AgentChatMessage =
 
 export interface AgentChatRequest {
   configId: string
+  mode: AgentChatMode
+  approvalMode: AgentApprovalMode
   messages: AgentChatMessage[]
 }
 

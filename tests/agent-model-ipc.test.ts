@@ -247,6 +247,8 @@ describe('Agent model IPC', () => {
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
         configId: services.registry.list()[0].id,
+        mode: 'agent',
+        approvalMode: 'request',
         messages: [{ role: 'user', content: '读取工程' }]
       } as never)
     ).resolves.toMatchObject({
@@ -258,12 +260,16 @@ describe('Agent model IPC', () => {
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
         configId: '',
+        mode: 'agent',
+        approvalMode: 'request',
         messages: []
       } as never)
     ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
         configId: services.registry.list()[0].id,
+        mode: 'agent',
+        approvalMode: 'request',
         messages: [
           {
             role: 'assistant',
@@ -282,6 +288,8 @@ describe('Agent model IPC', () => {
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
         configId: services.registry.list()[0].id,
+        mode: 'agent',
+        approvalMode: 'request',
         messages: [
           {
             role: 'assistant',

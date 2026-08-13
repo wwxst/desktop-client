@@ -222,7 +222,12 @@ function AiPanel({
     let conversation = history
     try {
       for (let turn = 0; turn < 6; turn += 1) {
-        const response = await chatApi({ configId: selectedConfigId, messages: conversation })
+        const response = await chatApi({
+          configId: selectedConfigId,
+          mode: 'agent',
+          approvalMode: 'request',
+          messages: conversation
+        })
         if (!response.success || !response.assistant) {
           throw new Error(response.message || 'AI 对话失败')
         }
