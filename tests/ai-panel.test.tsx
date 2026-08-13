@@ -1,9 +1,24 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AiPanel from '../src/renderer/src/components/AiPanel/AiPanel'
+import { LAST_USED_AGENT_MODEL_CONFIG_KEY } from '../src/renderer/src/components/AiPanel/aiPanelModelPreference'
+import type { AgentModelRegistryItem } from '../src/shared/agent/workflow'
+
+function setAgentModels(configurations: AgentModelRegistryItem[]): void {
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      listAgentModelConfigurations: vi.fn().mockResolvedValue({
+        success: true,
+        message: '模型配置加载成功',
+        configurations
+      })
+    }
+  })
+}
 
 function readAiPanelCss(): string {
   return readFileSync(
@@ -20,6 +35,10 @@ function getCssBlock(css: string, selector: string): string {
 }
 
 describe('AiPanel', () => {
+  beforeEach(() => {
+    window.localStorage.removeItem(LAST_USED_AGENT_MODEL_CONFIG_KEY)
+  })
+
   it('renders the chat shell and switches to Codex mode', async () => {
     const user = userEvent.setup()
     render(<AiPanel />)
@@ -153,6 +172,57 @@ describe('AiPanel', () => {
       messages: [{ role: 'user', content: '看看当前工程' }]
     })
     expect(await screen.findByText('我已读取当前工程。')).toBeInTheDocument()
+  })
+
+  it('selects the only configured model by default', async () => {
+    setAgentModels([{ id: 'config-1', kind: 'custom', modelId: 'chat-model' }])
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'chat-model' })
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '模型' })).toHaveValue('config-1')
+    })
+    expect(window.localStorage.getItem(LAST_USED_AGENT_MODEL_CONFIG_KEY)).toBe('config-1')
+  })
+
+  it('restores the model selected during the previous mount', async () => {
+    const user = userEvent.setup()
+    setAgentModels([
+      { id: 'config-1', kind: 'custom', modelId: 'first-model' },
+      { id: 'config-2', kind: 'custom', modelId: 'second-model' }
+    ])
+    const firstMount = render(<AiPanel />)
+    await screen.findByRole('option', { name: 'second-model' })
+    await user.selectOptions(screen.getByRole('combobox', { name: '模型' }), 'config-2')
+    firstMount.unmount()
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'second-model' })
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '模型' })).toHaveValue('config-2')
+    })
+  })
+
+  it('replaces a deleted stored model with the first available model', async () => {
+    window.localStorage.setItem(LAST_USED_AGENT_MODEL_CONFIG_KEY, 'deleted-config')
+    setAgentModels([{ id: 'config-1', kind: 'custom', modelId: 'first-model' }])
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'first-model' })
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '模型' })).toHaveValue('config-1')
+    })
+    expect(window.localStorage.getItem(LAST_USED_AGENT_MODEL_CONFIG_KEY)).toBe('config-1')
+  })
+
+  it('clears a deleted stored model when no models remain', async () => {
+    window.localStorage.setItem(LAST_USED_AGENT_MODEL_CONFIG_KEY, 'deleted-config')
+    setAgentModels([])
+    render(<AiPanel />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('请先在设置中添加模型')
+    expect(screen.getByRole('combobox', { name: '模型' })).toHaveValue('')
+    expect(window.localStorage.getItem(LAST_USED_AGENT_MODEL_CONFIG_KEY)).toBeNull()
   })
 
   it('returns tool results to the model before rendering the final response', async () => {
