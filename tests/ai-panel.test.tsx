@@ -279,7 +279,13 @@ describe('AiPanel', () => {
         role: 'tool',
         name: 'get_editor_context',
         toolCallId: 'call-1',
-        content: JSON.stringify({ success: false, message: '当前没有打开剪辑工程' })
+        content: JSON.stringify({
+          success: false,
+          code: 'EDITOR_UNAVAILABLE',
+          message: '当前没有打开剪辑工程',
+          changed: false,
+          affectedClipIds: []
+        })
       }
     ])
   })
@@ -287,7 +293,13 @@ describe('AiPanel', () => {
   it('keeps structured tool history when the user sends a follow-up message', async () => {
     const user = userEvent.setup()
     const toolCall = { id: 'call-1', name: 'get_editor_context', arguments: {} } as const
-    const toolResult = JSON.stringify({ success: false, message: '当前没有打开剪辑工程' })
+    const toolResult = JSON.stringify({
+      success: false,
+      code: 'EDITOR_UNAVAILABLE',
+      message: '当前没有打开剪辑工程',
+      changed: false,
+      affectedClipIds: []
+    })
     const runAgentChat = vi
       .fn()
       .mockResolvedValueOnce({

@@ -81,11 +81,11 @@ describe('parseAgentToolCall', () => {
   })
 
   it.each([
-    [
-      'legacy tool',
-      { id: 'call', name: 'delete_selected_clips', arguments: {} },
+    ...['delete_selected_clips', 'split_selected_clip'].map((name) => [
+      `legacy tool ${name}`,
+      { id: 'call', name, arguments: {} },
       'Unsupported Agent tool'
-    ],
+    ]),
     ['unknown tool', { id: 'call', name: 'unknown', arguments: {} }, 'Unsupported Agent tool'],
     [
       'unknown call key',

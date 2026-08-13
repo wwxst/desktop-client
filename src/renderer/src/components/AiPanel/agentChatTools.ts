@@ -1,28 +1,33 @@
-import type { AgentToolCall } from '../../../../shared/agent/workflow'
+import type { AgentToolCall, AgentToolExecutionResult } from '../../../../shared/agent/workflow'
 import type { EditorAgentApi } from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
 import {
   getProjectDuration,
   resolveTimelineClip
 } from '../SmartEdit/VideoEditorWorkspace/editorProject'
 
-export interface AgentToolExecutionResult {
-  success: boolean
-  message: string
-  data?: unknown
-}
-
 export function executeAgentToolCall(
   call: AgentToolCall,
   editorApi: EditorAgentApi | null
 ): AgentToolExecutionResult {
-  if (!editorApi) return { success: false, message: '当前没有打开剪辑工程' }
+  if (!editorApi) {
+    return {
+      success: false,
+      code: 'EDITOR_UNAVAILABLE',
+      message: '当前没有打开剪辑工程',
+      changed: false,
+      affectedClipIds: []
+    }
+  }
 
   if (call.name === 'get_editor_context') {
     const project = editorApi.getProjectSnapshot()
     const selectedIds = new Set(editorApi.getSelection())
     return {
       success: true,
+      code: 'OK',
       message: '已读取当前剪辑工程',
+      changed: false,
+      affectedClipIds: [],
       data: {
         aspectRatio: project.aspectRatio,
         duration: getProjectDuration(project),
@@ -47,35 +52,11 @@ export function executeAgentToolCall(
     }
   }
 
-  const selection = editorApi.getSelection()
-  if (call.name === 'delete_selected_clips') {
-    if (selection.length === 0) return { success: false, message: '请先在时间线中选择要删除的片段' }
-    const result = editorApi.deleteClips?.(selection, {
-      magnetMainTrack: call.arguments.magnetMainTrack === true
-    })
-    if (!result) return { success: false, message: '当前编辑器不支持删除工具' }
-    return {
-      success: result.success && result.changed,
-      message:
-        result.success && result.changed
-          ? `已删除 ${selection.length} 个片段`
-          : (result.message ?? '删除片段失败')
-    }
-  }
-
-  if (call.name !== 'split_selected_clip') {
-    return { success: false, message: '不支持的 AI 工具' }
-  }
-  if (selection.length !== 1) {
-    return { success: false, message: '请先在时间线中只选择一个要分割的片段' }
-  }
-  const result = editorApi.splitClip?.(selection[0], editorApi.getPlayhead())
-  if (!result) return { success: false, message: '当前编辑器不支持分割工具' }
   return {
-    success: result.success && result.changed,
-    message:
-      result.success && result.changed
-        ? '已在播放头位置分割所选片段'
-        : (result.message ?? '分割片段失败')
+    success: false,
+    code: 'AWAITING_APPROVAL',
+    message: `已生成编辑计划，等待审批：${call.arguments.summary}`,
+    changed: false,
+    affectedClipIds: []
   }
 }

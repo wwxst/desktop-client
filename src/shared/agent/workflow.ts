@@ -146,8 +146,6 @@ export interface AgentToolExecutionResult {
 export type AgentToolCall =
   | { id: string; name: 'get_editor_context'; arguments: Record<string, never> }
   | { id: string; name: 'propose_editor_plan'; arguments: AgentEditorPlan }
-  | { id: string; name: 'delete_selected_clips'; arguments: { magnetMainTrack?: boolean } }
-  | { id: string; name: 'split_selected_clip'; arguments: Record<string, never> }
 
 export type AgentChatMessage =
   | { role: 'user'; content: string }

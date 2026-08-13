@@ -64,8 +64,7 @@ const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
 
 const TOOL_LABELS: Record<string, string> = {
   get_editor_context: '读取工程',
-  delete_selected_clips: '删除所选片段',
-  split_selected_clip: '分割所选片段'
+  propose_editor_plan: '编辑计划'
 }
 
 function formatMessageTime(date = new Date()): string {

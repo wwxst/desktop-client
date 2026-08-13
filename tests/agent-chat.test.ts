@@ -82,6 +82,31 @@ describe('Agent chat model gateway', () => {
         actions: { minItems: 1, maxItems: 20, items: { oneOf: expect.any(Array) } }
       }
     })
+    const actionBranches = body.tools[1].function.parameters.properties?.actions as {
+      items: { oneOf: Array<Record<string, unknown>> }
+    }
+    expect(actionBranches.items.oneOf).toHaveLength(4)
+    expect(actionBranches.items.oneOf.map((branch) => branch.properties?.type)).toEqual([
+      { const: 'clip.delete' },
+      { const: 'clip.split' },
+      { const: 'clip.move' },
+      { const: 'clip.update' }
+    ])
+    expect(actionBranches.items.oneOf.map((branch) => branch.additionalProperties)).toEqual([
+      false,
+      false,
+      false,
+      false
+    ])
+    const update = actionBranches.items.oneOf[3]
+    expect(update.properties?.patch).toMatchObject({
+      type: 'object',
+      additionalProperties: false
+    })
+    expect(
+      (update.properties?.patch as { properties?: { transform?: Record<string, unknown> } })
+        .properties?.transform
+    ).toMatchObject({ type: 'object', additionalProperties: false })
   })
 
   it('parses a valid structured editor plan', async () => {
@@ -175,20 +200,23 @@ describe('Agent chat model gateway', () => {
     await expect(run()).rejects.toThrow('Invalid Agent editor plan')
   })
 
-  it('rejects legacy direct-edit tool calls', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: { name: 'delete_selected_clips', arguments: '{}' }
-        }
-      ]
-    })
+  it.each(['delete_selected_clips', 'split_selected_clip'])(
+    'rejects legacy direct-edit tool call %s',
+    async (name) => {
+      const { run } = createGatewayReturning({
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name, arguments: '{}' }
+          }
+        ]
+      })
 
-    await expect(run()).rejects.toThrow('Unsupported Agent tool: delete_selected_clips')
-  })
+      await expect(run()).rejects.toThrow(`Unsupported Agent tool: ${name}`)
+    }
+  )
 
   it('rejects malformed JSON tool arguments', async () => {
     const { run } = createGatewayReturning({

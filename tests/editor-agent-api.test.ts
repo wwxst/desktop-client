@@ -85,23 +85,15 @@ describe('EditorAgentApi execution results', () => {
     expect(batch.results.map((result) => result.code)).toEqual(['OK', 'NO_CHANGE'])
   })
 
-  it('executes chat tools through EditorService capabilities', () => {
-    const deleteClips = vi.fn().mockReturnValue({
-      success: true,
-      changed: true,
-      code: 'OK',
-      message: '删除片段',
-      state: createProject(),
-      results: []
-    })
+  it('returns a structured pending result for editor plans before the executor exists', () => {
+    const executeTransaction = vi.fn()
     const api = createEditorAgentApi({
       getProject: createProject,
       getSelection: () => ['clip-1'],
       getPlayhead: () => 3,
       execute: (command) => applyEditorCommand(createProject(), command),
       executeBatch: (commands) => applyEditorCommandsWithResult(createProject(), commands),
-      executeTransaction: (commands) => applyEditorCommandsWithResult(createProject(), commands),
-      service: { deleteClips } as never,
+      executeTransaction,
       undo: vi.fn(),
       redo: vi.fn()
     })
@@ -110,12 +102,22 @@ describe('EditorAgentApi execution results', () => {
       executeAgentToolCall(
         {
           id: 'call-1',
-          name: 'delete_selected_clips',
-          arguments: { magnetMainTrack: true }
+          name: 'propose_editor_plan',
+          arguments: {
+            planId: 'plan-1',
+            projectRevision: 0,
+            summary: '删除片段',
+            actions: [{ type: 'clip.delete', clipIds: ['clip-1'] }]
+          }
         },
         api
       )
-    ).toMatchObject({ success: true, message: '已删除 1 个片段' })
-    expect(deleteClips).toHaveBeenCalledWith(['clip-1'], { magnetMainTrack: true })
+    ).toMatchObject({
+      success: false,
+      code: 'AWAITING_APPROVAL',
+      changed: false,
+      affectedClipIds: []
+    })
+    expect(executeTransaction).not.toHaveBeenCalled()
   })
 })
