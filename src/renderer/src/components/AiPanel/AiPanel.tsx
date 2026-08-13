@@ -34,6 +34,11 @@ import {
 import type { AgentChatMessage, AgentModelRegistryItem } from '../../../../shared/agent/workflow'
 import { getActiveEditorAgentApi } from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
 import { executeAgentToolCall } from './agentChatTools'
+import {
+  readLastUsedAgentModelConfigId,
+  resolveAgentModelConfigId,
+  writeLastUsedAgentModelConfigId
+} from './aiPanelModelPreference'
 import './AiPanel.css'
 
 type AiPanelTab = 'chat' | 'codex'
@@ -139,11 +144,15 @@ function AiPanel({
           return
         }
         setModelConfigurations(response.configurations)
-        setSelectedConfigId((current) =>
-          response.configurations.some((configuration) => configuration.id === current)
-            ? current
-            : ''
-        )
+        setSelectedConfigId((current) => {
+          const next = resolveAgentModelConfigId(
+            response.configurations,
+            current,
+            readLastUsedAgentModelConfigId()
+          )
+          writeLastUsedAgentModelConfigId(next)
+          return next
+        })
         setModelError(response.configurations.length ? '' : '请先在设置中添加模型')
       })
       .catch((error: unknown) => {
@@ -607,7 +616,9 @@ function AiPanel({
               aria-label="模型"
               value={selectedConfigId}
               onChange={(event) => {
-                setSelectedConfigId(event.target.value)
+                const configId = event.target.value
+                setSelectedConfigId(configId)
+                writeLastUsedAgentModelConfigId(configId)
                 setModelError('')
               }}
             >
