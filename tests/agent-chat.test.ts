@@ -10,7 +10,11 @@ function createGatewayReturning(
   message: Record<string, unknown>,
   mode: AgentChatMode = 'agent',
   approvalMode: AgentApprovalMode = 'request'
-) {
+): {
+  gateway: ModelGateway
+  fetchMock: ReturnType<typeof vi.fn>
+  run: () => ReturnType<ModelGateway['chat']>
+} {
   const registry = new ModelRegistry(findInternalModelProvider, () => 'config-1')
   registry.create({
     kind: 'custom',
