@@ -146,6 +146,16 @@ function rejectedResult(): AgentToolExecutionResult {
   }
 }
 
+function competingPlanResult(): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: 'REJECTED',
+    message: '同一轮只能提交一个编辑计划，请重新规划',
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
 function staleContextResult(): AgentToolExecutionResult {
   return {
     success: false,
@@ -386,6 +396,21 @@ function AiPanel({
         chatHistoryRef.current[tab] = conversation
         if (assistant.content) appendMessages(tab, [createMessage('assistant', assistant.content)])
         if (assistant.toolCalls.length === 0) return
+
+        const planCallCount = assistant.toolCalls.filter(
+          (call) => call.name === 'propose_editor_plan'
+        ).length
+        if (planCallCount > 1) {
+          for (const call of assistant.toolCalls) {
+            const result =
+              call.name === 'get_editor_context'
+                ? executeAgentToolCall(call, getActiveEditorAgentApi(), executionMode)
+                : competingPlanResult()
+            conversation = continueAfterToolResult({ tab, call, conversation }, result)
+          }
+          chatHistoryRef.current[tab] = conversation
+          continue
+        }
 
         for (const call of assistant.toolCalls) {
           const editorApi = getActiveEditorAgentApi()

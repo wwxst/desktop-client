@@ -25,10 +25,12 @@ import {
   type EditorProjectState
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
 import type {
+  AgentApprovalMode,
   AgentChatResponse,
   AgentEditorPlan,
   AgentModelRegistryItem
 } from '../src/shared/agent/workflow'
+import { isAgentChatRequest } from '../src/shared/agent/chatContract'
 
 let unregisterEditorApi: (() => void) | null = null
 
@@ -253,6 +255,109 @@ describe('AiPanel', () => {
       code: 'UNSUPPORTED_ACTION',
       changed: false
     })
+  })
+
+  it.each<AgentApprovalMode>(['request', 'smart', 'full'])(
+    'rejects every competing plan and completes all tool results in %s mode',
+    async (selectedApprovalMode) => {
+      const user = userEvent.setup()
+      const executeTransaction = registerTestEditor()
+      window.localStorage.setItem(AI_APPROVAL_MODE_KEY, selectedApprovalMode)
+      const firstPlan = plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }])
+      const secondPlan = {
+        ...plan([{ type: 'clip.update', clipId: 'clip-1', patch: { opacity: 0.5 } }]),
+        planId: 'plan-2'
+      }
+      const runAgentChat = vi
+        .fn()
+        .mockResolvedValueOnce({
+          success: true,
+          message: '已生成计划',
+          assistant: {
+            content: '',
+            toolCalls: [
+              { id: 'call-context', name: 'get_editor_context', arguments: {} },
+              { id: 'call-plan-1', name: 'propose_editor_plan', arguments: firstPlan },
+              { id: 'call-plan-2', name: 'propose_editor_plan', arguments: secondPlan }
+            ]
+          }
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          message: '对话完成',
+          assistant: { content: '一次只能处理一个编辑计划，请重新规划。', toolCalls: [] }
+        })
+      setAgentChat(runAgentChat)
+      render(<AiPanel />)
+
+      await submitPrompt(user)
+
+      expect(await screen.findByText('一次只能处理一个编辑计划，请重新规划。')).toBeInTheDocument()
+      expect(executeTransaction).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button', { name: '批准执行' })).not.toBeInTheDocument()
+      expect(runAgentChat).toHaveBeenCalledTimes(2)
+
+      const continuationRequest = runAgentChat.mock.calls[1][0]
+      expect(isAgentChatRequest(continuationRequest)).toBe(true)
+      const toolMessages = continuationRequest.messages.filter(
+        (message: { role: string }) => message.role === 'tool'
+      )
+      expect(toolMessages.map((message: { toolCallId: string }) => message.toolCallId)).toEqual([
+        'call-context',
+        'call-plan-1',
+        'call-plan-2'
+      ])
+      expect(JSON.parse(toolMessages[0].content)).toMatchObject({ code: 'OK', changed: false })
+      for (const toolMessage of toolMessages.slice(1)) {
+        expect(JSON.parse(toolMessage.content)).toMatchObject({
+          code: 'REJECTED',
+          changed: false,
+          message: '同一轮只能提交一个编辑计划，请重新规划'
+        })
+      }
+    }
+  )
+
+  it('keeps context reading and one request-mode plan in the normal approval flow', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const editorPlan = plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }])
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        message: '已生成计划',
+        assistant: {
+          content: '',
+          toolCalls: [
+            { id: 'call-context', name: 'get_editor_context', arguments: {} },
+            { id: 'call-plan-1', name: 'propose_editor_plan', arguments: editorPlan }
+          ]
+        }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '单个计划已执行。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    const approval = await screen.findByRole('region', { name: '审批计划 整理时间线' })
+    expect(executeTransaction).not.toHaveBeenCalled()
+
+    await user.click(within(approval).getByRole('button', { name: '批准执行' }))
+
+    expect(await screen.findByText('单个计划已执行。')).toBeInTheDocument()
+    expect(executeTransaction).toHaveBeenCalledOnce()
+    const continuationRequest = runAgentChat.mock.calls[1][0]
+    expect(isAgentChatRequest(continuationRequest)).toBe(true)
+    expect(
+      continuationRequest.messages
+        .filter((message: { role: string }) => message.role === 'tool')
+        .map((message: { toolCallId: string }) => message.toolCallId)
+    ).toEqual(['call-context', 'call-plan-1'])
   })
 
   it('waits in request mode, executes once after approval, and resumes with structured history', async () => {
