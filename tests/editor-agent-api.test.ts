@@ -38,8 +38,10 @@ describe('EditorAgentApi execution results', () => {
 
     const api = createEditorAgentApi({
       getProject: () => project,
+      getRevision: () => 7,
       execute: (command) => applyEditorCommand(project, command),
       executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
+      executeTransaction: (commands) => applyEditorCommandsWithResult(project, commands),
       undo: vi.fn(),
       redo: vi.fn()
     })
@@ -62,14 +64,17 @@ describe('EditorAgentApi execution results', () => {
     const snapshot = api.getProjectSnapshot()
     snapshot.clips.push({ id: 'mutated', assetId: asset.id })
     expect(api.getProjectSnapshot().clips).toHaveLength(1)
+    expect(api.getRevision()).toBe(7)
   })
 
   it('aggregates batch results while preserving individual error codes', () => {
     const project = createProject()
     const api = createEditorAgentApi({
       getProject: () => project,
+      getRevision: () => 0,
       execute: (command) => applyEditorCommand(project, command),
       executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
+      executeTransaction: (commands) => applyEditorCommandsWithResult(project, commands),
       undo: vi.fn(),
       redo: vi.fn()
     })
@@ -89,6 +94,7 @@ describe('EditorAgentApi execution results', () => {
     const executeTransaction = vi.fn()
     const api = createEditorAgentApi({
       getProject: createProject,
+      getRevision: () => 0,
       getSelection: () => ['clip-1'],
       getPlayhead: () => 3,
       execute: (command) => applyEditorCommand(createProject(), command),

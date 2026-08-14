@@ -17,6 +17,7 @@ export interface EditorHistoryState {
   past: EditorProjectState[]
   present: EditorProjectState
   future: EditorProjectState[]
+  revision: number
 }
 
 export type EditorHistoryAction =
@@ -32,7 +33,8 @@ export function createInitialEditorHistoryState(draftRowId: string): EditorHisto
   return {
     past: [],
     present: createInitialEditorProjectState(draftRowId),
-    future: []
+    future: [],
+    revision: 0
   }
 }
 
@@ -102,7 +104,8 @@ export function editorHistoryReducer(
         return {
           past: state.past.map((snapshot) => applyActionToSnapshot(snapshot, action.action)),
           present,
-          future: state.future.map((snapshot) => applyActionToSnapshot(snapshot, action.action))
+          future: state.future.map((snapshot) => applyActionToSnapshot(snapshot, action.action)),
+          revision: state.revision + 1
         }
       }
 
@@ -111,7 +114,7 @@ export function editorHistoryReducer(
       }
 
       // 兼容旧的 project/action 文档修改入口：不新增 history step，但也绝不清空历史。
-      return { ...state, present }
+      return { ...state, present, revision: state.revision + 1 }
     }
 
     case 'command/execute': {
@@ -139,7 +142,8 @@ export function editorHistoryReducer(
       return {
         past: state.past.slice(0, -1),
         present: preserveEphemeralState(previous, state.present),
-        future: [state.present, ...state.future].slice(0, HISTORY_LIMIT)
+        future: [state.present, ...state.future].slice(0, HISTORY_LIMIT),
+        revision: state.revision + 1
       }
     }
 
@@ -149,13 +153,14 @@ export function editorHistoryReducer(
       return {
         past: [...state.past, state.present].slice(-HISTORY_LIMIT),
         present: preserveEphemeralState(next, state.present),
-        future: state.future.slice(1)
+        future: state.future.slice(1),
+        revision: state.revision + 1
       }
     }
 
     case 'history/clear':
       if (state.past.length === 0 && state.future.length === 0) return state
-      return { past: [], present: state.present, future: [] }
+      return { past: [], present: state.present, future: [], revision: state.revision }
   }
 }
 
@@ -163,6 +168,7 @@ function pushHistory(state: EditorHistoryState, present: EditorProjectState): Ed
   return {
     past: [...state.past, state.present].slice(-HISTORY_LIMIT),
     present,
-    future: []
+    future: [],
+    revision: state.revision + 1
   }
 }

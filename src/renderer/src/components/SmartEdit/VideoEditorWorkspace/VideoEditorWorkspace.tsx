@@ -298,6 +298,7 @@ function VideoEditorWorkspace(): JSX.Element {
     () =>
       createEditorAgentApi({
         getProject: () => project,
+        getRevision: () => history.revision,
         getSelection: () => selectedClipIds,
         getPlayhead: () => playbackController.getSnapshot().playhead,
         execute,
@@ -307,7 +308,7 @@ function VideoEditorWorkspace(): JSX.Element {
         undo,
         redo
       }),
-    [editorService, execute, executeBatch, executeTransaction, playbackController, project, redo, selectedClipIds, undo]
+    [editorService, execute, executeBatch, executeTransaction, history.revision, playbackController, project, redo, selectedClipIds, undo]
   )
 
   useEffect(() => registerEditorAgentApi(agentApi), [agentApi])
