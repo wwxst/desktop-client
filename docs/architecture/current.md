@@ -3,7 +3,7 @@
 > 状态：当前事实
 > 适用范围：Electron 应用、Renderer 工作区和 Editor V2
 > 事实来源：`src/main`、`src/preload`、`src/shared`、`src/renderer/src` 与对应测试
-> 最近验证：`a53b152` + 当前 AI 模型管理改动 / 2026-08-12
+> 最近验证：`16a55be5` / 2026-08-14
 
 ## 总体边界
 
@@ -20,7 +20,7 @@ Java 后端
 
 ### Main
 
-`src/main/index.ts` 创建窗口、管理 Electron 生命周期、注册认证/订阅 IPC，并加载全局素材库、TTS 和 Agent IPC。登录 Token 只保存在 Main 进程内存，不返回给 Renderer。Agent 模型配置由 Main 内存注册表持有，API Key 不通过列表或变更响应返回；服务商配置的官方 Base URL 也只保存在 Main 的内部目录中。全局素材库索引保存在 `app.getPath('userData')/media-library/index.json`，记录来源路径、文件元数据和标签，不复制或修改用户的源媒体文件。
+`src/main/index.ts` 创建窗口、管理 Electron 生命周期、注册认证/订阅 IPC，并加载全局素材库、TTS 和 Agent IPC。登录 Token 只保存在 Main 进程内存，不返回给 Renderer。Agent 模型配置由 Main 注册表持有并写入 `app.getPath('userData')/agent/model-configurations.json`；API Key 通过 `safeStorage` 加密，列表或变更响应不返回密钥，服务商官方 Base URL 也只保留在 Main 内部目录中。全局素材库索引保存在 `app.getPath('userData')/media-library/index.json`，记录来源路径、文件元数据和标签，不复制或修改用户的源媒体文件。
 
 ### Preload
 
@@ -51,23 +51,42 @@ App
 
 侧栏账户区齿轮和 `AiPanel` 的设置按钮进入同一个独立设置工作区；进入后隐藏普通主侧栏和 AI 右栏，但保持原工作区挂载，“返回应用”恢复原一级页面、智剪编辑状态和 AI 会话状态。当前设置页以单一表格管理多个模型配置，只提供添加、编辑和删除，不提供启用、停用或默认模型。
 
-“模型服务商”模式通过 Main 获取 Java 后台目录，后台不可用或返回无效数据时使用桌面端六厂商内置目录；Renderer 只获得厂商、模型和推荐模型信息，不获得服务商官方 Base URL。“自定义配置”模式提交 Base URL、模型 ID 和 API Key，Main 固定按 OpenAI Chat Completions 兼容协议使用。API Key 只作为当前表单输入发送到 Main，列表和编辑状态永远不回填；编辑时留空表示保留原密钥。模型配置和密钥本次只存在 Main 内存，应用重启后不保留。
+“模型服务商”模式通过 Main 获取 Java 后台目录，后台不可用或返回无效数据时使用桌面端六厂商内置目录；Renderer 只获得厂商、模型和推荐模型信息，不获得服务商官方 Base URL。“自定义配置”模式提交 Base URL、模型 ID 和 API Key，Main 固定按 OpenAI Chat Completions 兼容协议使用。API Key 只作为当前表单输入发送到 Main，列表和编辑状态永远不回填；编辑时留空表示保留原密钥。模型配置和加密密钥可在应用重启后恢复。
 
 保存模型配置不会隐式选择第一个或最后添加的模型。`ModelGateway` 只接受显式配置 ID 选择；工作流如何保存并传入该 ID 仍是后续边界，当前不引入默认模型。
 
 ## Editor V2 状态分层
 
-| 状态 | 当前实现 | 责任 |
-| --- | --- | --- |
-| 项目状态 | `editorProject.ts` + `editorHistory.ts` | assets、tracks、clips、activeClipId、兼容 playhead 字段、画布比例和草稿表格 |
-| 编辑命令 | `editorCommands.ts` | 校验并应用低层 Command，保留 V1/Agent 兼容 |
-| 编辑服务 | `core/editorService.ts` | 放置、移动、删除、更新、分割、粘贴等高层动作 |
-| 放置规则 | `core/editorPlacementPolicy.ts` | 碰撞检测、复用/新建轨道、磁吸删除和批量放置规划 |
-| 播放运行态 | `playback/editorPlaybackController.ts` | playhead、播放、循环、主音量和 animation-frame 时钟 |
-| 交互运行态 | `interaction/editorInteractionController.ts` | idle、拖动、空格手势和 pointer ownership |
-| Agent 适配 | `editorAgentApi.ts` | 低层命令兼容及推荐的 Service 能力 |
+| 状态       | 当前实现                                     | 责任                                                                        |
+| ---------- | -------------------------------------------- | --------------------------------------------------------------------------- |
+| 项目状态   | `editorProject.ts` + `editorHistory.ts`      | assets、tracks、clips、activeClipId、兼容 playhead 字段、画布比例和草稿表格 |
+| 编辑命令   | `editorCommands.ts`                          | 校验并应用低层 Command，保留 V1/Agent 兼容                                  |
+| 编辑服务   | `core/editorService.ts`                      | 放置、移动、删除、更新、分割、粘贴等高层动作                                |
+| 放置规则   | `core/editorPlacementPolicy.ts`              | 碰撞检测、复用/新建轨道、磁吸删除和批量放置规划                             |
+| 播放运行态 | `playback/editorPlaybackController.ts`       | playhead、播放、循环、主音量和 animation-frame 时钟                         |
+| 交互运行态 | `interaction/editorInteractionController.ts` | idle、拖动、空格手势和 pointer ownership                                    |
+| Agent 适配 | `editorAgentApi.ts`                          | 低层命令兼容及推荐的 Service 能力                                           |
 
-播放时钟和交互控制器是运行时状态，当前播放器以 Playback Controller 的 playhead 为准；Project 中保留的 playhead 字段属于兼容模型，不应通过每帧 dispatch 整个项目 reducer。新的用户或 Agent 编辑动作应尽量通过 EditorService 形成事务；一次事务对应一次 Undo Step。
+播放时钟和交互控制器是运行时状态，当前播放器以 Playback Controller 的 playhead 为准；Project 中保留的 playhead 字段属于兼容模型，不应通过每帧 dispatch 整个项目 reducer。`EditorHistoryState.revision` 独立于可撤销的 Project 快照：成功编辑、Undo/Redo 和外部工程事实变化递增，选择、播放头、缩放和无变化事务不递增。
+
+## AI 对话与审批执行
+
+```text
+AiPanel (Renderer 模式/审批偏好与状态机)
+  -> window.api.runAgentChat({ configId, mode, approvalMode, messages })
+Main ModelGateway (API Key、模式化提示/工具 schema、结构校验)
+  -> get_editor_context | propose_editor_plan
+AiPanel (审批策略 + revision 校验)
+  -> AgentEditorPlanExecutor (PlacementPolicy 预检)
+  -> EditorAgentApi.executeTransaction (一次事务 / 一个 Undo Step)
+```
+
+- 助手模式只声明 `get_editor_context`，用于只读问答；Agent 模式额外声明 `propose_editor_plan`，用于提交删除、分割、移动和参数修改的结构化多步计划。
+- Main 负责 IPC 输入、消息、工具 schema 和结构化结果校验；Renderer 独立负责当前模式、三级审批策略、工程 revision、计划失效和实际执行。任一边界拒绝都不能由另一边界或模型提示绕过。
+- 执行模式和审批模式只作为 Renderer 非敏感偏好写入独立 `localStorage` 键，默认 `Agent + 请求批准`；它们不写入 Main，也不属于编辑工程或 Undo 历史。
+- “完全访问”仍只自动执行已注册且通过 schema、revision、Placement Policy 和事务校验的编辑计划，不增加任意 IPC、文件、网络或代码执行能力。
+
+当前 AI 对话采用非流式逐轮请求，聊天内容只保留在当前 Renderer 生命周期。流式输出、请求级取消、跨重启会话持久化和计划白名单之外的新编辑工具均未实现。
 
 ## 媒体和生命周期
 
@@ -97,6 +116,7 @@ App
 ## 代码定位
 
 - Electron 入口：`src/main/index.ts`、`src/preload/index.ts`、`src/preload/index.d.ts`
-- 共享契约：`src/shared/auth.ts`、`src/shared/tts.ts`、`src/shared/agent/workflow.ts`
+- 共享契约：`src/shared/auth.ts`、`src/shared/tts.ts`、`src/shared/agent/workflow.ts`、`src/shared/agent/chatContract.ts`
 - 总工作区：`src/renderer/src/components/Workspace/WorkspaceView.tsx`
+- AI 对话与审批：`src/main/agent/runtime/ModelGateway.ts`、`src/renderer/src/components/AiPanel/`
 - Editor V2：`src/renderer/src/components/SmartEdit/VideoEditorWorkspace/`

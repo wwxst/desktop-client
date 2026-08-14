@@ -3,11 +3,11 @@
 > 状态：当前契约
 > 适用范围：`src/renderer/src/components/SmartEdit/VideoEditorWorkspace/`
 > 事实来源：`editorProject.ts`、`editorCommands.ts`、`core/`、`playback/`、`interaction/` 与 Editor V2 测试
-> 最近验证：`e4a63ef` + 当前 AI 对话工具调用改动 / 2026-08-12
+> 最近验证：`16a55be5` / 2026-08-14
 
 ## 状态所有权
 
-- `editorHistoryReducer` 持有可撤销的 EditorProjectState：assets、tracks、clips、activeClipId、兼容 playhead 字段、timelineZoom、aspectRatio 和 draftRows。
+- `editorHistoryReducer` 持有可撤销的 `EditorProjectState` 以及独立、单调递增的工程 `revision`。revision 是运行边界状态，不写入可撤销的 Project 快照。
 - `EditorPlaybackController` 持有当前播放器使用的运行态：playhead、isPlaying、duration、revision 和 animation-frame 时钟；播放到工程末尾后停止，不提供循环播放或预览总音量状态。
 - `EditorInteractionController` 持有交互运行态：当前 mode、pointerId、空格手势和 revision。
 - 组件通过 props 和回调组合这些状态，不在 `FunctionPanel`、`PlayerPanel`、`Timeline` 中创建第二份项目状态。
@@ -25,7 +25,17 @@
 
 这些能力通过 `EditorPlacementPolicy` 规划轨道、碰撞和磁吸行为，再以 `executeTransaction` 提交。低层 `EditorCommand` 仍保留给已有 Agent 和兼容调用，但新自动化不应绕过 Placement Policy 直接拼接移动/放置规则。
 
-AI 面板通过已注册的 `EditorAgentApi` 读取当前工程摘要并执行白名单工具。当前工具包括读取工程摘要、删除当前选中片段、在播放头处分割当前唯一选中片段；删除和分割分别调用 `EditorService.deleteClips` 与 `EditorService.splitClip`，仍形成单个可撤销事务。模型不能直接持有 Project 状态或派发 reducer action。
+AI 面板通过已注册的 `EditorAgentApi` 读取工程快照、当前 revision、选择和播放头。模型只能读取上下文或提交结构化 `AgentEditorPlan`；计划动作限定为删除、分割、移动和参数修改，不接收任意 `EditorCommand`、代码或 reducer action。
+
+Renderer 的计划执行器先在工程快照上逐项编译并预检完整计划：移动和删除复用 `EditorPlacementPolicy`，所有生成命令都经过编辑事务规则模拟。任一目标不存在、轨道锁定、碰撞、参数非法或动作不受支持时，整组计划不执行。全部动作预检成功且 revision 在预检前后都一致时，执行器只调用一次 `executeTransaction`；因此多步计划只形成一个 Undo Step，不会出现部分提交。
+
+## 工程 Revision
+
+- 初始 revision 为 `0`，成功改变版本化工程内容的命令、批处理或事务会递增。
+- 成功的 Undo、Redo，以及素材导入、Ready、Failed 等会改变工程事实的外部更新会递增。
+- 选择、播放头、时间线缩放、纯播放/交互运行态、无变化事务和仅清空历史栈不会递增。
+- `EditorAgentApi.getRevision()` 暴露当前值；`get_editor_context` 将其作为 `projectRevision` 返回给模型。
+- 计划在进入审批/自动执行以及用户批准后执行前都必须匹配当前 revision。等待期间工程变化会使计划失效，返回结构化 `STALE_CONTEXT`，且不执行任何动作。
 
 ## 不变量
 

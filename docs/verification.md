@@ -2,32 +2,27 @@
 
 > 状态：当前验证口径
 > 适用范围：提交前的 Electron/React Renderer 改动
-> 最近验证：`a828271` + 当前 AI 对话模型偏好改动 / 2026-08-13
+> 最近验证：`16a55be5` / 2026-08-14
 
 ## 必跑命令
 
 ```bash
 npm test -- --reporter=dot
 npm run typecheck
+npm run lint
 npm run build
 git diff --check
 ```
 
-改动涉及 lint 规则、组件结构或测试时，再运行：
-
-```bash
-npm run lint
-```
-
 ## 最近基线
 
-在 `a828271` 加当前 AI 对话模型偏好改动上：
+在 `16a55be5` 上：
 
-- `npm test -- --reporter=dot`：54/54 测试文件、275/275 测试通过；jsdom 仍输出 4 条 `HTMLMediaElement.load()` 未实现提示，不影响退出码。模型目录回退测试会记录 1 条预期的 Main warning，不影响退出码。
-- `npm run typecheck`：通过。
-- `npm run build`：通过。
-- `git diff --check`：通过。
-- `npm run lint`：通过，0 个 error、351 个 warning，其中 350 个可由 `--fix` 自动修复。此前 5 个 `react-hooks/set-state-in-effect` 源码错误已改为派生状态或带来源身份的异步结果，6 个 V2 测试辅助函数已补充显式返回类型。
+- `npm test -- --reporter=dot`：退出码 `0`；58/58 测试文件、395/395 测试通过。jsdom 输出 4 条 `HTMLMediaElement.load()` 未实现提示；模型目录离线回退测试记录 1 条预期的“加载远程模型目录失败，使用内置目录”Main warning，均不影响退出码。
+- `npm run typecheck`：退出码 `0`；Node 与 Web TypeScript 检查通过。
+- `npm run build`：退出码 `0`；Main、Preload 和 Renderer 产物生成成功。Vite 本次转换 Main 32 个模块、Preload 1 个模块、Renderer 1876 个模块；输出 Main `153.59 kB`、Preload `5.03 kB`、Renderer JS `851.12 kB`、Renderer CSS `130.42 kB`。
+- `git diff --check`：退出码 `0`。
+- `npm run lint`：退出码 `0`；0 个 error、341 个 warning，其中 340 个可由 `--fix` 自动修复。warning 仍属于当前格式基线，不能描述为 lint 无告警。
 
 Lint 现在是提交门禁。ESLint 只检查当前工作区的项目文件，不扫描 Git 已忽略的 `.worktrees/`、`.tts-v2-backup/` 和 `.superpowers/` 目录。
 
