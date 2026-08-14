@@ -471,12 +471,22 @@ export function editorProjectStatesEqual(
 ): boolean {
   if (left === right) return true
   return (
+    editorProjectVersionedContentEqual(left, right) &&
+    left.activeClipId === right.activeClipId &&
+    numbersEqual(left.playhead, right.playhead) &&
+    numbersEqual(left.timelineZoom, right.timelineZoom)
+  )
+}
+
+export function editorProjectVersionedContentEqual(
+  left: EditorProjectState,
+  right: EditorProjectState
+): boolean {
+  if (left === right) return true
+  return (
     arrayItemsEqual(left.assets, right.assets, mediaAssetsEqual) &&
     arrayItemsEqual(left.tracks, right.tracks, editorTracksEqual) &&
     arrayItemsEqual(left.clips, right.clips, timelineClipsEqual) &&
-    left.activeClipId === right.activeClipId &&
-    numbersEqual(left.playhead, right.playhead) &&
-    numbersEqual(left.timelineZoom, right.timelineZoom) &&
     canvasAspectRatiosEqual(left.aspectRatio, right.aspectRatio) &&
     arrayItemsEqual(left.draftRows, right.draftRows, draftRowsEqual)
   )

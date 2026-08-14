@@ -7,6 +7,7 @@ import {
 import {
   createInitialEditorProjectState,
   editorProjectStatesEqual,
+  editorProjectVersionedContentEqual,
   editorProjectReducer,
   type EditorProjectAction,
   type EditorProjectState
@@ -101,6 +102,14 @@ export function editorHistoryReducer(
       const present = editorProjectReducer(state.present, action.action)
       if (editorProjectStatesEqual(present, state.present)) return state
 
+      if (isEphemeralAction(action.action)) {
+        return { ...state, present }
+      }
+
+      if (editorProjectVersionedContentEqual(present, state.present)) {
+        return { ...state, present }
+      }
+
       if (isExternalFactAction(action.action)) {
         return {
           past: state.past.map((snapshot) => applyActionToSnapshot(snapshot, action.action)),
@@ -110,10 +119,6 @@ export function editorHistoryReducer(
         }
       }
 
-      if (isEphemeralAction(action.action)) {
-        return { ...state, present }
-      }
-
       // 兼容旧的 project/action 文档修改入口：不新增 history step，但也绝不清空历史。
       return { ...state, present, revision: state.revision + 1 }
     }
@@ -121,6 +126,9 @@ export function editorHistoryReducer(
     case 'command/execute': {
       const result = applyEditorCommand(state.present, action.command)
       if (!result.changed) return state
+      if (editorProjectVersionedContentEqual(result.state, state.present)) {
+        return { ...state, present: result.state }
+      }
       return pushHistory(state, result.state)
     }
 
@@ -128,12 +136,18 @@ export function editorHistoryReducer(
       if (action.commands.length === 0) return state
       const present = applyEditorCommands(state.present, action.commands)
       if (editorProjectStatesEqual(present, state.present)) return state
+      if (editorProjectVersionedContentEqual(present, state.present)) {
+        return { ...state, present }
+      }
       return pushHistory(state, present)
     }
 
     case 'command/transaction': {
       const result = applyEditorTransactionWithResult(state.present, action.commands)
       if (!result.success || !result.changed) return state
+      if (editorProjectVersionedContentEqual(result.state, state.present)) {
+        return { ...state, present: result.state }
+      }
       return pushHistory(state, result.state)
     }
 

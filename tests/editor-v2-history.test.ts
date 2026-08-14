@@ -303,6 +303,66 @@ describe('Editor V2 history external fact rebase', () => {
     expect(next.past).toHaveLength(0)
   })
 
+  it('does not version a net-zero clip move that only changes active selection', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'assets/imported', asset: readyAsset() }
+    })
+    state = editorHistoryReducer(state, {
+      type: 'command/execute',
+      command: { type: 'clip/addAsset', assetId: 'asset-a', clipId: 'clip-a' }
+    })
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'timeline/clipSelected', clipId: null }
+    })
+    state = editorHistoryReducer(state, { type: 'history/clear' })
+    const revision = state.revision
+    const clips = state.present.clips
+
+    const next = editorHistoryReducer(state, {
+      type: 'command/batch',
+      commands: [
+        { type: 'clip/move', clipId: 'clip-a', timelineStart: 2 },
+        { type: 'clip/move', clipId: 'clip-a', timelineStart: 0 }
+      ]
+    })
+
+    expect(next.revision).toBe(revision)
+    expect(next.past).toHaveLength(0)
+    expect(next.present.clips).toEqual(clips)
+    expect(next.present.activeClipId).toBe('clip-a')
+  })
+
+  it('does not version an add-delete transaction that only changes playhead', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'assets/imported', asset: readyAsset() }
+    })
+    const revision = state.revision
+
+    const next = editorHistoryReducer(state, {
+      type: 'command/transaction',
+      commands: [
+        {
+          type: 'clip/addAsset',
+          assetId: 'asset-a',
+          clipId: 'clip-a',
+          timelineStart: 3
+        },
+        { type: 'clip/delete', clipId: 'clip-a' }
+      ]
+    })
+
+    expect(next.revision).toBe(revision)
+    expect(next.past).toHaveLength(0)
+    expect(next.present.clips).toHaveLength(0)
+    expect(next.present.activeClipId).toBeNull()
+    expect(next.present.playhead).toBe(3)
+  })
+
   it('does not increment revision when writing identical draft values', () => {
     let state = createInitialEditorHistoryState('draft-1')
     state = editorHistoryReducer(state, {
