@@ -19,6 +19,8 @@ import {
   type TimelineClip
 } from './editorProject'
 
+const MAX_CLIP_SCALE = 100
+
 export interface ClipPatch {
   trackId?: string
   timelineStart?: number
@@ -546,8 +548,16 @@ function reduceEditorCommand(
           transform: {
             x: finiteOr(transformPatch?.x, clip.transform.x),
             y: finiteOr(transformPatch?.y, clip.transform.y),
-            scaleX: clamp(finiteOr(transformPatch?.scaleX, clip.transform.scaleX), 0.01, 10),
-            scaleY: clamp(finiteOr(transformPatch?.scaleY, clip.transform.scaleY), 0.01, 10),
+            scaleX: clamp(
+              finiteOr(transformPatch?.scaleX, clip.transform.scaleX),
+              0.01,
+              MAX_CLIP_SCALE
+            ),
+            scaleY: clamp(
+              finiteOr(transformPatch?.scaleY, clip.transform.scaleY),
+              0.01,
+              MAX_CLIP_SCALE
+            ),
             rotation: finiteOr(transformPatch?.rotation, clip.transform.rotation)
           }
         }

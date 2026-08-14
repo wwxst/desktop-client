@@ -377,6 +377,41 @@ describe('Agent editor plan execution', () => {
     })
   })
 
+  it('executes transform scales within the shared protocol without truncating them', () => {
+    let project = createProject()
+    const executeTransaction = vi.fn((commands: readonly EditorCommand[]) => {
+      const result = applyEditorTransactionWithResult(project, commands)
+      if (result.success) project = result.state
+      return result
+    })
+    const api = createEditorAgentApi({
+      getProject: () => project,
+      getRevision: () => 3,
+      execute: (command) => applyEditorCommand(project, command),
+      executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
+      executeTransaction,
+      undo: vi.fn(),
+      redo: vi.fn()
+    })
+
+    const result = executeAgentEditorPlan(
+      plan([
+        {
+          type: 'clip.update',
+          clipId: 'clip-1',
+          patch: { transform: { scaleX: 50, scaleY: 50 } }
+        }
+      ]),
+      api
+    )
+
+    expect(result).toMatchObject({ success: true, code: 'OK', changed: true })
+    expect(project.clips.find((clip) => clip.id === 'clip-1')?.transform).toMatchObject({
+      scaleX: 50,
+      scaleY: 50
+    })
+  })
+
   it('creates exactly one undo step for a successful multi-action plan', () => {
     let history: EditorHistoryState = {
       past: [],

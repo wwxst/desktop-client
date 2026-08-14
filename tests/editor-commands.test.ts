@@ -71,6 +71,26 @@ describe('editor commands', () => {
     expect(clip.transform.scaleX).toBe(1.25)
   })
 
+  it('preserves transform scales up to the shared Agent protocol limit', () => {
+    let state = createReadyProject()
+    state = applyEditorCommand(state, {
+      type: 'clip/addAsset',
+      assetId: asset.id,
+      clipId: 'clip-1'
+    }).state
+
+    const updated = applyEditorCommand(state, {
+      type: 'clip/update',
+      clipId: 'clip-1',
+      patch: { transform: { scaleX: 50, scaleY: 50 } }
+    })
+
+    expect(updated.success).toBe(true)
+    const clip = resolveTimelineClip(updated.state.clips[0], asset)
+    expect(clip.transform.scaleX).toBe(50)
+    expect(clip.transform.scaleY).toBe(50)
+  })
+
   it('allows the same asset to create multiple clip instances', () => {
     let state = createReadyProject()
     state = applyEditorCommand(state, {

@@ -187,9 +187,7 @@ function compileAction(
     }
 
     default:
-      return unsupportedAction(
-        `不支持的编辑动作：${String((action as unknown as { type?: unknown }).type)}`
-      )
+      return unsupportedRuntimeAction(action)
   }
 }
 
@@ -253,8 +251,13 @@ function affectedIdsForCommands(commands: readonly EditorCommand[]): string[] {
       case 'clip/duplicate':
         affected.push(command.clipId, command.newClipId)
         break
-      default:
+      case 'track/add':
+      case 'track/delete':
+      case 'track/update':
+      case 'canvas/setAspectRatio':
         break
+      default:
+        assertNever(command)
     }
   }
   return affected
@@ -282,6 +285,19 @@ function unsupportedAction(message: string): {
   message: string
 } {
   return { success: false, code: 'UNSUPPORTED_ACTION', message }
+}
+
+function unsupportedRuntimeAction(action: never): {
+  success: false
+  code: 'UNSUPPORTED_ACTION'
+  message: string
+} {
+  const type = (action as unknown as { type?: unknown }).type
+  return unsupportedAction(`不支持的编辑动作：${String(type)}`)
+}
+
+function assertNever(value: never): never {
+  throw new Error(`未处理的编辑命令：${JSON.stringify(value)}`)
 }
 
 function staleContext(): AgentToolExecutionResult {
