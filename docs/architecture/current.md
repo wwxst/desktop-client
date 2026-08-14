@@ -83,7 +83,7 @@ AiPanel (审批策略 + revision 校验)
 
 - 助手模式只声明 `get_editor_context`，用于只读问答；Agent 模式额外声明 `propose_editor_plan`，用于提交删除、分割、移动和参数修改的结构化多步计划。
 - Main 负责 IPC 输入、消息、工具 schema 和结构化结果校验；Renderer 独立负责当前模式、三级审批策略、工程 revision、计划失效和实际执行。任一边界拒绝都不能由另一边界或模型提示绕过。
-- 执行模式和审批模式只作为 Renderer 非敏感偏好写入独立 `localStorage` 键，默认 `Agent + 请求批准`；它们不写入 Main，也不属于编辑工程或 Undo 历史。
+- 执行模式和审批模式的持久化副本只作为 Renderer 非敏感偏好写入独立 `localStorage` 键，默认 `Agent + 请求批准`；当前值随每轮 `runAgentChat` 请求传给 Main，但不在 Main 持久化，也不属于编辑工程或 Undo 历史。
 - “完全访问”仍只自动执行已注册且通过 schema、revision、Placement Policy 和事务校验的编辑计划，不增加任意 IPC、文件、网络或代码执行能力。
 
 当前 AI 对话采用非流式逐轮请求，聊天内容只保留在当前 Renderer 生命周期。流式输出、请求级取消、跨重启会话持久化和计划白名单之外的新编辑工具均未实现。
