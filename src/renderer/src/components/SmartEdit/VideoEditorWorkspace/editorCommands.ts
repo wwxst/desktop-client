@@ -233,7 +233,10 @@ function getCommandFailure(
       if (trackFailure) return trackFailure
       const timelineStart = command.timelineStart ?? getTrackEnd(state, trackId)
       if (trackWouldCollide(state, trackId, Math.max(0, timelineStart), asset.duration)) {
-        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+        return failure(
+          'INVALID_RANGE',
+          '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层'
+        )
       }
       return null
     }
@@ -249,7 +252,10 @@ function getCommandFailure(
       const trackFailure = getTargetTrackFailure(state, getAssetKind(asset), resolved.trackId)
       if (trackFailure) return trackFailure
       if (trackWouldCollide(state, resolved.trackId, resolved.timelineStart, resolved.duration)) {
-        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+        return failure(
+          'INVALID_RANGE',
+          '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层'
+        )
       }
       return null
     }
@@ -266,12 +272,24 @@ function getCommandFailure(
       const currentTrack = state.tracks.find((track) => track.id === clip.trackId)
       if (currentTrack?.locked) return failure('TRACK_LOCKED', '当前内容层已锁定')
       const asset = state.assets.find((item) => item.id === clip.assetId)
-      const targetTrackId = command.trackId ?? clip.trackId ?? getDefaultTrackIdForAsset(state, asset!)
+      const targetTrackId =
+        command.trackId ?? clip.trackId ?? getDefaultTrackIdForAsset(state, asset!)
       const trackFailure = getTargetTrackFailure(state, getAssetKind(asset), targetTrackId)
       if (trackFailure) return trackFailure
       const resolved = resolveTimelineClip(clip, asset ?? null)
-      if (trackWouldCollide(state, targetTrackId, Math.max(0, command.timelineStart), resolved.duration, [clip.id])) {
-        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+      if (
+        trackWouldCollide(
+          state,
+          targetTrackId,
+          Math.max(0, command.timelineStart),
+          resolved.duration,
+          [clip.id]
+        )
+      ) {
+        return failure(
+          'INVALID_RANGE',
+          '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层'
+        )
       }
       return null
     }
@@ -309,10 +327,27 @@ function getCommandFailure(
       const targetTrackId = command.patch.trackId ?? current.trackId
       const trackFailure = getTargetTrackFailure(state, getAssetKind(currentAsset), targetTrackId)
       if (trackFailure) return trackFailure
-      if (command.patch.timelineStart !== undefined || command.patch.trackId !== undefined) {
+      const changesPlacement =
+        command.patch.timelineStart !== undefined ||
+        command.patch.trackId !== undefined ||
+        command.patch.sourceStart !== undefined ||
+        command.patch.sourceEnd !== undefined ||
+        command.patch.speed !== undefined
+      if (changesPlacement) {
         const nextStart = Math.max(0, command.patch.timelineStart ?? current.timelineStart)
-        if (trackWouldCollide(state, targetTrackId, nextStart, current.duration, [current.id])) {
-          return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+        const sourceRange = normalizeSourceRange({
+          sourceStart: command.patch.sourceStart ?? current.sourceStart,
+          sourceEnd: command.patch.sourceEnd ?? current.sourceEnd,
+          assetDuration: currentAsset?.duration ?? current.sourceEnd,
+          minDuration: MIN_CLIP_DURATION
+        })
+        const speed = clamp(finiteOr(command.patch.speed, current.speed), 0.1, 8)
+        const nextDuration = (sourceRange.sourceEnd - sourceRange.sourceStart) / speed
+        if (trackWouldCollide(state, targetTrackId, nextStart, nextDuration, [current.id])) {
+          return failure(
+            'INVALID_RANGE',
+            '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层'
+          )
         }
       }
       return null
@@ -333,7 +368,10 @@ function getCommandFailure(
       if (trackFailure) return trackFailure
       const start = Math.max(0, command.timelineStart ?? resolved.timelineStart + resolved.duration)
       if (trackWouldCollide(state, targetTrackId, start, resolved.duration, [clip.id])) {
-        return failure('INVALID_RANGE', '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层')
+        return failure(
+          'INVALID_RANGE',
+          '目标内容层在该时间范围已有内容，请使用 Editor Service 自动选择新层'
+        )
       }
       return null
     }

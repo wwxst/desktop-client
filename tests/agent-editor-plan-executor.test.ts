@@ -204,6 +204,28 @@ describe('Agent editor plan compiler', () => {
     expect(result).toMatchObject({ success: false, code: 'INVALID_PLAN' })
   })
 
+  it('rejects a speed update when the longer resolved clip would collide', () => {
+    const result = compileAgentEditorPlan(
+      createProject(),
+      plan([{ type: 'clip.update', clipId: 'clip-1', patch: { speed: 0.5 } }])
+    )
+
+    expect(result).toMatchObject({ success: false, code: 'INVALID_PLAN' })
+  })
+
+  it('allows a speed update when the shorter resolved clip remains collision-free', () => {
+    const result = compileAgentEditorPlan(
+      createProject(),
+      plan([{ type: 'clip.update', clipId: 'clip-1', patch: { speed: 2 } }])
+    )
+
+    expect(result).toMatchObject({ success: true })
+    if (!result.success) return
+    expect(result.compiled.commands).toEqual([
+      { type: 'clip/update', clipId: 'clip-1', patch: { speed: 2 } }
+    ])
+  })
+
   it.each([{ opacity: 1.1 }, { volume: -0.1 }, { speed: 9 }, { transform: { scaleX: 101 } }])(
     'rejects an out-of-range update patch %#',
     (patch) => {
@@ -269,6 +291,25 @@ describe('Agent editor plan execution', () => {
       plan([
         { type: 'clip.move', clipId: 'clip-2', timelineStart: 8 },
         { type: 'clip.update', clipId: 'missing', patch: { opacity: 0.5 } }
+      ]),
+      api
+    )
+
+    expect(result).toMatchObject({ success: false, code: 'INVALID_PLAN', changed: false })
+    expect(executeTransaction).not.toHaveBeenCalled()
+  })
+
+  it('does not submit a multi-action plan when a later speed update would collide', () => {
+    const project = createProject()
+    const executeTransaction = vi.fn((commands: readonly EditorCommand[]) =>
+      applyEditorTransactionWithResult(project, commands)
+    )
+    const api = createApi(project, () => 3, executeTransaction)
+
+    const result = executeAgentEditorPlan(
+      plan([
+        { type: 'clip.update', clipId: 'clip-2', patch: { opacity: 0.5 } },
+        { type: 'clip.update', clipId: 'clip-1', patch: { speed: 0.5 } }
       ]),
       api
     )
