@@ -461,6 +461,103 @@
   line-height: 17px;
 }
 
+.studio-ai-panel__approval {
+  width: 100%;
+  min-width: 0;
+  padding: 11px;
+  margin-bottom: 20px;
+  color: #3d3d3d;
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 7px;
+}
+
+.studio-ai-panel__approval-heading {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+
+.studio-ai-panel__approval-heading > svg {
+  margin-top: 1px;
+  color: #356a54;
+}
+
+.studio-ai-panel__approval-heading > div {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.studio-ai-panel__approval-heading strong,
+.studio-ai-panel__approval-heading span {
+  overflow-wrap: anywhere;
+}
+
+.studio-ai-panel__approval-heading strong {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.studio-ai-panel__approval-heading span {
+  flex: 0 0 auto;
+  color: #727272;
+  font-size: 10px;
+  line-height: 18px;
+}
+
+.studio-ai-panel__approval.is-stale .studio-ai-panel__approval-heading > svg,
+.studio-ai-panel__approval.is-failed .studio-ai-panel__approval-heading > svg,
+.studio-ai-panel__approval.is-rejected .studio-ai-panel__approval-heading > svg {
+  color: #9c624c;
+}
+
+.studio-ai-panel__approval ul {
+  display: grid;
+  gap: 3px;
+  padding: 0 0 0 34px;
+  margin: 8px 0 0;
+  color: #666666;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.studio-ai-panel__approval li {
+  overflow-wrap: anywhere;
+}
+
+.studio-ai-panel__approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.studio-ai-panel__approval-actions button {
+  min-height: 28px;
+  padding: 4px 10px;
+  color: #4a4a4a;
+  font-size: 11px;
+  line-height: 18px;
+  cursor: pointer;
+  background: #f0f0f0;
+  border: 1px solid #d2d2d2;
+  border-radius: 5px;
+}
+
+.studio-ai-panel__approval-actions button:first-child {
+  color: #ffffff;
+  background: #256b4e;
+  border-color: #256b4e;
+}
+
+.studio-ai-panel__approval-actions button:hover {
+  filter: brightness(0.96);
+}
+
 .studio-ai-panel__pending {
   display: flex;
   align-items: center;
@@ -682,6 +779,14 @@
   background: #e8e8e8;
 }
 
+.studio-ai-panel__select:has(select:disabled) {
+  color: #a3a3a3;
+}
+
+.studio-ai-panel__select select:disabled {
+  cursor: default;
+}
+
 .studio-ai-panel__select svg {
   flex: 0 0 auto;
 }
@@ -721,8 +826,7 @@
   font-size: 10px;
 }
 
-.studio-ai-panel__statusbar > span,
-.studio-ai-panel__statusbar label {
+.studio-ai-panel__statusbar > span {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -730,15 +834,108 @@
   white-space: nowrap;
 }
 
-.studio-ai-panel__statusbar select {
+.studio-ai-panel__approval-control {
+  position: relative;
   min-width: 0;
-  padding: 0;
-  color: inherit;
+}
+
+.studio-ai-panel__approval-trigger {
+  display: flex;
+  min-width: 0;
+  height: 24px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  color: #666666;
   font-size: 10px;
   cursor: pointer;
   background: transparent;
   border: 0;
-  outline: none;
+  border-radius: 3px;
+}
+
+.studio-ai-panel__approval-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-ai-panel__approval-trigger:hover:not(:disabled),
+.studio-ai-panel__approval-trigger[aria-expanded='true'] {
+  color: #262626;
+  background: #e8e8e8;
+}
+
+.studio-ai-panel__approval-trigger:disabled {
+  color: #a3a3a3;
+  cursor: default;
+}
+
+.studio-ai-panel__approval-menu {
+  position: absolute;
+  right: -4px;
+  bottom: 28px;
+  z-index: 12;
+  display: grid;
+  width: min(292px, calc(100vw - 24px));
+  padding: 4px;
+  color: #262626;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.studio-ai-panel__approval-menu button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  gap: 7px;
+  width: 100%;
+  min-height: 50px;
+  align-items: start;
+  padding: 7px 6px;
+  color: #333333;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border-radius: 4px;
+}
+
+.studio-ai-panel__approval-menu button:hover,
+.studio-ai-panel__approval-menu button:focus-visible,
+.studio-ai-panel__approval-menu button[aria-checked='true'] {
+  background: #f0f0f0;
+}
+
+.studio-ai-panel__approval-menu button > svg {
+  margin-top: 3px;
+  color: #606060;
+}
+
+.studio-ai-panel__approval-menu button > svg:last-child {
+  color: #256b4e;
+}
+
+.studio-ai-panel__approval-menu button > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.studio-ai-panel__approval-menu strong,
+.studio-ai-panel__approval-menu small {
+  overflow-wrap: anywhere;
+}
+
+.studio-ai-panel__approval-menu strong {
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.studio-ai-panel__approval-menu small {
+  color: #777777;
+  font-size: 10px;
+  line-height: 15px;
 }
 
 @media (max-height: 720px) {

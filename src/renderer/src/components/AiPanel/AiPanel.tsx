@@ -31,9 +31,25 @@ import {
   type JSX,
   type KeyboardEvent
 } from 'react'
-import type { AgentChatMessage, AgentModelRegistryItem } from '../../../../shared/agent/workflow'
+import type {
+  AgentApprovalMode,
+  AgentChatMessage,
+  AgentChatMode,
+  AgentEditorPlan,
+  AgentEditorPlanAction,
+  AgentModelRegistryItem,
+  AgentToolCall,
+  AgentToolExecutionResult
+} from '../../../../shared/agent/workflow'
 import { getActiveEditorAgentApi } from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
-import { executeAgentToolCall } from './agentChatTools'
+import { decideAgentPlanApproval } from './agentApprovalPolicy'
+import { executeAgentToolCall, executeApprovedAgentPlan } from './agentChatTools'
+import {
+  readAiApprovalMode,
+  readAiExecutionMode,
+  writeAiApprovalMode,
+  writeAiExecutionMode
+} from './aiPanelAgentPreferences'
 import {
   readLastUsedAgentModelConfigId,
   resolveAgentModelConfigId,
@@ -42,7 +58,9 @@ import {
 import './AiPanel.css'
 
 type AiPanelTab = 'chat' | 'codex'
-type PopupName = 'history' | 'more' | null
+type PopupName = 'history' | 'more' | 'approval' | null
+type ApprovalState = 'awaiting' | 'executing' | 'completed' | 'rejected' | 'stale' | 'failed'
+type PlanToolCall = Extract<AgentToolCall, { name: 'propose_editor_plan' }>
 
 interface AiPanelProps {
   onCollapse?: () => void
@@ -58,6 +76,22 @@ interface ConversationMessage {
   createdAt: string
   toolName?: string
   success?: boolean
+  plan?: AgentEditorPlan
+  approvalState?: ApprovalState
+}
+
+interface PendingPlan {
+  tab: AiPanelTab
+  call: PlanToolCall
+  conversation: AgentChatMessage[]
+  approvalMessageId: number
+}
+
+interface ToolContinuation {
+  tab: AiPanelTab
+  call: AgentToolCall
+  conversation: AgentChatMessage[]
+  approvalMessageId?: number
 }
 
 const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
@@ -65,6 +99,68 @@ const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
 const TOOL_LABELS: Record<string, string> = {
   get_editor_context: '读取工程',
   propose_editor_plan: '编辑计划'
+}
+
+const APPROVAL_OPTIONS: ReadonlyArray<{
+  value: AgentApprovalMode
+  label: string
+  description: string
+}> = [
+  { value: 'request', label: '请求批准', description: '修改工程前始终询问' },
+  { value: 'smart', label: '智能审批', description: '仅对删除、批量和覆盖操作询问' },
+  { value: 'full', label: '完全访问', description: '自动执行已注册的编辑操作' }
+]
+
+const APPROVAL_LABELS: Record<AgentApprovalMode, string> = {
+  request: '请求批准',
+  smart: '智能审批',
+  full: '完全访问'
+}
+
+function formatPlanAction(action: AgentEditorPlanAction): string {
+  switch (action.type) {
+    case 'clip.delete':
+      return `删除 ${action.clipIds.join('、')}`
+    case 'clip.split':
+      return `在 ${action.at} 秒分割 ${action.clipId}`
+    case 'clip.move':
+      return `移动 ${action.clipId} 到 ${action.timelineStart} 秒${action.trackId ? `（${action.trackId}）` : ''}`
+    case 'clip.update':
+      return `修改 ${action.clipId} 参数`
+    default:
+      return assertNever(action)
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`未知计划动作：${JSON.stringify(value)}`)
+}
+
+function rejectedResult(): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: 'REJECTED',
+    message: '用户已拒绝编辑计划',
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
+function staleContextResult(): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: 'STALE_CONTEXT',
+    message: '工程已发生变化，请重新读取工程并生成计划',
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
+function resultApprovalState(result: AgentToolExecutionResult): ApprovalState {
+  if (result.code === 'OK') return 'completed'
+  if (result.code === 'REJECTED') return 'rejected'
+  if (result.code === 'STALE_CONTEXT') return 'stale'
+  return 'failed'
 }
 
 function formatMessageTime(date = new Date()): string {
@@ -98,6 +194,10 @@ function AiPanel({
   const [selectedConfigId, setSelectedConfigId] = useState('')
   const [modelError, setModelError] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [executionMode, setExecutionMode] = useState<AgentChatMode>(() => readAiExecutionMode())
+  const [approvalMode, setApprovalMode] = useState<AgentApprovalMode>(() => readAiApprovalMode())
+  const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null)
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null)
   const panelRef = useRef<HTMLElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
@@ -110,6 +210,7 @@ function AiPanel({
   const chatAvailable = typeof window.api?.runAgentChat === 'function'
   const activeMessages = messages[activeTab]
   const isEmpty = activeMessages.length === 0
+  const interactionLocked = isSending || isExecuting || pendingPlan !== null
 
   useEffect(() => {
     if (!openPopup) return undefined
@@ -167,16 +268,6 @@ function AiPanel({
     if (container) container.scrollTop = container.scrollHeight
   }, [activeMessages.length, isSending])
 
-  const resetConversation = (): void => {
-    setMessages((current) => ({ ...current, [activeTab]: [] }))
-    chatHistoryRef.current[activeTab] = []
-    setComposerValue('')
-    setSelectedFileName(null)
-    setOpenPopup(null)
-    if (textareaRef.current) textareaRef.current.style.height = ''
-    textareaRef.current?.focus()
-  }
-
   const appendMessages = (tab: AiPanelTab, next: ConversationMessage[]): void => {
     setMessages((current) => ({ ...current, [tab]: [...current[tab], ...next] }))
   }
@@ -184,7 +275,9 @@ function AiPanel({
   const createMessage = (
     role: ConversationMessage['role'],
     text: string,
-    metadata: Pick<ConversationMessage, 'toolName' | 'success'> = {}
+    metadata: Partial<
+      Pick<ConversationMessage, 'toolName' | 'success' | 'plan' | 'approvalState'>
+    > = {}
   ): ConversationMessage => {
     const message = {
       id: nextMessageIdRef.current,
@@ -209,6 +302,61 @@ function AiPanel({
     }
   }
 
+  const updateApprovalMessage = (
+    tab: AiPanelTab,
+    messageId: number,
+    approvalState: ApprovalState
+  ): void => {
+    setMessages((current) => ({
+      ...current,
+      [tab]: current[tab].map((message) =>
+        message.id === messageId ? { ...message, approvalState } : message
+      )
+    }))
+  }
+
+  const continueAfterToolResult = (
+    continuation: ToolContinuation,
+    result: AgentToolExecutionResult
+  ): AgentChatMessage[] => {
+    const toolMessage: AgentChatMessage = {
+      role: 'tool',
+      content: JSON.stringify(result),
+      toolCallId: continuation.call.id,
+      name: continuation.call.name
+    }
+    const nextConversation = [...continuation.conversation, toolMessage]
+    chatHistoryRef.current[continuation.tab] = nextConversation
+    appendMessages(continuation.tab, [
+      createMessage('tool', result.message, {
+        toolName: TOOL_LABELS[continuation.call.name] ?? continuation.call.name,
+        success: result.success
+      })
+    ])
+    if (continuation.approvalMessageId !== undefined) {
+      updateApprovalMessage(
+        continuation.tab,
+        continuation.approvalMessageId,
+        resultApprovalState(result)
+      )
+    }
+    return nextConversation
+  }
+
+  const resetConversation = (): void => {
+    if (pendingPlan) {
+      continueAfterToolResult(pendingPlan, rejectedResult())
+      setPendingPlan(null)
+    }
+    setMessages((current) => ({ ...current, [activeTab]: [] }))
+    chatHistoryRef.current[activeTab] = []
+    setComposerValue('')
+    setSelectedFileName(null)
+    setOpenPopup(null)
+    if (textareaRef.current) textareaRef.current.style.height = ''
+    textareaRef.current?.focus()
+  }
+
   const runChat = async (tab: AiPanelTab, history: AgentChatMessage[]): Promise<void> => {
     const chatApi = window.api?.runAgentChat
     if (!chatApi) return
@@ -223,8 +371,8 @@ function AiPanel({
       for (let turn = 0; turn < 6; turn += 1) {
         const response = await chatApi({
           configId: selectedConfigId,
-          mode: 'agent',
-          approvalMode: 'request',
+          mode: executionMode,
+          approvalMode,
           messages: conversation
         })
         if (!response.success || !response.assistant) {
@@ -239,21 +387,63 @@ function AiPanel({
         if (assistant.content) appendMessages(tab, [createMessage('assistant', assistant.content)])
         if (assistant.toolCalls.length === 0) return
 
-        const toolMessages: AgentChatMessage[] = []
-        const renderedTools: ConversationMessage[] = []
         for (const call of assistant.toolCalls) {
-          const result = executeAgentToolCall(call, getActiveEditorAgentApi())
-          const content = JSON.stringify(result)
-          toolMessages.push({ role: 'tool', content, toolCallId: call.id, name: call.name })
-          renderedTools.push(
-            createMessage('tool', result.message, {
-              toolName: TOOL_LABELS[call.name] ?? call.name,
-              success: result.success
-            })
-          )
+          const editorApi = getActiveEditorAgentApi()
+          const continuation: ToolContinuation = { tab, call, conversation }
+
+          if (call.name === 'get_editor_context') {
+            conversation = continueAfterToolResult(
+              continuation,
+              executeAgentToolCall(call, editorApi, executionMode)
+            )
+            continue
+          }
+
+          const decision = decideAgentPlanApproval(executionMode, approvalMode, call.arguments)
+          if (decision === 'reject') {
+            conversation = continueAfterToolResult(
+              continuation,
+              executeAgentToolCall(call, editorApi, executionMode)
+            )
+            continue
+          }
+
+          if (!editorApi) {
+            conversation = continueAfterToolResult(
+              continuation,
+              executeAgentToolCall(call, editorApi, executionMode)
+            )
+            continue
+          }
+
+          if (call.arguments.projectRevision !== editorApi.getRevision()) {
+            conversation = continueAfterToolResult(continuation, staleContextResult())
+            continue
+          }
+
+          if (decision === 'auto_execute') {
+            setIsExecuting(true)
+            const result = executeApprovedAgentPlan(call.arguments, editorApi)
+            setIsExecuting(false)
+            conversation = continueAfterToolResult(continuation, result)
+            continue
+          }
+
+          const approvalMessage = createMessage('tool', call.arguments.summary, {
+            toolName: TOOL_LABELS[call.name],
+            success: false,
+            plan: call.arguments,
+            approvalState: 'awaiting'
+          })
+          appendMessages(tab, [approvalMessage])
+          setPendingPlan({
+            tab,
+            call,
+            conversation,
+            approvalMessageId: approvalMessage.id
+          })
+          return
         }
-        appendMessages(tab, renderedTools)
-        conversation = [...conversation, ...toolMessages]
         chatHistoryRef.current[tab] = conversation
       }
       throw new Error('AI 工具调用次数过多，已停止执行')
@@ -263,13 +453,39 @@ function AiPanel({
       ])
     } finally {
       setIsSending(false)
+      setIsExecuting(false)
     }
+  }
+
+  const approvePendingPlan = (): void => {
+    if (!pendingPlan || isExecuting) return
+    const editorApi = getActiveEditorAgentApi()
+    updateApprovalMessage(pendingPlan.tab, pendingPlan.approvalMessageId, 'executing')
+    setIsExecuting(true)
+
+    const result =
+      !editorApi || editorApi.getRevision() !== pendingPlan.call.arguments.projectRevision
+        ? staleContextResult()
+        : executeApprovedAgentPlan(pendingPlan.call.arguments, editorApi)
+    const nextConversation = continueAfterToolResult(pendingPlan, result)
+    const tab = pendingPlan.tab
+    setPendingPlan(null)
+    setIsExecuting(false)
+    void runChat(tab, nextConversation)
+  }
+
+  const rejectPendingPlan = (): void => {
+    if (!pendingPlan || isExecuting) return
+    const nextConversation = continueAfterToolResult(pendingPlan, rejectedResult())
+    const tab = pendingPlan.tab
+    setPendingPlan(null)
+    void runChat(tab, nextConversation)
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
     const text = composerValue.trim()
-    if (!text || isSending) return
+    if (!text || interactionLocked) return
     if (chatAvailable && !selectedConfigId) {
       setModelError('请选择模型')
       return
@@ -490,6 +706,52 @@ function AiPanel({
             aria-label="当前会话"
           >
             {activeMessages.map((message) => {
+              if (message.plan) {
+                const awaiting = message.approvalState === 'awaiting'
+                const statusLabel =
+                  message.approvalState === 'executing'
+                    ? '正在执行'
+                    : message.approvalState === 'completed'
+                      ? '已执行'
+                      : message.approvalState === 'rejected'
+                        ? '已拒绝'
+                        : message.approvalState === 'stale'
+                          ? '计划已失效'
+                          : message.approvalState === 'failed'
+                            ? '执行失败'
+                            : '等待批准'
+                return (
+                  <section
+                    key={message.id}
+                    className={`studio-ai-panel__approval is-${message.approvalState ?? 'awaiting'}`}
+                    aria-label={`审批计划 ${message.plan.summary}`}
+                  >
+                    <div className="studio-ai-panel__approval-heading">
+                      <ShieldCheck size={16} strokeWidth={1.7} aria-hidden="true" />
+                      <div>
+                        <strong>{message.plan.summary}</strong>
+                        <span>{statusLabel}</span>
+                      </div>
+                    </div>
+                    <ul>
+                      {message.plan.actions.map((action, index) => (
+                        <li key={`${message.plan?.planId}-${index}`}>{formatPlanAction(action)}</li>
+                      ))}
+                    </ul>
+                    {awaiting && (
+                      <div className="studio-ai-panel__approval-actions">
+                        <button type="button" onClick={approvePendingPlan}>
+                          批准执行
+                        </button>
+                        <button type="button" onClick={rejectPendingPlan}>
+                          拒绝
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )
+              }
+
               if (message.role === 'tool') {
                 const ToolStatusIcon = message.success ? CircleCheck : CircleAlert
                 return (
@@ -609,9 +871,19 @@ function AiPanel({
           </button>
           <label className="studio-ai-panel__select" title="选择执行模式">
             <Bot size={13} strokeWidth={1.7} aria-hidden="true" />
-            <select aria-label="执行模式" defaultValue="Agent">
-              <option>Agent</option>
-              <option>Ask</option>
+            <select
+              aria-label="执行模式"
+              value={executionMode}
+              disabled={interactionLocked}
+              onChange={(event) => {
+                const mode = event.target.value as AgentChatMode
+                setExecutionMode(mode)
+                writeAiExecutionMode(mode)
+                setOpenPopup(null)
+              }}
+            >
+              <option value="agent">Agent</option>
+              <option value="assistant">助手</option>
             </select>
           </label>
           <label className="studio-ai-panel__select" title="选择模型">
@@ -662,7 +934,9 @@ function AiPanel({
             aria-label="发送"
             title="发送"
             disabled={
-              !composerValue.trim() || isSending || Boolean(chatAvailable && !selectedConfigId)
+              !composerValue.trim() ||
+              interactionLocked ||
+              Boolean(chatAvailable && !selectedConfigId)
             }
           >
             <ArrowUp size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -681,14 +955,54 @@ function AiPanel({
           <Monitor size={13} strokeWidth={1.6} aria-hidden="true" />
           本地
         </span>
-        <label title="选择审批模式">
-          <ShieldCheck size={13} strokeWidth={1.6} aria-hidden="true" />
-          <select aria-label="审批模式" defaultValue="默认审批">
-            <option>默认审批</option>
-            <option>自动审批</option>
-            <option>逐项审批</option>
-          </select>
-        </label>
+        <div className="studio-ai-panel__approval-control">
+          <button
+            className="studio-ai-panel__approval-trigger"
+            type="button"
+            aria-label={`审批模式：${APPROVAL_LABELS[approvalMode]}`}
+            aria-haspopup="menu"
+            aria-expanded={openPopup === 'approval'}
+            disabled={executionMode === 'assistant' || interactionLocked}
+            onClick={() => togglePopup('approval')}
+          >
+            <ShieldCheck size={13} strokeWidth={1.6} aria-hidden="true" />
+            <span>{APPROVAL_LABELS[approvalMode]}</span>
+            <ChevronDown size={11} strokeWidth={1.7} aria-hidden="true" />
+          </button>
+          {openPopup === 'approval' && (
+            <div className="studio-ai-panel__approval-menu" role="menu" aria-label="审批模式">
+              {APPROVAL_OPTIONS.map((option) => {
+                const selected = approvalMode === option.value
+                const OptionIcon =
+                  option.value === 'request'
+                    ? CircleAlert
+                    : option.value === 'smart'
+                      ? ShieldCheck
+                      : Bot
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    onClick={() => {
+                      setApprovalMode(option.value)
+                      writeAiApprovalMode(option.value)
+                      setOpenPopup(null)
+                    }}
+                  >
+                    <OptionIcon size={16} strokeWidth={1.65} aria-hidden="true" />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                    {selected && <Check size={15} strokeWidth={1.8} aria-hidden="true" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </footer>
     </section>
   )

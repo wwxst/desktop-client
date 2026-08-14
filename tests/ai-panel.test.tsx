@@ -2,10 +2,35 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AiPanel from '../src/renderer/src/components/AiPanel/AiPanel'
+import {
+  AI_APPROVAL_MODE_KEY,
+  AI_EXECUTION_MODE_KEY
+} from '../src/renderer/src/components/AiPanel/aiPanelAgentPreferences'
 import { LAST_USED_AGENT_MODEL_CONFIG_KEY } from '../src/renderer/src/components/AiPanel/aiPanelModelPreference'
-import type { AgentModelRegistryItem } from '../src/shared/agent/workflow'
+import {
+  createEditorAgentApi,
+  registerEditorAgentApi
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorAgentApi'
+import {
+  applyEditorCommand,
+  applyEditorCommandsWithResult,
+  applyEditorTransactionWithResult,
+  type EditorCommand
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorCommands'
+import {
+  createInitialEditorProjectState,
+  MAIN_VISUAL_TRACK_ID,
+  type EditorProjectState
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
+import type {
+  AgentChatResponse,
+  AgentEditorPlan,
+  AgentModelRegistryItem
+} from '../src/shared/agent/workflow'
+
+let unregisterEditorApi: (() => void) | null = null
 
 function setAgentModels(configurations: AgentModelRegistryItem[]): void {
   Object.defineProperty(window, 'api', {
@@ -18,6 +43,120 @@ function setAgentModels(configurations: AgentModelRegistryItem[]): void {
       })
     }
   })
+}
+
+function createProject(): EditorProjectState {
+  return {
+    ...createInitialEditorProjectState('draft-1'),
+    assets: [
+      {
+        id: 'asset-1',
+        name: 'one.mp4',
+        url: 'blob:one',
+        duration: 4,
+        status: 'ready',
+        kind: 'video'
+      },
+      {
+        id: 'asset-2',
+        name: 'two.mp4',
+        url: 'blob:two',
+        duration: 4,
+        status: 'ready',
+        kind: 'video'
+      }
+    ],
+    clips: [
+      {
+        id: 'clip-1',
+        assetId: 'asset-1',
+        trackId: MAIN_VISUAL_TRACK_ID,
+        timelineStart: 0,
+        sourceStart: 0,
+        sourceEnd: 4,
+        duration: 4
+      },
+      {
+        id: 'clip-2',
+        assetId: 'asset-2',
+        trackId: MAIN_VISUAL_TRACK_ID,
+        timelineStart: 4,
+        sourceStart: 0,
+        sourceEnd: 4,
+        duration: 4
+      }
+    ]
+  }
+}
+
+function registerTestEditor(revision = { current: 3 }): ReturnType<typeof vi.fn> {
+  const project = createProject()
+  const executeTransaction = vi.fn((commands: readonly EditorCommand[]) =>
+    applyEditorTransactionWithResult(project, commands)
+  )
+  unregisterEditorApi = registerEditorAgentApi(
+    createEditorAgentApi({
+      getProject: () => project,
+      getRevision: () => revision.current,
+      execute: (command) => applyEditorCommand(project, command),
+      executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
+      executeTransaction,
+      undo: vi.fn(),
+      redo: vi.fn()
+    })
+  )
+  return executeTransaction
+}
+
+function plan(actions: AgentEditorPlan['actions']): AgentEditorPlan {
+  return {
+    planId: 'plan-1',
+    projectRevision: 3,
+    summary: '整理时间线',
+    actions
+  }
+}
+
+function planResponse(editorPlan: AgentEditorPlan): AgentChatResponse {
+  return {
+    success: true,
+    message: '已生成计划',
+    assistant: {
+      content: '',
+      toolCalls: [{ id: 'call-plan-1', name: 'propose_editor_plan', arguments: editorPlan }]
+    }
+  }
+}
+
+function setAgentChat(runAgentChat: ReturnType<typeof vi.fn>): void {
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      listAgentModelConfigurations: vi.fn().mockResolvedValue({
+        success: true,
+        message: '模型配置加载成功',
+        configurations: [{ id: 'config-1', kind: 'custom', modelId: 'chat-model' }]
+      }),
+      runAgentChat
+    }
+  })
+}
+
+async function submitPrompt(
+  user: ReturnType<typeof userEvent.setup>,
+  text = '整理时间线'
+): Promise<void> {
+  await screen.findByRole('option', { name: 'chat-model' })
+  await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), text)
+  await user.click(screen.getByRole('button', { name: '发送' }))
+}
+
+async function selectApprovalMode(
+  user: ReturnType<typeof userEvent.setup>,
+  label: '请求批准' | '智能审批' | '完全访问'
+): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /审批模式/ }))
+  await user.click(screen.getByRole('menuitemradio', { name: new RegExp(`^${label}`) }))
 }
 
 function readAiPanelCss(): string {
@@ -36,7 +175,274 @@ function getCssBlock(css: string, selector: string): string {
 
 describe('AiPanel', () => {
   beforeEach(() => {
-    window.localStorage.removeItem(LAST_USED_AGENT_MODEL_CONFIG_KEY)
+    window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    unregisterEditorApi?.()
+    unregisterEditorApi = null
+  })
+
+  it('persists Agent and approval preferences while Assistant keeps the saved approval', async () => {
+    const user = userEvent.setup()
+    const firstMount = render(<AiPanel />)
+
+    expect(screen.getByRole('combobox', { name: '执行模式' })).toHaveValue('agent')
+    expect(screen.getByRole('button', { name: '审批模式：请求批准' })).toBeEnabled()
+
+    await selectApprovalMode(user, '智能审批')
+    await user.selectOptions(screen.getByRole('combobox', { name: '执行模式' }), 'assistant')
+
+    expect(screen.getByRole('combobox', { name: '执行模式' })).toHaveDisplayValue('助手')
+    expect(screen.getByRole('button', { name: '审批模式：智能审批' })).toBeDisabled()
+    expect(window.localStorage.getItem(AI_EXECUTION_MODE_KEY)).toBe('assistant')
+    expect(window.localStorage.getItem(AI_APPROVAL_MODE_KEY)).toBe('smart')
+
+    firstMount.unmount()
+    render(<AiPanel />)
+
+    expect(screen.getByRole('combobox', { name: '执行模式' })).toHaveValue('assistant')
+    expect(screen.getByRole('button', { name: '审批模式：智能审批' })).toBeDisabled()
+    expect(screen.queryByRole('option', { name: 'Ask' })).not.toBeInTheDocument()
+  })
+
+  it('sends the selected mode and retained approval mode with every request', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'smart')
+    const runAgentChat = vi.fn().mockResolvedValue({
+      success: true,
+      message: '对话完成',
+      assistant: { content: '只提供建议。', toolCalls: [] }
+    })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '执行模式' }), 'assistant')
+    await submitPrompt(user, '分析当前工程')
+
+    await screen.findByText('只提供建议。')
+    expect(runAgentChat).toHaveBeenCalledWith({
+      configId: 'config-1',
+      mode: 'assistant',
+      approvalMode: 'smart',
+      messages: [{ role: 'user', content: '分析当前工程' }]
+    })
+  })
+
+  it('rejects a forged Assistant plan without executing it and resumes the model', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const editorPlan = plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }])
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(editorPlan))
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '助手模式只能提供建议。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '执行模式' }), 'assistant')
+    await submitPrompt(user)
+
+    expect(await screen.findByText('助手模式只能提供建议。')).toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'UNSUPPORTED_ACTION',
+      changed: false
+    })
+  })
+
+  it('waits in request mode, executes once after approval, and resumes with structured history', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const editorPlan = plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }])
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(editorPlan))
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '时间线已经整理完成。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+
+    const approval = await screen.findByRole('region', { name: '审批计划 整理时间线' })
+    expect(approval).toHaveTextContent('移动 clip-2 到 8 秒')
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(screen.queryByText('AI 正在处理...')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '发送' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: '执行模式' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '审批模式：请求批准' })).toBeDisabled()
+
+    await user.click(within(approval).getByRole('button', { name: '批准执行' }))
+
+    expect(await screen.findByText('时间线已经整理完成。')).toBeInTheDocument()
+    expect(executeTransaction).toHaveBeenCalledOnce()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      success: true,
+      code: 'OK',
+      changed: true,
+      affectedClipIds: ['clip-2']
+    })
+    expect(runAgentChat.mock.calls[1][0].messages.at(-1)).toMatchObject({
+      role: 'tool',
+      toolCallId: 'call-plan-1',
+      name: 'propose_editor_plan'
+    })
+  })
+
+  it('rejects a pending plan without editing and resumes for an explanation', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(plan([{ type: 'clip.delete', clipIds: ['clip-1'] }])))
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '已取消这次修改。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    await user.click(await screen.findByRole('button', { name: '拒绝' }))
+
+    expect(await screen.findByText('已取消这次修改。')).toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      success: false,
+      code: 'REJECTED',
+      changed: false
+    })
+  })
+
+  it('auto executes a single smart move', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'smart')
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '已自动移动片段。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+
+    expect(await screen.findByText('已自动移动片段。')).toBeInTheDocument()
+    expect(executeTransaction).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: '批准执行' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    {
+      name: 'delete',
+      actions: [{ type: 'clip.delete' as const, clipIds: ['clip-1'] }]
+    },
+    {
+      name: 'multiple actions',
+      actions: [
+        { type: 'clip.move' as const, clipId: 'clip-2', timelineStart: 8 },
+        { type: 'clip.update' as const, clipId: 'clip-1', patch: { opacity: 0.5 } }
+      ]
+    }
+  ])('waits for approval for smart $name plans', async ({ actions }) => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'smart')
+    const runAgentChat = vi.fn().mockResolvedValueOnce(planResponse(plan(actions)))
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+
+    expect(await screen.findByRole('button', { name: '批准执行' })).toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(runAgentChat).toHaveBeenCalledOnce()
+  })
+
+  it('auto executes delete plans in full mode', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'full')
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(plan([{ type: 'clip.delete', clipIds: ['clip-1'] }])))
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '已自动删除片段。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+
+    expect(await screen.findByText('已自动删除片段。')).toBeInTheDocument()
+    expect(executeTransaction).toHaveBeenCalledOnce()
+  })
+
+  it('returns STALE_CONTEXT without editing when revision changes while waiting', async () => {
+    const user = userEvent.setup()
+    const revision = { current: 3 }
+    const executeTransaction = registerTestEditor(revision)
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '工程已变化，需要重新规划。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    revision.current = 4
+    await user.click(await screen.findByRole('button', { name: '批准执行' }))
+
+    expect(await screen.findByText('工程已变化，需要重新规划。')).toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'STALE_CONTEXT',
+      changed: false
+    })
+  })
+
+  it('starts a clean conversation by rejecting and clearing a pending plan without editing', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(plan([{ type: 'clip.delete', clipIds: ['clip-1'] }])))
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    expect(await screen.findByRole('button', { name: '批准执行' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '新建会话' }))
+
+    expect(screen.queryByRole('button', { name: '批准执行' })).not.toBeInTheDocument()
+    expect(screen.getByText('欢迎使用智剪')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '执行模式' })).toBeEnabled()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(runAgentChat).toHaveBeenCalledOnce()
   })
 
   it('renders the chat shell and switches to Codex mode', async () => {
