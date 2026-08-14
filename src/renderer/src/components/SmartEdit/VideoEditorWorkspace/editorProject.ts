@@ -465,6 +465,124 @@ export function canvasAspectRatiosEqual(
   )
 }
 
+export function editorProjectStatesEqual(
+  left: EditorProjectState,
+  right: EditorProjectState
+): boolean {
+  if (left === right) return true
+  return (
+    arrayItemsEqual(left.assets, right.assets, mediaAssetsEqual) &&
+    arrayItemsEqual(left.tracks, right.tracks, editorTracksEqual) &&
+    arrayItemsEqual(left.clips, right.clips, timelineClipsEqual) &&
+    left.activeClipId === right.activeClipId &&
+    numbersEqual(left.playhead, right.playhead) &&
+    numbersEqual(left.timelineZoom, right.timelineZoom) &&
+    canvasAspectRatiosEqual(left.aspectRatio, right.aspectRatio) &&
+    arrayItemsEqual(left.draftRows, right.draftRows, draftRowsEqual)
+  )
+}
+
+function arrayItemsEqual<T>(
+  left: readonly T[],
+  right: readonly T[],
+  equal: (leftItem: T, rightItem: T) => boolean
+): boolean {
+  return (
+    left === right ||
+    (left.length === right.length && left.every((item, index) => equal(item, right[index])))
+  )
+}
+
+function mediaAssetsEqual(left: MediaAsset, right: MediaAsset): boolean {
+  return (
+    left === right ||
+    (left.id === right.id &&
+      left.name === right.name &&
+      left.url === right.url &&
+      nullableNumbersEqual(left.duration, right.duration) &&
+      left.status === right.status &&
+      left.kind === right.kind &&
+      nullableNumbersEqual(left.width, right.width) &&
+      nullableNumbersEqual(left.height, right.height) &&
+      left.error === right.error)
+  )
+}
+
+function editorTracksEqual(left: EditorTrack, right: EditorTrack): boolean {
+  return (
+    left === right ||
+    (left.id === right.id &&
+      left.name === right.name &&
+      left.kind === right.kind &&
+      left.role === right.role &&
+      left.locked === right.locked &&
+      left.hidden === right.hidden &&
+      left.muted === right.muted)
+  )
+}
+
+function timelineClipsEqual(left: TimelineClip, right: TimelineClip): boolean {
+  return (
+    left === right ||
+    (left.id === right.id &&
+      left.assetId === right.assetId &&
+      left.trackId === right.trackId &&
+      optionalNumbersEqual(left.timelineStart, right.timelineStart) &&
+      optionalNumbersEqual(left.duration, right.duration) &&
+      optionalNumbersEqual(left.sourceStart, right.sourceStart) &&
+      optionalNumbersEqual(left.sourceEnd, right.sourceEnd) &&
+      clipTransformsEqual(left.transform, right.transform) &&
+      optionalNumbersEqual(left.opacity, right.opacity) &&
+      optionalNumbersEqual(left.volume, right.volume) &&
+      left.muted === right.muted &&
+      optionalNumbersEqual(left.speed, right.speed) &&
+      left.enabled === right.enabled)
+  )
+}
+
+function clipTransformsEqual(
+  left: ClipTransform | undefined,
+  right: ClipTransform | undefined
+): boolean {
+  if (left === right) return true
+  if (!left || !right) return false
+  return (
+    numbersEqual(left.x, right.x) &&
+    numbersEqual(left.y, right.y) &&
+    numbersEqual(left.scaleX, right.scaleX) &&
+    numbersEqual(left.scaleY, right.scaleY) &&
+    numbersEqual(left.rotation, right.rotation)
+  )
+}
+
+function draftRowsEqual(left: DraftRow, right: DraftRow): boolean {
+  return (
+    left === right ||
+    (left.id === right.id &&
+      left.draftName === right.draftName &&
+      left.fixedStartFileName === right.fixedStartFileName &&
+      left.audio === right.audio &&
+      left.fixedEndFileName === right.fixedEndFileName)
+  )
+}
+
+function optionalNumbersEqual(left: number | undefined, right: number | undefined): boolean {
+  return left === undefined || right === undefined ? left === right : numbersEqual(left, right)
+}
+
+function nullableNumbersEqual(
+  left: number | null | undefined,
+  right: number | null | undefined
+): boolean {
+  return left === null || left === undefined || right === null || right === undefined
+    ? left === right
+    : numbersEqual(left, right)
+}
+
+function numbersEqual(left: number, right: number): boolean {
+  return left === right || (Number.isNaN(left) && Number.isNaN(right))
+}
+
 export function editorProjectReducer(
   state: EditorProjectState,
   action: EditorProjectAction

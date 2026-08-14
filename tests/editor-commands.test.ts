@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { applyEditorCommand } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorCommands'
+import {
+  applyEditorCommand,
+  applyEditorCommandsWithResult,
+  applyEditorTransactionWithResult
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorCommands'
 import {
   createInitialEditorProjectState,
   editorProjectReducer,
@@ -24,6 +28,23 @@ function createReadyProject(): EditorProjectState {
 }
 
 describe('editor commands', () => {
+  it('reports no change when batch and transaction commands net to the starting project', () => {
+    const project = createReadyProject()
+    const track = project.tracks[0]
+    const commands = [
+      { type: 'track/update' as const, trackId: track.id, patch: { name: 'Temp' } },
+      { type: 'track/update' as const, trackId: track.id, patch: { name: track.name } }
+    ]
+
+    const batch = applyEditorCommandsWithResult(project, commands)
+    expect(batch).toMatchObject({ success: true, changed: false, code: 'NO_CHANGE' })
+    expect(batch.state).toBe(project)
+
+    const transaction = applyEditorTransactionWithResult(project, commands)
+    expect(transaction).toMatchObject({ success: true, changed: false, code: 'NO_CHANGE' })
+    expect(transaction.state).toBe(project)
+  })
+
   it('adds, moves and updates a clip through commands', () => {
     let state = createReadyProject()
     state = applyEditorCommand(state, {

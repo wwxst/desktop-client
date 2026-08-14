@@ -6,6 +6,7 @@ import {
 } from './editorCommands'
 import {
   createInitialEditorProjectState,
+  editorProjectStatesEqual,
   editorProjectReducer,
   type EditorProjectAction,
   type EditorProjectState
@@ -98,7 +99,7 @@ export function editorHistoryReducer(
   switch (action.type) {
     case 'project/action': {
       const present = editorProjectReducer(state.present, action.action)
-      if (present === state.present) return state
+      if (editorProjectStatesEqual(present, state.present)) return state
 
       if (isExternalFactAction(action.action)) {
         return {
@@ -126,7 +127,7 @@ export function editorHistoryReducer(
     case 'command/batch': {
       if (action.commands.length === 0) return state
       const present = applyEditorCommands(state.present, action.commands)
-      if (present === state.present) return state
+      if (editorProjectStatesEqual(present, state.present)) return state
       return pushHistory(state, present)
     }
 

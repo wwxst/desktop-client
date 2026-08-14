@@ -271,6 +271,38 @@ describe('Editor V2 history external fact rebase', () => {
     expect(state.revision).toBe(1)
   })
 
+  it('does not create history for a batch whose final project matches its start', () => {
+    const state = createInitialEditorHistoryState('draft-1')
+    const track = state.present.tracks[0]
+    const next = editorHistoryReducer(state, {
+      type: 'command/batch',
+      commands: [
+        { type: 'track/update', trackId: track.id, patch: { name: 'Temp' } },
+        { type: 'track/update', trackId: track.id, patch: { name: track.name } }
+      ]
+    })
+
+    expect(next).toBe(state)
+    expect(next.revision).toBe(0)
+    expect(next.past).toHaveLength(0)
+  })
+
+  it('does not create history for a transaction whose final project matches its start', () => {
+    const state = createInitialEditorHistoryState('draft-1')
+    const track = state.present.tracks[0]
+    const next = editorHistoryReducer(state, {
+      type: 'command/transaction',
+      commands: [
+        { type: 'track/update', trackId: track.id, patch: { name: 'Temp' } },
+        { type: 'track/update', trackId: track.id, patch: { name: track.name } }
+      ]
+    })
+
+    expect(next).toBe(state)
+    expect(next.revision).toBe(0)
+    expect(next.past).toHaveLength(0)
+  })
+
   it('does not increment revision when writing identical draft values', () => {
     let state = createInitialEditorHistoryState('draft-1')
     state = editorHistoryReducer(state, {

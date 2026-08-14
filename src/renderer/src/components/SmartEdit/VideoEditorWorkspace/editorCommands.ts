@@ -3,6 +3,7 @@ import {
   MIN_CLIP_DURATION,
   canvasAspectRatiosEqual,
   createTimelineClipFromAsset,
+  editorProjectStatesEqual,
   getDefaultTrackIdForAsset,
   getMediaAssetKind,
   getTrackEnd,
@@ -122,9 +123,9 @@ export function applyEditorCommand(
   }
 
   const nextState = reduceEditorCommand(state, command)
-  const changed = nextState !== state
+  const changed = !editorProjectStatesEqual(nextState, state)
   return {
-    state: nextState,
+    state: changed ? nextState : state,
     success: changed,
     changed,
     code: changed ? 'OK' : 'NO_CHANGE',
@@ -157,11 +158,12 @@ export function applyEditorCommandsWithResult(
   }
 
   const failedResult = results.find((result) => !result.success)
+  const changed = !editorProjectStatesEqual(current, state)
   return {
-    state: current,
+    state: changed ? current : state,
     success: results.length > 0 && !failedResult,
-    changed: current !== state,
-    code: failedResult?.code ?? (results.length > 0 ? 'OK' : 'NO_CHANGE'),
+    changed,
+    code: failedResult?.code ?? (changed ? 'OK' : 'NO_CHANGE'),
     results,
     message: failedResult?.message
   }
@@ -204,11 +206,12 @@ export function applyEditorTransactionWithResult(
     current = result.state
   }
 
+  const changed = !editorProjectStatesEqual(current, state)
   return {
-    state: current,
+    state: changed ? current : state,
     success: true,
-    changed: current !== state,
-    code: current !== state ? 'OK' : 'NO_CHANGE',
+    changed,
+    code: changed ? 'OK' : 'NO_CHANGE',
     results
   }
 }
