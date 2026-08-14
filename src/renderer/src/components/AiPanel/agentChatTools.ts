@@ -1,14 +1,31 @@
-import type { AgentToolCall, AgentToolExecutionResult } from '../../../../shared/agent/workflow'
+import type {
+  AgentChatMode,
+  AgentEditorPlan,
+  AgentToolCall,
+  AgentToolExecutionResult
+} from '../../../../shared/agent/workflow'
 import type { EditorAgentApi } from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
 import {
   getProjectDuration,
   resolveTimelineClip
 } from '../SmartEdit/VideoEditorWorkspace/editorProject'
+import { executeAgentEditorPlan } from './agentEditorPlanExecutor'
 
 export function executeAgentToolCall(
   call: AgentToolCall,
-  editorApi: EditorAgentApi | null
+  editorApi: EditorAgentApi | null,
+  mode: AgentChatMode = 'agent'
 ): AgentToolExecutionResult {
+  if (call.name === 'propose_editor_plan' && mode !== 'agent') {
+    return {
+      success: false,
+      code: 'UNSUPPORTED_ACTION',
+      message: '助手模式不能修改剪辑工程',
+      changed: false,
+      affectedClipIds: []
+    }
+  }
+
   if (!editorApi) {
     return {
       success: false,
@@ -29,6 +46,7 @@ export function executeAgentToolCall(
       changed: false,
       affectedClipIds: [],
       data: {
+        revision: editorApi.getRevision(),
         aspectRatio: project.aspectRatio,
         duration: getProjectDuration(project),
         playhead: editorApi.getPlayhead(),
@@ -59,4 +77,20 @@ export function executeAgentToolCall(
     changed: false,
     affectedClipIds: []
   }
+}
+
+export function executeApprovedAgentPlan(
+  plan: AgentEditorPlan,
+  editorApi: EditorAgentApi | null
+): AgentToolExecutionResult {
+  if (!editorApi) {
+    return {
+      success: false,
+      code: 'EDITOR_UNAVAILABLE',
+      message: '当前没有打开剪辑工程',
+      changed: false,
+      affectedClipIds: []
+    }
+  }
+  return executeAgentEditorPlan(plan, editorApi)
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { AgentChatMode } from '../src/shared/agent/workflow'
 import { createEditorAgentApi } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorAgentApi'
 import { executeAgentToolCall } from '../src/renderer/src/components/AiPanel/agentChatTools'
 import {
@@ -116,11 +117,75 @@ describe('EditorAgentApi execution results', () => {
             actions: [{ type: 'clip.delete', clipIds: ['clip-1'] }]
           }
         },
-        api
+        api,
+        'agent'
       )
     ).toMatchObject({
       success: false,
       code: 'AWAITING_APPROVAL',
+      changed: false,
+      affectedClipIds: []
+    })
+    expect(executeTransaction).not.toHaveBeenCalled()
+  })
+
+  it('includes the editor revision in the structured context result', () => {
+    const api = createEditorAgentApi({
+      getProject: createProject,
+      getRevision: () => 9,
+      execute: (command) => applyEditorCommand(createProject(), command),
+      executeBatch: (commands) => applyEditorCommandsWithResult(createProject(), commands),
+      executeTransaction: (commands) => applyEditorCommandsWithResult(createProject(), commands),
+      undo: vi.fn(),
+      redo: vi.fn()
+    })
+
+    const result = executeAgentToolCall(
+      { id: 'call-context', name: 'get_editor_context', arguments: {} },
+      api,
+      'assistant'
+    )
+
+    expect(result).toMatchObject({
+      success: true,
+      code: 'OK',
+      changed: false,
+      affectedClipIds: [],
+      data: { revision: 9 }
+    })
+  })
+
+  it('rejects a forged plan in Assistant mode without executing it', () => {
+    const executeTransaction = vi.fn()
+    const api = createEditorAgentApi({
+      getProject: createProject,
+      getRevision: () => 0,
+      execute: (command) => applyEditorCommand(createProject(), command),
+      executeBatch: (commands) => applyEditorCommandsWithResult(createProject(), commands),
+      executeTransaction,
+      undo: vi.fn(),
+      redo: vi.fn()
+    })
+    const mode: AgentChatMode = 'assistant'
+
+    const result = executeAgentToolCall(
+      {
+        id: 'forged-call',
+        name: 'propose_editor_plan',
+        arguments: {
+          planId: 'plan-forged',
+          projectRevision: 0,
+          summary: '删除片段',
+          actions: [{ type: 'clip.delete', clipIds: ['clip-1'] }]
+        }
+      },
+      api,
+      mode
+    )
+
+    expect(result).toMatchObject({
+      success: false,
+      code: 'UNSUPPORTED_ACTION',
       changed: false,
       affectedClipIds: []
     })
