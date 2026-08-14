@@ -46,6 +46,7 @@ export function executeAgentToolCall(
       changed: false,
       affectedClipIds: [],
       data: {
+        sessionId: editorApi.getSessionId(),
         revision: editorApi.getRevision(),
         aspectRatio: project.aspectRatio,
         duration: getProjectDuration(project),

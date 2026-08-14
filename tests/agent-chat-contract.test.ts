@@ -309,6 +309,39 @@ describe('isAgentChatRequest', () => {
       isAgentChatRequest({ ...request, messages: [{ role: 'user', content: 'x'.repeat(20_001) }] })
     ).toBe(false)
   })
+
+  it('rejects assistant messages with more than 12 tool calls', () => {
+    const toolCalls = Array.from({ length: 13 }, (_, index) => ({
+      id: `call-${index + 1}`,
+      name: 'get_editor_context' as const,
+      arguments: {}
+    }))
+    const toolResults = toolCalls.map((call) => ({
+      role: 'tool' as const,
+      name: call.name,
+      toolCallId: call.id,
+      content: JSON.stringify({
+        success: true,
+        code: 'OK',
+        message: 'ok',
+        changed: false,
+        affectedClipIds: []
+      })
+    }))
+
+    expect(
+      isAgentChatRequest({
+        configId: 'config-1',
+        mode: 'agent',
+        approvalMode: 'request',
+        messages: [
+          { role: 'user', content: '读取工程' },
+          { role: 'assistant', content: '', toolCalls },
+          ...toolResults
+        ]
+      })
+    ).toBe(false)
+  })
 })
 
 describe('isAgentToolExecutionResult', () => {

@@ -25,17 +25,17 @@
 
 这些能力通过 `EditorPlacementPolicy` 规划轨道、碰撞和磁吸行为，再以 `executeTransaction` 提交。低层 `EditorCommand` 仍保留给已有 Agent 和兼容调用，但新自动化不应绕过 Placement Policy 直接拼接移动/放置规则。
 
-AI 面板通过已注册的 `EditorAgentApi` 读取工程快照、当前 revision、选择和播放头。模型只能读取上下文或提交结构化 `AgentEditorPlan`；计划动作限定为删除、分割、移动和参数修改，不接收任意 `EditorCommand`、代码或 reducer action。
+AI 面板通过已注册的 `EditorAgentApi` 读取工程快照、挂载级 session ID、当前 revision、选择和播放头。模型只能读取上下文或提交结构化 `AgentEditorPlan`；计划动作限定为删除、分割、移动和参数修改，不接收任意 `EditorCommand`、代码或 reducer action。
 
-Renderer 的计划执行器先在工程快照上逐项编译并预检完整计划：移动和删除复用 `EditorPlacementPolicy`，所有生成命令都经过编辑事务规则模拟。任一目标不存在、轨道锁定、碰撞、参数非法或动作不受支持时，整组计划不执行。全部动作预检成功且 revision 在预检前后都一致时，执行器只调用一次 `executeTransaction`；因此多步计划只形成一个 Undo Step，不会出现部分提交。
+Renderer 在显示审批卡或自动执行前，先调用同一个计划编译器在工程快照上逐项预检完整计划：移动和删除复用 `EditorPlacementPolicy`，所有生成命令都经过编辑事务规则模拟。任一目标不存在、轨道锁定、碰撞、参数非法或动作不受支持时，立即返回结构化失败结果，不显示审批卡且不提交事务。全部动作预检成功且 revision 在预检前后都一致时，执行器只调用一次 `executeTransaction`；因此多步计划只形成一个 Undo Step，不会出现部分提交。
 
 ## 工程 Revision
 
 - 初始 revision 为 `0`，成功改变版本化工程内容的命令、批处理或事务会递增。
 - 成功的 Undo、Redo，以及素材导入、Ready、Failed 等会改变工程事实的外部更新会递增。
 - 选择、播放头、时间线缩放、纯播放/交互运行态、无变化事务和仅清空历史栈不会递增。
-- `EditorAgentApi.getRevision()` 暴露当前值；`get_editor_context` 在工具结果的 `data.revision` 中返回该值，模型生成 `AgentEditorPlan` 时将它回填到 `projectRevision`。
-- 计划在进入审批/自动执行以及用户批准后执行前都必须匹配当前 revision。等待期间工程变化会使计划失效，返回结构化 `STALE_CONTEXT`，且不执行任何动作。
+- 每次 `VideoEditorWorkspace` 挂载生成一个稳定且只属于该实例的 session ID；`EditorAgentApi.getSessionId()` 暴露该值。`get_editor_context` 在工具结果中同时返回 `data.sessionId` 和 `data.revision`，模型生成 `AgentEditorPlan` 时将 revision 回填到 `projectRevision`。
+- AI 面板在每次等待模型响应前记录当前 editor session；模型返回计划、自动执行和用户批准前都要求该 session 仍是当前实例，并要求 `projectRevision` 匹配当前 revision。编辑器已关闭返回 `EDITOR_UNAVAILABLE`；编辑器实例替换或 revision 变化返回 `STALE_CONTEXT`，且不执行任何动作。
 
 ## 不变量
 
@@ -48,7 +48,7 @@ Renderer 的计划执行器先在工程快照上逐项编译并预检完整计�
 
 ## 生命周期
 
-- `VideoEditorWorkspace` 挂载时创建 history、playback controller 和 interaction controller。
+- `VideoEditorWorkspace` 挂载时创建 history、挂载级 Agent session ID、playback controller 和 interaction controller。
 - 离开编辑器时清理 playback controller、媒体检测和 Object URL；临时项目状态随工作区卸载消失。
 - `crypto.randomUUID()` 只能在组件事件/初始化或 ID factory 中生成，纯 reducer 必须保持确定性。
 

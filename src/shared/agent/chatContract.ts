@@ -11,6 +11,7 @@ import type {
 const MAX_ID_LENGTH = 200
 const MAX_MESSAGE_CONTENT_LENGTH = 20_000
 const MAX_MESSAGES = 60
+export const MAX_AGENT_TOOL_CALLS = 12
 const MAX_PLAN_ACTIONS = 20
 const MAX_CLIP_IDS = 100
 
@@ -231,6 +232,7 @@ function isMessage(mode: AgentChatMode, value: unknown): boolean {
     if (!hasExactKeys(value, ['role', 'content'], ['toolCalls'])) return false
     if (value.toolCalls === undefined) return true
     if (!Array.isArray(value.toolCalls)) return false
+    if (value.toolCalls.length > MAX_AGENT_TOOL_CALLS) return false
     try {
       value.toolCalls.forEach((call) => parseAgentToolCall(mode, call))
       return true

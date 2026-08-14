@@ -41,9 +41,13 @@ import type {
   AgentToolCall,
   AgentToolExecutionResult
 } from '../../../../shared/agent/workflow'
-import { getActiveEditorAgentApi } from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
+import {
+  getActiveEditorAgentApi,
+  type EditorAgentApi
+} from '../SmartEdit/VideoEditorWorkspace/editorAgentApi'
 import { decideAgentPlanApproval } from './agentApprovalPolicy'
 import { executeAgentToolCall, executeApprovedAgentPlan } from './agentChatTools'
+import { preflightAgentEditorPlan } from './agentEditorPlanExecutor'
 import {
   readAiApprovalMode,
   readAiExecutionMode,
@@ -84,6 +88,7 @@ interface ConversationMessage {
 interface PendingPlan {
   tab: AiPanelTab
   generation: number
+  sourceSessionId: string
   call: PlanToolCall
   conversation: AgentChatMessage[]
   approvalMessageId: number
@@ -125,16 +130,37 @@ const APPROVAL_LABELS: Record<AgentApprovalMode, string> = {
 function formatPlanAction(action: AgentEditorPlanAction): string {
   switch (action.type) {
     case 'clip.delete':
-      return `删除 ${action.clipIds.join('、')}`
+      return `删除 ${action.clipIds.length} 个片段：${action.clipIds.join('、')}${
+        action.magnetMainTrack ? '；磁吸主轨道空隙，后续片段移动' : ''
+      }`
     case 'clip.split':
-      return `在 ${action.at} 秒分割 ${action.clipId}`
+      return `分割片段 ${action.clipId}，时间 ${action.at} 秒`
     case 'clip.move':
-      return `移动 ${action.clipId} 到 ${action.timelineStart} 秒${action.trackId ? `（${action.trackId}）` : ''}`
+      return action.trackId
+        ? `移动 ${action.clipId} 到 ${action.timelineStart} 秒，目标轨道 ${action.trackId}`
+        : `移动 ${action.clipId} 到 ${action.timelineStart} 秒，保持当前轨道`
     case 'clip.update':
-      return `修改 ${action.clipId} 参数`
+      return `修改片段 ${action.clipId}：${formatUpdatePatch(action.patch)}`
     default:
       return assertNever(action)
   }
+}
+
+function formatUpdatePatch(
+  action: Extract<AgentEditorPlanAction, { type: 'clip.update' }>['patch']
+): string {
+  const values: string[] = []
+  for (const key of ['opacity', 'volume', 'muted', 'speed', 'enabled'] as const) {
+    if (action[key] !== undefined) values.push(`${key}=${String(action[key])}`)
+  }
+  if (action.transform) {
+    for (const key of ['x', 'y', 'scaleX', 'scaleY', 'rotation'] as const) {
+      if (action.transform[key] !== undefined) {
+        values.push(`transform.${key}=${String(action.transform[key])}`)
+      }
+    }
+  }
+  return values.join('，')
 }
 
 function assertNever(value: never): never {
@@ -168,6 +194,42 @@ function staleContextResult(): AgentToolExecutionResult {
     message: '工程已发生变化，请重新读取工程并生成计划',
     changed: false,
     affectedClipIds: []
+  }
+}
+
+function editorUnavailableResult(): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: 'EDITOR_UNAVAILABLE',
+    message: '当前没有打开剪辑工程',
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
+function executionFailedResult(error: unknown): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: 'EXECUTION_FAILED',
+    message: error instanceof Error ? error.message : 'AI 编辑计划执行失败',
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
+function validatePlanContext(
+  sourceSessionId: string | null,
+  editorApi: EditorAgentApi | null,
+  plan: AgentEditorPlan
+): AgentToolExecutionResult | null {
+  if (!sourceSessionId || !editorApi) return editorUnavailableResult()
+  try {
+    if (editorApi.getSessionId() !== sourceSessionId) return staleContextResult()
+    if (editorApi.getRevision() !== plan.projectRevision) return staleContextResult()
+    const preflight = preflightAgentEditorPlan(plan, editorApi)
+    return preflight.success ? null : preflight
+  } catch (error) {
+    return executionFailedResult(error)
   }
 }
 
@@ -463,6 +525,7 @@ function AiPanel({
     try {
       for (let turn = 0; turn < 6; turn += 1) {
         if (!isCurrentGeneration(generation)) return
+        const requestEditorSessionId = getActiveEditorAgentApi()?.getSessionId() ?? null
         const response = await chatApi({
           configId: selectedConfigId,
           mode: executionMode,
@@ -502,13 +565,15 @@ function AiPanel({
           (call): call is PlanToolCall => call.name === 'propose_editor_plan'
         )
         const editorApi = getActiveEditorAgentApi()
+        let planReadiness: AgentToolExecutionResult | null | undefined
         if (
           planCall &&
           decideAgentPlanApproval(executionMode, approvalMode, planCall.arguments) ===
-            'require_approval' &&
-          editorApi &&
-          planCall.arguments.projectRevision === editorApi.getRevision()
+            'require_approval'
         ) {
+          planReadiness = validatePlanContext(requestEditorSessionId, editorApi, planCall.arguments)
+        }
+        if (planCall && planReadiness === null && requestEditorSessionId) {
           const deferredReadResults = assistant.toolCalls
             .filter((call): call is ReadToolCall => call.name === 'get_editor_context')
             .map((call) => ({
@@ -525,6 +590,7 @@ function AiPanel({
           setPendingPlan({
             tab,
             generation,
+            sourceSessionId: requestEditorSessionId,
             call: planCall,
             conversation,
             approvalMessageId: approvalMessage.id,
@@ -556,23 +622,24 @@ function AiPanel({
             continue
           }
 
-          if (!editorApi) {
-            conversation = continueAfterToolResult(
-              continuation,
-              executeAgentToolCall(call, editorApi, executionMode)
-            )
-            continue
-          }
-
-          if (call.arguments.projectRevision !== editorApi.getRevision()) {
-            conversation = continueAfterToolResult(continuation, staleContextResult())
+          const readiness =
+            call === planCall && planReadiness !== undefined
+              ? planReadiness
+              : validatePlanContext(requestEditorSessionId, editorApi, call.arguments)
+          if (readiness) {
+            conversation = continueAfterToolResult(continuation, readiness)
             continue
           }
 
           if (decision === 'auto_execute') {
             if (!isCurrentGeneration(generation)) return
             setIsExecuting(true)
-            const result = executeApprovedAgentPlan(call.arguments, editorApi)
+            let result: AgentToolExecutionResult
+            try {
+              result = executeApprovedAgentPlan(call.arguments, editorApi)
+            } catch (error) {
+              result = executionFailedResult(error)
+            }
             if (!isCurrentGeneration(generation)) return
             setIsExecuting(false)
             conversation = continueAfterToolResult(continuation, result)
@@ -599,21 +666,28 @@ function AiPanel({
 
   const approvePendingPlan = (): void => {
     if (!pendingPlan || isExecuting || !isCurrentGeneration(pendingPlan.generation)) return
-    const editorApi = getActiveEditorAgentApi()
-    updateApprovalMessage(pendingPlan.tab, pendingPlan.approvalMessageId, 'executing')
+    const pending = pendingPlan
+    updateApprovalMessage(pending.tab, pending.approvalMessageId, 'executing')
     setIsExecuting(true)
-
-    const result =
-      !editorApi || editorApi.getRevision() !== pendingPlan.call.arguments.projectRevision
-        ? staleContextResult()
-        : executeApprovedAgentPlan(pendingPlan.call.arguments, editorApi)
-    if (!isCurrentGeneration(pendingPlan.generation)) return
-    const nextConversation = continueAfterPendingPlan(pendingPlan, result)
-    const tab = pendingPlan.tab
-    const generation = pendingPlan.generation
-    setPendingPlan(null)
-    setIsExecuting(false)
-    void runChat(tab, nextConversation, generation)
+    let result: AgentToolExecutionResult = executionFailedResult(new Error('AI 编辑计划执行失败'))
+    try {
+      const editorApi = getActiveEditorAgentApi()
+      const readiness = validatePlanContext(
+        pending.sourceSessionId,
+        editorApi,
+        pending.call.arguments
+      )
+      result = readiness ?? executeApprovedAgentPlan(pending.call.arguments, editorApi)
+    } catch (error) {
+      result = executionFailedResult(error)
+    } finally {
+      if (isCurrentGeneration(pending.generation)) {
+        const nextConversation = continueAfterPendingPlan(pending, result)
+        setPendingPlan(null)
+        setIsExecuting(false)
+        void runChat(pending.tab, nextConversation, pending.generation)
+      }
+    }
   }
 
   const rejectPendingPlan = (): void => {

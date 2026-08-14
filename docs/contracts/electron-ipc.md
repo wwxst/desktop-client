@@ -58,13 +58,13 @@
 
 ### AI 对话边界
 
-`window.api.runAgentChat` 继续使用现有 `agent:chat:run` 通道，没有为 Agent 或助手模式新增通用 IPC。Renderer 每轮都把当前 `mode` 和 `approvalMode` 与 `configId`、`messages` 一起发送给 Main；Main 对字段白名单、消息数量/长度、工具调用和工具结果对应关系进行严格校验。
+`window.api.runAgentChat` 继续使用现有 `agent:chat:run` 通道，没有为 Agent 或助手模式新增通用 IPC。Renderer 每轮都把当前 `mode` 和 `approvalMode` 与 `configId`、`messages` 一起发送给 Main；Main 对字段白名单、消息数量/长度、工具调用和工具结果对应关系进行严格校验。模型单轮响应最多包含 12 个 `tool_calls`；Main 先整批验证每项都是 `function`、ID 非空且批内唯一，再解析任何一项的 JSON 参数，任一项非法则整批拒绝。
 
 - `mode: 'assistant'`：Main 使用固定的只读系统提示，并只向模型声明 `get_editor_context`；请求中的 `approvalMode` 不附加到助手系统提示。助手模式不能提交编辑计划；即使响应或历史中伪造 `propose_editor_plan`，Main 契约和 Renderer 策略都会拒绝。
 - `mode: 'agent'`：Main 声明 `get_editor_context` 和 `propose_editor_plan`，并把当前 `approvalMode: 'request' | 'smart' | 'full'` 的说明附加到 Agent 系统提示。计划工具只能返回含 `projectRevision` 的结构化计划，首期动作白名单为 `clip.delete`、`clip.split`、`clip.move` 和 `clip.update`，不直接修改工程。
 - `approvalMode` 虽然是每轮请求的必填上下文，但模型不能据此自行决定是否执行。实际审批策略、当前编辑器 revision 和计划执行均由 Renderer 持有。
 
-Main 的 schema/协议校验与 Renderer 的审批/执行校验是两道独立防线：Main 拒绝未知、旧式或畸形工具调用；Renderer 再按当前模式、审批权限、工程 revision 和编辑器规则决定拒绝、等待批准或执行。执行模式和审批模式的持久化副本只存在 Renderer `localStorage` 的独立键中；存储不可用时回退到 `Agent + 请求批准`。当前值仅随 `runAgentChat` 请求传给 Main，没有独立的偏好持久化 IPC，Main 也不持久化这两项偏好。
+Main 的 schema/协议校验与 Renderer 的审批/执行校验是两道独立防线：Main 拒绝未知、旧式或畸形工具调用；Renderer 再按当前模式、审批权限、编辑器 session、工程 revision 和编辑器规则决定拒绝、等待批准或执行。执行模式和审批模式的持久化副本只存在 Renderer `localStorage` 的独立键中；存储不可用时回退到 `Agent + 请求批准`。当前值仅随 `runAgentChat` 请求传给 Main，没有独立的偏好持久化 IPC，Main 也不持久化这两项偏好。
 
 “完全访问”只表示 Renderer 可自动执行已经注册且通过校验的编辑计划，不开放任意 IPC、文件系统、网络、代码执行或底层 reducer action。当前聊天仍是逐轮非流式请求；请求取消、流式输出和跨重启会话持久化尚未实现。
 

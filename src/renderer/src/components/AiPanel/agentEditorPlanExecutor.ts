@@ -32,6 +32,27 @@ export type AgentEditorPlanCompilationResult =
 const UPDATE_PATCH_KEYS = ['opacity', 'volume', 'muted', 'speed', 'enabled', 'transform'] as const
 const TRANSFORM_KEYS = ['x', 'y', 'scaleX', 'scaleY', 'rotation'] as const
 
+export function preflightAgentEditorPlan(
+  plan: AgentEditorPlan,
+  editorApi: EditorAgentApi
+): AgentToolExecutionResult {
+  try {
+    if (editorApi.getRevision() !== plan.projectRevision) return staleContext()
+    const compilation = compileAgentEditorPlan(editorApi.getProjectSnapshot(), plan)
+    if (!compilation.success) return compilationFailure(compilation)
+    if (editorApi.getRevision() !== plan.projectRevision) return staleContext()
+    return {
+      success: true,
+      code: 'OK',
+      message: '编辑计划预检通过',
+      changed: false,
+      affectedClipIds: compilation.compiled.affectedClipIds
+    }
+  } catch (error) {
+    return executionFailure(error)
+  }
+}
+
 export function compileAgentEditorPlan(
   project: EditorProjectState,
   plan: AgentEditorPlan,
@@ -74,38 +95,37 @@ export function executeAgentEditorPlan(
   plan: AgentEditorPlan,
   editorApi: EditorAgentApi
 ): AgentToolExecutionResult {
-  if (editorApi.getRevision() !== plan.projectRevision) return staleContext()
+  try {
+    if (editorApi.getRevision() !== plan.projectRevision) return staleContext()
 
-  const compilation = compileAgentEditorPlan(editorApi.getProjectSnapshot(), plan)
-  if (!compilation.success) {
-    return {
-      success: false,
-      code: compilation.code,
-      message: compilation.message,
-      changed: false,
-      affectedClipIds: []
+    const compilation = compileAgentEditorPlan(editorApi.getProjectSnapshot(), plan)
+    if (!compilation.success) return compilationFailure(compilation)
+
+    if (editorApi.getRevision() !== plan.projectRevision) return staleContext()
+
+    const result = editorApi.executeTransaction(
+      compilation.compiled.commands,
+      `AI：${plan.summary}`
+    )
+    if (!result.success || !result.changed) {
+      return {
+        success: false,
+        code: 'EXECUTION_FAILED',
+        message: result.message ?? 'AI 编辑计划执行失败',
+        changed: false,
+        affectedClipIds: []
+      }
     }
-  }
 
-  if (editorApi.getRevision() !== plan.projectRevision) return staleContext()
-
-  const result = editorApi.executeTransaction(compilation.compiled.commands, `AI：${plan.summary}`)
-  if (!result.success || !result.changed) {
     return {
-      success: false,
-      code: 'EXECUTION_FAILED',
-      message: result.message ?? 'AI 编辑计划执行失败',
-      changed: false,
-      affectedClipIds: []
+      success: true,
+      code: 'OK',
+      message: `已执行编辑计划：${plan.summary}`,
+      changed: true,
+      affectedClipIds: compilation.compiled.affectedClipIds
     }
-  }
-
-  return {
-    success: true,
-    code: 'OK',
-    message: `已执行编辑计划：${plan.summary}`,
-    changed: true,
-    affectedClipIds: compilation.compiled.affectedClipIds
+  } catch (error) {
+    return executionFailure(error)
   }
 }
 
@@ -305,6 +325,28 @@ function staleContext(): AgentToolExecutionResult {
     success: false,
     code: 'STALE_CONTEXT',
     message: '工程已发生变化，请重新读取工程并生成计划',
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
+function compilationFailure(
+  failure: Extract<AgentEditorPlanCompilationResult, { success: false }>
+): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: failure.code,
+    message: failure.message,
+    changed: false,
+    affectedClipIds: []
+  }
+}
+
+function executionFailure(error: unknown): AgentToolExecutionResult {
+  return {
+    success: false,
+    code: 'EXECUTION_FAILED',
+    message: error instanceof Error ? error.message : 'AI 编辑计划执行失败',
     changed: false,
     affectedClipIds: []
   }

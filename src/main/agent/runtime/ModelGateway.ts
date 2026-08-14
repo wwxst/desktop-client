@@ -7,7 +7,7 @@ import type {
   AgentModelStatus,
   AgentToolCall
 } from '../../../shared/agent/workflow'
-import { parseAgentToolCall } from '../../../shared/agent/chatContract'
+import { MAX_AGENT_TOOL_CALLS, parseAgentToolCall } from '../../../shared/agent/chatContract'
 import { ModelRegistry } from './ModelRegistry'
 
 export interface JsonCompletionRequest {
@@ -193,8 +193,21 @@ function parseToolCalls(
   message: NonNullable<ChatCompletionResponse['choices']>[number]['message'],
   mode: AgentChatMode
 ): AgentToolCall[] {
+  const candidates = message?.tool_calls ?? []
+  if (candidates.length > MAX_AGENT_TOOL_CALLS) {
+    throw new Error(`大模型单轮返回的工具调用不能超过 ${MAX_AGENT_TOOL_CALLS} 个`)
+  }
+  const ids = new Set<string>()
+  for (const candidate of candidates) {
+    if (candidate.type !== 'function') throw new Error('工具调用类型必须为 function')
+    const id = candidate.id?.trim() ?? ''
+    if (!id) throw new Error('工具调用 ID 不能为空')
+    if (ids.has(id)) throw new Error(`工具调用 ID 重复：${id}`)
+    ids.add(id)
+  }
+
   const calls: AgentToolCall[] = []
-  for (const candidate of message?.tool_calls ?? []) {
+  for (const candidate of candidates) {
     const id = candidate.id?.trim() ?? ''
     const name = candidate.function?.name?.trim() ?? ''
     let parsed: unknown

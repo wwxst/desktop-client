@@ -237,6 +237,59 @@ describe('Agent chat model gateway', () => {
     await expect(run()).rejects.toThrow('工具 get_editor_context 的参数不是有效 JSON')
   })
 
+  it('rejects duplicate tool call IDs before parsing any call arguments', async () => {
+    const { run } = createGatewayReturning({
+      content: null,
+      tool_calls: [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_editor_context', arguments: '{' }
+        },
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_editor_context', arguments: '{}' }
+        }
+      ]
+    })
+
+    await expect(run()).rejects.toThrow('工具调用 ID 重复：call-1')
+  })
+
+  it('rejects a non-function tool call before parsing any call arguments', async () => {
+    const { run } = createGatewayReturning({
+      content: null,
+      tool_calls: [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_editor_context', arguments: '{' }
+        },
+        {
+          id: 'call-2',
+          type: 'custom',
+          function: { name: 'get_editor_context', arguments: '{}' }
+        }
+      ]
+    })
+
+    await expect(run()).rejects.toThrow('工具调用类型必须为 function')
+  })
+
+  it('rejects more than 12 tool calls as one invalid batch', async () => {
+    const { run } = createGatewayReturning({
+      content: null,
+      tool_calls: Array.from({ length: 13 }, (_, index) => ({
+        id: `call-${index + 1}`,
+        type: 'function',
+        function: { name: 'get_editor_context', arguments: '{}' }
+      }))
+    })
+
+    await expect(run()).rejects.toThrow('大模型单轮返回的工具调用不能超过 12 个')
+  })
+
   it('rejects a missing explicit model configuration', async () => {
     const gateway = new ModelGateway(new ModelRegistry(findInternalModelProvider))
 

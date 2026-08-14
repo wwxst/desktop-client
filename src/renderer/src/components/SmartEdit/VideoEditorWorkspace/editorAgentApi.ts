@@ -15,6 +15,7 @@ export interface EditorCapability {
 
 export interface EditorAgentApi {
   getProjectSnapshot: () => EditorProjectState
+  getSessionId: () => string
   getRevision: () => number
   getSelection: () => readonly string[]
   getPlayhead: () => number
@@ -34,6 +35,7 @@ export interface EditorAgentApi {
 
 export interface EditorAgentApiDependencies {
   getProject: () => EditorProjectState
+  getSessionId?: () => string
   getRevision: () => number
   getSelection?: () => readonly string[]
   getPlayhead?: () => number
@@ -64,8 +66,10 @@ const capabilities: readonly EditorCapability[] = [
 ]
 
 export function createEditorAgentApi(deps: EditorAgentApiDependencies): EditorAgentApi {
+  const sessionId = deps.getSessionId?.() ?? crypto.randomUUID()
   return {
     getProjectSnapshot: () => cloneProject(deps.getProject()),
+    getSessionId: () => sessionId,
     getRevision: deps.getRevision,
     getSelection: () => [...(deps.getSelection?.() ?? [])],
     getPlayhead: () => deps.getPlayhead?.() ?? deps.getProject().playhead,

@@ -108,14 +108,19 @@ function createProject(): EditorProjectState {
   }
 }
 
-function registerTestEditor(revision = { current: 3 }): ReturnType<typeof vi.fn> {
-  const project = createProject()
-  const executeTransaction = vi.fn((commands: readonly EditorCommand[]) =>
-    applyEditorTransactionWithResult(project, commands)
+function registerTestEditor(
+  revision = { current: 3 },
+  sessionId = 'editor-session-1',
+  executeTransaction = vi.fn((commands: readonly EditorCommand[]) =>
+    applyEditorTransactionWithResult(createProject(), commands)
   )
+): ReturnType<typeof vi.fn> {
+  const project = createProject()
+  unregisterEditorApi?.()
   unregisterEditorApi = registerEditorAgentApi(
     createEditorAgentApi({
       getProject: () => project,
+      getSessionId: () => sessionId,
       getRevision: () => revision.current,
       execute: (command) => applyEditorCommand(project, command),
       executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
@@ -827,6 +832,209 @@ describe('AiPanel', () => {
       code: 'STALE_CONTEXT',
       changed: false
     })
+  })
+
+  it('does not auto execute a response against a replacement editor with the same revision and clip IDs', async () => {
+    const user = userEvent.setup()
+    const firstTransaction = registerTestEditor({ current: 3 }, 'editor-session-1')
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'full')
+    const response = createDeferred<AgentChatResponse>()
+    const runAgentChat = vi
+      .fn()
+      .mockReturnValueOnce(response.promise)
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '工程实例已变化，需要重新规划。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    await waitFor(() => expect(runAgentChat).toHaveBeenCalledOnce())
+    const replacementTransaction = registerTestEditor({ current: 3 }, 'editor-session-2')
+    await act(async () => {
+      response.resolve(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByText('工程实例已变化，需要重新规划。')).toBeInTheDocument()
+    expect(firstTransaction).not.toHaveBeenCalled()
+    expect(replacementTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'STALE_CONTEXT',
+      changed: false
+    })
+  })
+
+  it('does not approve a pending plan against a replacement editor with the same revision and clip IDs', async () => {
+    const user = userEvent.setup()
+    const firstTransaction = registerTestEditor({ current: 3 }, 'editor-session-1')
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '工程实例已变化，需要重新规划。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    const approve = await screen.findByRole('button', { name: '批准执行' })
+    const replacementTransaction = registerTestEditor({ current: 3 }, 'editor-session-2')
+    await user.click(approve)
+
+    expect(await screen.findByText('工程实例已变化，需要重新规划。')).toBeInTheDocument()
+    expect(firstTransaction).not.toHaveBeenCalled()
+    expect(replacementTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'STALE_CONTEXT',
+      changed: false
+    })
+  })
+
+  it('returns EDITOR_UNAVAILABLE when the editor closes before approval', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '当前没有打开剪辑工程。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    const approve = await screen.findByRole('button', { name: '批准执行' })
+    unregisterEditorApi?.()
+    unregisterEditorApi = null
+    await user.click(approve)
+
+    expect(await screen.findByText('当前没有打开剪辑工程。')).toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'EDITOR_UNAVAILABLE',
+      changed: false
+    })
+  })
+
+  it('preflights an invalid request-mode plan without showing approval or editing', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'missing-clip', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '计划目标不存在，请重新规划。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+
+    expect(await screen.findByText('计划目标不存在，请重新规划。')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '批准执行' })).not.toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'INVALID_PLAN',
+      changed: false
+    })
+  })
+
+  it('recovers from a synchronous approval execution failure and accepts another prompt', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = vi.fn(() => {
+      throw new Error('transaction exploded')
+    })
+    registerTestEditor({ current: 3 }, 'editor-session-1', executeTransaction)
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '执行失败，工程没有变化。', toolCalls: [] }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '可以继续提问。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    await user.click(await screen.findByRole('button', { name: '批准执行' }))
+
+    expect(await screen.findByText('执行失败，工程没有变化。')).toBeInTheDocument()
+    expect(JSON.parse(runAgentChat.mock.calls[1][0].messages.at(-1).content)).toMatchObject({
+      code: 'EXECUTION_FAILED',
+      changed: false
+    })
+    const composer = screen.getByRole('textbox', { name: '描述要构建的内容' })
+    await user.type(composer, '继续分析')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+    expect(await screen.findByText('可以继续提问。')).toBeInTheDocument()
+  })
+
+  it('renders exact action targets and delete magnet side effects', async () => {
+    const user = userEvent.setup()
+    registerTestEditor()
+    const runAgentChat = vi.fn().mockResolvedValueOnce(
+      planResponse(
+        plan([
+          { type: 'clip.split', clipId: 'clip-1', at: 2 },
+          {
+            type: 'clip.move',
+            clipId: 'clip-2',
+            timelineStart: 8,
+            trackId: MAIN_VISUAL_TRACK_ID
+          },
+          {
+            type: 'clip.update',
+            clipId: 'clip-1',
+            patch: {
+              opacity: 0.5,
+              volume: 0.75,
+              muted: true,
+              speed: 1.25,
+              enabled: false,
+              transform: { x: 10, y: -5, scaleX: 1.5, scaleY: 0.8, rotation: 15 }
+            }
+          },
+          { type: 'clip.delete', clipIds: ['clip-2'], magnetMainTrack: true }
+        ])
+      )
+    )
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    const approval = await screen.findByRole('region', { name: '审批计划 整理时间线' })
+
+    expect(approval).toHaveTextContent('分割片段 clip-1，时间 2 秒')
+    expect(approval).toHaveTextContent(`移动 clip-2 到 8 秒，目标轨道 ${MAIN_VISUAL_TRACK_ID}`)
+    expect(approval).toHaveTextContent(
+      '修改片段 clip-1：opacity=0.5，volume=0.75，muted=true，speed=1.25，enabled=false，transform.x=10，transform.y=-5，transform.scaleX=1.5，transform.scaleY=0.8，transform.rotation=15'
+    )
+    expect(approval).toHaveTextContent('删除 1 个片段：clip-2；磁吸主轨道空隙，后续片段移动')
   })
 
   it('starts a clean conversation by rejecting and clearing a pending plan without editing', async () => {

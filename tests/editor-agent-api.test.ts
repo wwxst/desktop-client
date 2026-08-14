@@ -39,6 +39,7 @@ describe('EditorAgentApi execution results', () => {
 
     const api = createEditorAgentApi({
       getProject: () => project,
+      getSessionId: () => 'editor-session-1',
       getRevision: () => 7,
       execute: (command) => applyEditorCommand(project, command),
       executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
@@ -65,6 +66,8 @@ describe('EditorAgentApi execution results', () => {
     const snapshot = api.getProjectSnapshot()
     snapshot.clips.push({ id: 'mutated', assetId: asset.id })
     expect(api.getProjectSnapshot().clips).toHaveLength(1)
+    expect(api.getSessionId()).toBe('editor-session-1')
+    expect(api.getSessionId()).toBe('editor-session-1')
     expect(api.getRevision()).toBe(7)
   })
 
@@ -72,6 +75,7 @@ describe('EditorAgentApi execution results', () => {
     const project = createProject()
     const api = createEditorAgentApi({
       getProject: () => project,
+      getSessionId: () => 'editor-session-1',
       getRevision: () => 0,
       execute: (command) => applyEditorCommand(project, command),
       executeBatch: (commands) => applyEditorCommandsWithResult(project, commands),
@@ -95,6 +99,7 @@ describe('EditorAgentApi execution results', () => {
     const executeTransaction = vi.fn()
     const api = createEditorAgentApi({
       getProject: createProject,
+      getSessionId: () => 'editor-session-1',
       getRevision: () => 0,
       getSelection: () => ['clip-1'],
       getPlayhead: () => 3,
@@ -132,6 +137,7 @@ describe('EditorAgentApi execution results', () => {
   it('includes the editor revision in the structured context result', () => {
     const api = createEditorAgentApi({
       getProject: createProject,
+      getSessionId: () => 'editor-session-1',
       getRevision: () => 9,
       execute: (command) => applyEditorCommand(createProject(), command),
       executeBatch: (commands) => applyEditorCommandsWithResult(createProject(), commands),
@@ -151,7 +157,7 @@ describe('EditorAgentApi execution results', () => {
       code: 'OK',
       changed: false,
       affectedClipIds: [],
-      data: { revision: 9 }
+      data: { sessionId: 'editor-session-1', revision: 9 }
     })
   })
 
@@ -159,6 +165,7 @@ describe('EditorAgentApi execution results', () => {
     const executeTransaction = vi.fn()
     const api = createEditorAgentApi({
       getProject: createProject,
+      getSessionId: () => 'editor-session-1',
       getRevision: () => 0,
       execute: (command) => applyEditorCommand(createProject(), command),
       executeBatch: (commands) => applyEditorCommandsWithResult(createProject(), commands),

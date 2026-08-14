@@ -59,6 +59,7 @@ function VideoEditorWorkspace(): JSX.Element {
   const [magnetEnabled, setMagnetEnabled] = useState(false)
   const [playbackController] = useState(() => createEditorPlaybackController(0))
   const [interactionController] = useState(() => createEditorInteractionController())
+  const [editorSessionId] = useState(() => crypto.randomUUID())
   const pendingExternalDropsRef = useRef<PendingExternalDrop[]>([])
   const rowLayout = useDefaultLayout({
     groupId: 'desktop-client-editor-v2-rows',
@@ -298,6 +299,7 @@ function VideoEditorWorkspace(): JSX.Element {
     () =>
       createEditorAgentApi({
         getProject: () => project,
+        getSessionId: () => editorSessionId,
         getRevision: () => history.revision,
         getSelection: () => selectedClipIds,
         getPlayhead: () => playbackController.getSnapshot().playhead,
@@ -308,7 +310,19 @@ function VideoEditorWorkspace(): JSX.Element {
         undo,
         redo
       }),
-    [editorService, execute, executeBatch, executeTransaction, history.revision, playbackController, project, redo, selectedClipIds, undo]
+    [
+      editorService,
+      editorSessionId,
+      execute,
+      executeBatch,
+      executeTransaction,
+      history.revision,
+      playbackController,
+      project,
+      redo,
+      selectedClipIds,
+      undo
+    ]
   )
 
   useEffect(() => registerEditorAgentApi(agentApi), [agentApi])
