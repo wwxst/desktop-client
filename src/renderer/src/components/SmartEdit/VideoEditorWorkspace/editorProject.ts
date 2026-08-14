@@ -453,43 +453,139 @@ function isCanvasAspectRatio(value: CanvasAspectRatio): boolean {
   )
 }
 
+type FieldComparator<T> = (left: T, right: T) => boolean
+type EditorProjectFieldKind = 'versioned' | 'ephemeral'
+
+const FIELD_COMPARATOR_KEY_CACHE = new WeakMap<object, readonly PropertyKey[]>()
+
+const MEDIA_ASSET_FIELD_COMPARATORS = {
+  id: (left, right) => left.id === right.id,
+  name: (left, right) => left.name === right.name,
+  url: (left, right) => left.url === right.url,
+  duration: (left, right) => nullableNumbersEqual(left.duration, right.duration),
+  status: (left, right) => left.status === right.status,
+  kind: (left, right) => left.kind === right.kind,
+  width: (left, right) => nullableNumbersEqual(left.width, right.width),
+  height: (left, right) => nullableNumbersEqual(left.height, right.height),
+  error: (left, right) => left.error === right.error
+} satisfies Record<keyof MediaAsset, FieldComparator<MediaAsset>>
+
+const EDITOR_TRACK_FIELD_COMPARATORS = {
+  id: (left, right) => left.id === right.id,
+  name: (left, right) => left.name === right.name,
+  kind: (left, right) => left.kind === right.kind,
+  role: (left, right) => left.role === right.role,
+  locked: (left, right) => left.locked === right.locked,
+  hidden: (left, right) => left.hidden === right.hidden,
+  muted: (left, right) => left.muted === right.muted
+} satisfies Record<keyof EditorTrack, FieldComparator<EditorTrack>>
+
+const CLIP_TRANSFORM_FIELD_COMPARATORS = {
+  x: (left, right) => numbersEqual(left.x, right.x),
+  y: (left, right) => numbersEqual(left.y, right.y),
+  scaleX: (left, right) => numbersEqual(left.scaleX, right.scaleX),
+  scaleY: (left, right) => numbersEqual(left.scaleY, right.scaleY),
+  rotation: (left, right) => numbersEqual(left.rotation, right.rotation)
+} satisfies Record<keyof ClipTransform, FieldComparator<ClipTransform>>
+
+const TIMELINE_CLIP_FIELD_COMPARATORS = {
+  id: (left, right) => left.id === right.id,
+  assetId: (left, right) => left.assetId === right.assetId,
+  trackId: (left, right) => left.trackId === right.trackId,
+  timelineStart: (left, right) => optionalNumbersEqual(left.timelineStart, right.timelineStart),
+  duration: (left, right) => optionalNumbersEqual(left.duration, right.duration),
+  sourceStart: (left, right) => optionalNumbersEqual(left.sourceStart, right.sourceStart),
+  sourceEnd: (left, right) => optionalNumbersEqual(left.sourceEnd, right.sourceEnd),
+  transform: (left, right) => clipTransformsEqual(left.transform, right.transform),
+  opacity: (left, right) => optionalNumbersEqual(left.opacity, right.opacity),
+  volume: (left, right) => optionalNumbersEqual(left.volume, right.volume),
+  muted: (left, right) => left.muted === right.muted,
+  speed: (left, right) => optionalNumbersEqual(left.speed, right.speed),
+  enabled: (left, right) => left.enabled === right.enabled
+} satisfies Record<keyof TimelineClip, FieldComparator<TimelineClip>>
+
+const CANVAS_ASPECT_RATIO_FIELD_COMPARATORS = {
+  id: (left, right) => left.id === right.id,
+  label: (left, right) => left.label === right.label,
+  width: (left, right) => numbersEqual(left.width, right.width),
+  height: (left, right) => numbersEqual(left.height, right.height)
+} satisfies Record<keyof CanvasAspectRatio, FieldComparator<CanvasAspectRatio>>
+
+const DRAFT_ROW_FIELD_COMPARATORS = {
+  id: (left, right) => left.id === right.id,
+  draftName: (left, right) => left.draftName === right.draftName,
+  fixedStartFileName: (left, right) => left.fixedStartFileName === right.fixedStartFileName,
+  audio: (left, right) => left.audio === right.audio,
+  fixedEndFileName: (left, right) => left.fixedEndFileName === right.fixedEndFileName
+} satisfies Record<keyof DraftRow, FieldComparator<DraftRow>>
+
+const EDITOR_PROJECT_FIELD_COMPARATORS = {
+  assets: (left, right) => arrayItemsEqual(left.assets, right.assets, mediaAssetsEqual),
+  tracks: (left, right) => arrayItemsEqual(left.tracks, right.tracks, editorTracksEqual),
+  clips: (left, right) => arrayItemsEqual(left.clips, right.clips, timelineClipsEqual),
+  activeClipId: (left, right) => left.activeClipId === right.activeClipId,
+  playhead: (left, right) => numbersEqual(left.playhead, right.playhead),
+  timelineZoom: (left, right) => numbersEqual(left.timelineZoom, right.timelineZoom),
+  aspectRatio: (left, right) => canvasAspectRatiosEqual(left.aspectRatio, right.aspectRatio),
+  draftRows: (left, right) => arrayItemsEqual(left.draftRows, right.draftRows, draftRowsEqual)
+} satisfies Record<keyof EditorProjectState, FieldComparator<EditorProjectState>>
+
+const EDITOR_PROJECT_FIELD_KINDS = {
+  assets: 'versioned',
+  tracks: 'versioned',
+  clips: 'versioned',
+  activeClipId: 'ephemeral',
+  playhead: 'ephemeral',
+  timelineZoom: 'ephemeral',
+  aspectRatio: 'versioned',
+  draftRows: 'versioned'
+} as const satisfies Record<keyof EditorProjectState, EditorProjectFieldKind>
+
 export function canvasAspectRatiosEqual(
   left: CanvasAspectRatio,
   right: CanvasAspectRatio
 ): boolean {
-  return (
-    left.id === right.id &&
-    left.label === right.label &&
-    left.width === right.width &&
-    left.height === right.height
-  )
+  return recordFieldsEqual(left, right, CANVAS_ASPECT_RATIO_FIELD_COMPARATORS)
 }
 
 export function editorProjectStatesEqual(
   left: EditorProjectState,
   right: EditorProjectState
 ): boolean {
-  if (left === right) return true
-  return (
-    editorProjectVersionedContentEqual(left, right) &&
-    left.activeClipId === right.activeClipId &&
-    numbersEqual(left.playhead, right.playhead) &&
-    numbersEqual(left.timelineZoom, right.timelineZoom)
-  )
+  return recordFieldsEqual(left, right, EDITOR_PROJECT_FIELD_COMPARATORS)
 }
 
 export function editorProjectVersionedContentEqual(
   left: EditorProjectState,
   right: EditorProjectState
 ): boolean {
+  return recordFieldsEqual(left, right, EDITOR_PROJECT_FIELD_COMPARATORS, isVersionedProjectField)
+}
+
+function isVersionedProjectField(key: keyof EditorProjectState): boolean {
+  return EDITOR_PROJECT_FIELD_KINDS[key] === 'versioned'
+}
+
+function recordFieldsEqual<T extends object>(
+  left: T,
+  right: T,
+  comparators: Record<keyof T, FieldComparator<T>>,
+  include?: (key: keyof T) => boolean
+): boolean {
   if (left === right) return true
-  return (
-    arrayItemsEqual(left.assets, right.assets, mediaAssetsEqual) &&
-    arrayItemsEqual(left.tracks, right.tracks, editorTracksEqual) &&
-    arrayItemsEqual(left.clips, right.clips, timelineClipsEqual) &&
-    canvasAspectRatiosEqual(left.aspectRatio, right.aspectRatio) &&
-    arrayItemsEqual(left.draftRows, right.draftRows, draftRowsEqual)
+  return getComparatorKeys(comparators).every(
+    (key) => (include && !include(key)) || comparators[key](left, right)
   )
+}
+
+function getComparatorKeys<T extends object>(
+  comparators: Record<keyof T, FieldComparator<T>>
+): readonly (keyof T)[] {
+  const cached = FIELD_COMPARATOR_KEY_CACHE.get(comparators)
+  if (cached) return cached as readonly (keyof T)[]
+  const keys = Reflect.ownKeys(comparators) as (keyof T)[]
+  FIELD_COMPARATOR_KEY_CACHE.set(comparators, keys)
+  return keys
 }
 
 function arrayItemsEqual<T>(
@@ -504,76 +600,27 @@ function arrayItemsEqual<T>(
 }
 
 function mediaAssetsEqual(left: MediaAsset, right: MediaAsset): boolean {
-  return (
-    left === right ||
-    (left.id === right.id &&
-      left.name === right.name &&
-      left.url === right.url &&
-      nullableNumbersEqual(left.duration, right.duration) &&
-      left.status === right.status &&
-      left.kind === right.kind &&
-      nullableNumbersEqual(left.width, right.width) &&
-      nullableNumbersEqual(left.height, right.height) &&
-      left.error === right.error)
-  )
+  return recordFieldsEqual(left, right, MEDIA_ASSET_FIELD_COMPARATORS)
 }
 
 function editorTracksEqual(left: EditorTrack, right: EditorTrack): boolean {
-  return (
-    left === right ||
-    (left.id === right.id &&
-      left.name === right.name &&
-      left.kind === right.kind &&
-      left.role === right.role &&
-      left.locked === right.locked &&
-      left.hidden === right.hidden &&
-      left.muted === right.muted)
-  )
+  return recordFieldsEqual(left, right, EDITOR_TRACK_FIELD_COMPARATORS)
 }
 
 function timelineClipsEqual(left: TimelineClip, right: TimelineClip): boolean {
-  return (
-    left === right ||
-    (left.id === right.id &&
-      left.assetId === right.assetId &&
-      left.trackId === right.trackId &&
-      optionalNumbersEqual(left.timelineStart, right.timelineStart) &&
-      optionalNumbersEqual(left.duration, right.duration) &&
-      optionalNumbersEqual(left.sourceStart, right.sourceStart) &&
-      optionalNumbersEqual(left.sourceEnd, right.sourceEnd) &&
-      clipTransformsEqual(left.transform, right.transform) &&
-      optionalNumbersEqual(left.opacity, right.opacity) &&
-      optionalNumbersEqual(left.volume, right.volume) &&
-      left.muted === right.muted &&
-      optionalNumbersEqual(left.speed, right.speed) &&
-      left.enabled === right.enabled)
-  )
+  return recordFieldsEqual(left, right, TIMELINE_CLIP_FIELD_COMPARATORS)
 }
 
 function clipTransformsEqual(
   left: ClipTransform | undefined,
   right: ClipTransform | undefined
 ): boolean {
-  if (left === right) return true
-  if (!left || !right) return false
-  return (
-    numbersEqual(left.x, right.x) &&
-    numbersEqual(left.y, right.y) &&
-    numbersEqual(left.scaleX, right.scaleX) &&
-    numbersEqual(left.scaleY, right.scaleY) &&
-    numbersEqual(left.rotation, right.rotation)
-  )
+  if (!left || !right) return left === right
+  return recordFieldsEqual(left, right, CLIP_TRANSFORM_FIELD_COMPARATORS)
 }
 
 function draftRowsEqual(left: DraftRow, right: DraftRow): boolean {
-  return (
-    left === right ||
-    (left.id === right.id &&
-      left.draftName === right.draftName &&
-      left.fixedStartFileName === right.fixedStartFileName &&
-      left.audio === right.audio &&
-      left.fixedEndFileName === right.fixedEndFileName)
-  )
+  return recordFieldsEqual(left, right, DRAFT_ROW_FIELD_COMPARATORS)
 }
 
 function optionalNumbersEqual(left: number | undefined, right: number | undefined): boolean {
@@ -651,7 +698,9 @@ export function editorProjectReducer(
         return state.activeClipId === null ? state : { ...state, activeClipId: null }
       }
       if (!state.clips.some((clip) => clip.id === action.clipId)) return state
-      return state.activeClipId === action.clipId ? state : { ...state, activeClipId: action.clipId }
+      return state.activeClipId === action.clipId
+        ? state
+        : { ...state, activeClipId: action.clipId }
 
     case 'timeline/playheadChanged': {
       const playhead = Math.max(0, finiteOr(action.time, state.playhead))
@@ -695,17 +744,12 @@ export function editorProjectReducer(
       ) {
         return state
       }
-      const draftRows = state.draftRows.map((item, index) =>
-        index === rowIndex ? nextRow : item
-      )
+      const draftRows = state.draftRows.map((item, index) => (index === rowIndex ? nextRow : item))
       return { ...state, draftRows }
     }
 
     case 'draft/rowDeleted':
-      if (
-        state.draftRows.length === 1 ||
-        !state.draftRows.some((row) => row.id === action.rowId)
-      ) {
+      if (state.draftRows.length === 1 || !state.draftRows.some((row) => row.id === action.rowId)) {
         return state
       }
       return { ...state, draftRows: state.draftRows.filter((row) => row.id !== action.rowId) }

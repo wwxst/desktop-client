@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { editorHistoryReducer, createInitialEditorHistoryState } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorHistory'
+import {
+  editorHistoryReducer,
+  createInitialEditorHistoryState
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorHistory'
 import type { MediaAsset } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
 
 function readyAsset(id = 'asset-a'): MediaAsset {
@@ -228,9 +231,7 @@ describe('Editor V2 history external fact rebase', () => {
 
     state = editorHistoryReducer(state, {
       type: 'command/transaction',
-      commands: [
-        { type: 'canvas/setAspectRatio', aspectRatio: { ...state.present.aspectRatio } }
-      ]
+      commands: [{ type: 'canvas/setAspectRatio', aspectRatio: { ...state.present.aspectRatio } }]
     })
     expect(state.revision).toBe(0)
 
@@ -406,7 +407,7 @@ describe('Editor V2 history external fact rebase', () => {
     expect(state.revision).toBe(4)
   })
 
-  it('媒体 ready 结果在 Undo 以后仍然保持 ready', () => {
+  it('rebases media ready and failed facts across undo and redo snapshots', () => {
     let state = createInitialEditorHistoryState('draft-1')
     state = editorHistoryReducer(state, {
       type: 'project/action',
@@ -416,10 +417,51 @@ describe('Editor V2 history external fact rebase', () => {
       }
     })
     state = editorHistoryReducer(state, {
+      type: 'command/execute',
+      command: {
+        type: 'canvas/setAspectRatio',
+        aspectRatio: { id: '16:9', label: '16:9', width: 16, height: 9 }
+      }
+    })
+    expect(state.past).toHaveLength(1)
+
+    state = editorHistoryReducer(state, {
       type: 'project/action',
       action: { type: 'asset/ready', assetId: 'asset-a', duration: 12, width: 1920, height: 1080 }
     })
+    expect([...state.past, state.present].map((snapshot) => snapshot.assets[0].status)).toEqual([
+      'ready',
+      'ready'
+    ])
     expect(state.present.assets[0].width).toBe(1920)
     expect(state.present.assets[0].height).toBe(1080)
+
+    const expectFailedFactInAllSnapshots = (): void => {
+      const snapshots = [...state.past, state.present, ...state.future]
+      expect(snapshots.length).toBeGreaterThan(0)
+      for (const snapshot of snapshots) {
+        expect(snapshot.assets[0]).toMatchObject({
+          duration: 12,
+          width: 1920,
+          height: 1080,
+          status: 'error',
+          error: 'decode failed'
+        })
+      }
+    }
+
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/failed', assetId: 'asset-a', error: 'decode failed' }
+    })
+    expectFailedFactInAllSnapshots()
+
+    state = editorHistoryReducer(state, { type: 'history/undo' })
+    expect(state.present.aspectRatio.id).toBe('9:16')
+    expectFailedFactInAllSnapshots()
+
+    state = editorHistoryReducer(state, { type: 'history/redo' })
+    expect(state.present.aspectRatio.id).toBe('16:9')
+    expectFailedFactInAllSnapshots()
   })
 })
