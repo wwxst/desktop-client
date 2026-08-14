@@ -290,6 +290,47 @@ describe('AiPanel', () => {
     })
   })
 
+  it('clears Agent plan history in every tab when the global mode changes', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'full')
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '聊天页 Agent 修改已完成。', toolCalls: [] }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '聊天页助手新会话。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user, '先在聊天页修改工程')
+    expect(await screen.findByText('聊天页 Agent 修改已完成。')).toBeInTheDocument()
+    expect(executeTransaction).toHaveBeenCalledOnce()
+
+    await user.click(screen.getByRole('tab', { name: 'CODEX' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '执行模式' }), 'assistant')
+    await user.click(screen.getByRole('tab', { name: '聊天' }))
+
+    expect(screen.getByText('欢迎使用智剪')).toBeInTheDocument()
+    expect(screen.queryByText('聊天页 Agent 修改已完成。')).not.toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '分析新问题')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText('聊天页助手新会话。')).toBeInTheDocument()
+    const assistantRequest = runAgentChat.mock.calls[2][0]
+    expect(isAgentChatRequest(assistantRequest)).toBe(true)
+    expect(assistantRequest.messages).toEqual([{ role: 'user', content: '分析新问题' }])
+  })
+
   it('does not apply a stale smart plan after a new conversation starts', async () => {
     const user = userEvent.setup()
     const executeTransaction = registerTestEditor()
@@ -807,6 +848,39 @@ describe('AiPanel', () => {
     expect(screen.getByRole('combobox', { name: '执行模式' })).toBeEnabled()
     expect(executeTransaction).not.toHaveBeenCalled()
     expect(runAgentChat).toHaveBeenCalledOnce()
+  })
+
+  it('clears a pending plan from its original tab when a new conversation starts elsewhere', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(plan([{ type: 'clip.delete', clipIds: ['clip-1'] }])))
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '聊天页已开启干净会话。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user)
+    expect(await screen.findByRole('button', { name: '批准执行' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'CODEX' }))
+
+    await user.click(screen.getByRole('button', { name: '新建会话' }))
+    await user.click(screen.getByRole('tab', { name: '聊天' }))
+
+    expect(screen.queryByRole('button', { name: '批准执行' })).not.toBeInTheDocument()
+    expect(screen.getByText('欢迎使用智剪')).toBeInTheDocument()
+    expect(executeTransaction).not.toHaveBeenCalled()
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '重新开始')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText('聊天页已开启干净会话。')).toBeInTheDocument()
+    const cleanRequest = runAgentChat.mock.calls[1][0]
+    expect(isAgentChatRequest(cleanRequest)).toBe(true)
+    expect(cleanRequest.messages).toEqual([{ role: 'user', content: '重新开始' }])
   })
 
   it('renders the chat shell and switches to Codex mode', async () => {

@@ -410,8 +410,14 @@ function AiPanel({
 
   const resetConversation = (): void => {
     requestGenerationRef.current += 1
-    setMessages((current) => ({ ...current, [activeTab]: [] }))
+    const pendingTab = pendingPlan?.tab
+    setMessages((current) => ({
+      ...current,
+      [activeTab]: [],
+      ...(pendingTab && pendingTab !== activeTab ? { [pendingTab]: [] } : {})
+    }))
     chatHistoryRef.current[activeTab] = []
+    if (pendingTab) chatHistoryRef.current[pendingTab] = []
     setComposerValue('')
     setSelectedFileName(null)
     setPendingPlan(null)
@@ -427,8 +433,8 @@ function AiPanel({
     requestGenerationRef.current += 1
     setExecutionMode(mode)
     writeAiExecutionMode(mode)
-    setMessages((current) => ({ ...current, [activeTab]: [] }))
-    chatHistoryRef.current[activeTab] = []
+    setMessages({ chat: [], codex: [] })
+    chatHistoryRef.current = { chat: [], codex: [] }
     setComposerValue('')
     setSelectedFileName(null)
     setAutoAttachProject(false)
