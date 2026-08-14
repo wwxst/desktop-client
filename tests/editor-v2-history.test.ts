@@ -150,6 +150,146 @@ describe('Editor V2 history external fact rebase', () => {
     expect(state.revision).toBe(revision)
   })
 
+  it('does not increment revision for identical asset ready facts', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: {
+        type: 'assets/imported',
+        asset: { ...readyAsset(), duration: null, status: 'loading' }
+      }
+    })
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/ready', assetId: 'asset-a', duration: 12, width: 1920, height: 1080 }
+    })
+    expect(state.revision).toBe(2)
+
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/ready', assetId: 'asset-a', duration: 12, width: 1920, height: 1080 }
+    })
+    expect(state.revision).toBe(2)
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/ready', assetId: 'asset-a', duration: 13, width: 1920, height: 1080 }
+    })
+    expect(state.revision).toBe(3)
+  })
+
+  it('does not increment revision for identical asset failure facts', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'assets/imported', asset: readyAsset() }
+    })
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/failed', assetId: 'asset-a', error: 'decode failed' }
+    })
+    expect(state.revision).toBe(2)
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/failed', assetId: 'asset-a', error: 'decode failed' }
+    })
+    expect(state.revision).toBe(2)
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'asset/failed', assetId: 'asset-a', error: 'different failure' }
+    })
+    expect(state.revision).toBe(3)
+  })
+
+  it('does not increment revision when selecting an identical aspect ratio', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    const currentAspectRatio = state.present.aspectRatio
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'aspectRatio/selected', aspectRatio: { ...currentAspectRatio } }
+    })
+    expect(state.revision).toBe(0)
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: {
+        type: 'aspectRatio/selected',
+        aspectRatio: { id: '16:9', label: '16:9', width: 16, height: 9 }
+      }
+    })
+    expect(state.revision).toBe(1)
+  })
+
+  it('does not increment revision when a command sets an identical aspect ratio', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    state = editorHistoryReducer(state, {
+      type: 'command/execute',
+      command: { type: 'canvas/setAspectRatio', aspectRatio: { ...state.present.aspectRatio } }
+    })
+    expect(state.revision).toBe(0)
+
+    state = editorHistoryReducer(state, {
+      type: 'command/transaction',
+      commands: [
+        { type: 'canvas/setAspectRatio', aspectRatio: { ...state.present.aspectRatio } }
+      ]
+    })
+    expect(state.revision).toBe(0)
+
+    state = editorHistoryReducer(state, {
+      type: 'command/execute',
+      command: {
+        type: 'canvas/setAspectRatio',
+        aspectRatio: { id: '16:9', label: '16:9', width: 16, height: 9 }
+      }
+    })
+    expect(state.revision).toBe(1)
+  })
+
+  it('does not increment revision when commands write identical track values', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    const track = state.present.tracks[0]
+
+    state = editorHistoryReducer(state, {
+      type: 'command/execute',
+      command: { type: 'track/update', trackId: track.id, patch: { name: track.name } }
+    })
+    expect(state.revision).toBe(0)
+    state = editorHistoryReducer(state, {
+      type: 'command/batch',
+      commands: [{ type: 'track/update', trackId: track.id, patch: { locked: track.locked } }]
+    })
+    expect(state.revision).toBe(0)
+    state = editorHistoryReducer(state, {
+      type: 'command/transaction',
+      commands: [{ type: 'track/update', trackId: track.id, patch: { hidden: track.hidden } }]
+    })
+    expect(state.revision).toBe(0)
+
+    state = editorHistoryReducer(state, {
+      type: 'command/execute',
+      command: { type: 'track/update', trackId: track.id, patch: { locked: !track.locked } }
+    })
+    expect(state.revision).toBe(1)
+  })
+
+  it('does not increment revision when writing identical draft values', () => {
+    let state = createInitialEditorHistoryState('draft-1')
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'draft/rowUpdated', rowId: 'draft-1', changes: { draftName: '' } }
+    })
+    expect(state.revision).toBe(0)
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'draft/rowUpdated', rowId: 'draft-1', changes: { draftName: 'Draft A' } }
+    })
+    expect(state.revision).toBe(1)
+    state = editorHistoryReducer(state, {
+      type: 'project/action',
+      action: { type: 'draft/rowUpdated', rowId: 'draft-1', changes: { draftName: 'Draft A' } }
+    })
+    expect(state.revision).toBe(1)
+  })
+
   it('导入新素材不会清空已有剪辑 Undo', () => {
     let state = createInitialEditorHistoryState('draft-1')
     state = editorHistoryReducer(state, {

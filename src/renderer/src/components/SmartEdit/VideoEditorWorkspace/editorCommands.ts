@@ -1,6 +1,7 @@
 import { canMoveClipToTrack, normalizeSourceRange, type ClipAssetKind } from './editorClipMath'
 import {
   MIN_CLIP_DURATION,
+  canvasAspectRatiosEqual,
   createTimelineClipFromAsset,
   getDefaultTrackIdForAsset,
   getMediaAssetKind,
@@ -545,16 +546,33 @@ function reduceEditorCommand(
       return { ...state, tracks: state.tracks.filter((track) => track.id !== command.trackId) }
 
     case 'track/update': {
-      const tracks = state.tracks.map((track) =>
-        track.id === command.trackId
-          ? { ...track, ...command.patch, id: track.id, kind: track.kind, role: track.role }
-          : track
-      )
+      const trackIndex = state.tracks.findIndex((track) => track.id === command.trackId)
+      if (trackIndex === -1) return state
+      const track = state.tracks[trackIndex]
+      const nextTrack = {
+        ...track,
+        ...command.patch,
+        id: track.id,
+        kind: track.kind,
+        role: track.role
+      }
+      if (
+        track.name === nextTrack.name &&
+        track.locked === nextTrack.locked &&
+        track.hidden === nextTrack.hidden &&
+        track.muted === nextTrack.muted
+      ) {
+        return state
+      }
+      const tracks = [...state.tracks]
+      tracks[trackIndex] = nextTrack
       return { ...state, tracks }
     }
 
     case 'canvas/setAspectRatio':
-      return { ...state, aspectRatio: command.aspectRatio }
+      return canvasAspectRatiosEqual(state.aspectRatio, command.aspectRatio)
+        ? state
+        : { ...state, aspectRatio: command.aspectRatio }
   }
 }
 

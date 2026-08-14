@@ -434,7 +434,11 @@ function updateAsset(
 ): EditorProjectState {
   const assetIndex = state.assets.findIndex((asset) => asset.id === assetId)
   if (assetIndex === -1) return state
-  const assets = state.assets.map((asset, index) => (index === assetIndex ? update(asset) : asset))
+  const asset = state.assets[assetIndex]
+  const nextAsset = update(asset)
+  if (nextAsset === asset) return state
+  const assets = [...state.assets]
+  assets[assetIndex] = nextAsset
   return { ...state, assets }
 }
 
@@ -449,6 +453,18 @@ function isCanvasAspectRatio(value: CanvasAspectRatio): boolean {
   )
 }
 
+export function canvasAspectRatiosEqual(
+  left: CanvasAspectRatio,
+  right: CanvasAspectRatio
+): boolean {
+  return (
+    left.id === right.id &&
+    left.label === right.label &&
+    left.width === right.width &&
+    left.height === right.height
+  )
+}
+
 export function editorProjectReducer(
   state: EditorProjectState,
   action: EditorProjectAction
@@ -460,11 +476,22 @@ export function editorProjectReducer(
 
     case 'asset/ready':
       return updateAsset(state, action.assetId, (asset) => {
+        const width = Number.isFinite(action.width) ? action.width : asset.width
+        const height = Number.isFinite(action.height) ? action.height : asset.height
+        if (
+          asset.duration === action.duration &&
+          asset.width === width &&
+          asset.height === height &&
+          asset.status === 'ready' &&
+          asset.error === undefined
+        ) {
+          return asset
+        }
         const readyAsset: MediaAsset = {
           ...asset,
           duration: action.duration,
-          width: Number.isFinite(action.width) ? action.width : asset.width,
-          height: Number.isFinite(action.height) ? action.height : asset.height,
+          width,
+          height,
           status: 'ready'
         }
         delete readyAsset.error
@@ -472,11 +499,11 @@ export function editorProjectReducer(
       })
 
     case 'asset/failed':
-      return updateAsset(state, action.assetId, (asset) => ({
-        ...asset,
-        status: 'error',
-        error: action.error
-      }))
+      return updateAsset(state, action.assetId, (asset) =>
+        asset.status === 'error' && asset.error === action.error
+          ? asset
+          : { ...asset, status: 'error', error: action.error }
+      )
 
     case 'timeline/assetAdded': {
       const asset = state.assets.find((item) => item.id === action.assetId)
@@ -510,6 +537,7 @@ export function editorProjectReducer(
 
     case 'aspectRatio/selected':
       if (!isCanvasAspectRatio(action.aspectRatio)) return state
+      if (canvasAspectRatiosEqual(state.aspectRatio, action.aspectRatio)) return state
       return { ...state, aspectRatio: action.aspectRatio }
 
     case 'draft/rowAdded': {
@@ -529,8 +557,18 @@ export function editorProjectReducer(
         )
       ) as Partial<Omit<DraftRow, 'id'>>
       if (Object.keys(changes).length === 0) return state
-      const draftRows = state.draftRows.map((row, index) =>
-        index === rowIndex ? { ...row, ...changes } : row
+      const row = state.draftRows[rowIndex]
+      const nextRow = { ...row, ...changes }
+      if (
+        row.draftName === nextRow.draftName &&
+        row.fixedStartFileName === nextRow.fixedStartFileName &&
+        row.audio === nextRow.audio &&
+        row.fixedEndFileName === nextRow.fixedEndFileName
+      ) {
+        return state
+      }
+      const draftRows = state.draftRows.map((item, index) =>
+        index === rowIndex ? nextRow : item
       )
       return { ...state, draftRows }
     }
