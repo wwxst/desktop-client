@@ -34,7 +34,7 @@ Renderer 的计划执行器先在工程快照上逐项编译并预检完整计�
 - 初始 revision 为 `0`，成功改变版本化工程内容的命令、批处理或事务会递增。
 - 成功的 Undo、Redo，以及素材导入、Ready、Failed 等会改变工程事实的外部更新会递增。
 - 选择、播放头、时间线缩放、纯播放/交互运行态、无变化事务和仅清空历史栈不会递增。
-- `EditorAgentApi.getRevision()` 暴露当前值；`get_editor_context` 将其作为 `projectRevision` 返回给模型。
+- `EditorAgentApi.getRevision()` 暴露当前值；`get_editor_context` 在工具结果的 `data.revision` 中返回该值，模型生成 `AgentEditorPlan` 时将它回填到 `projectRevision`。
 - 计划在进入审批/自动执行以及用户批准后执行前都必须匹配当前 revision。等待期间工程变化会使计划失效，返回结构化 `STALE_CONTEXT`，且不执行任何动作。
 
 ## 不变量

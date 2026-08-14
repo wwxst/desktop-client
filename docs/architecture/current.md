@@ -63,7 +63,7 @@ App
 | 编辑命令   | `editorCommands.ts`                          | 校验并应用低层 Command，保留 V1/Agent 兼容                                  |
 | 编辑服务   | `core/editorService.ts`                      | 放置、移动、删除、更新、分割、粘贴等高层动作                                |
 | 放置规则   | `core/editorPlacementPolicy.ts`              | 碰撞检测、复用/新建轨道、磁吸删除和批量放置规划                             |
-| 播放运行态 | `playback/editorPlaybackController.ts`       | playhead、播放、循环、主音量和 animation-frame 时钟                         |
+| 播放运行态 | `playback/editorPlaybackController.ts`       | playhead、isPlaying、duration、revision 和 animation-frame 时钟             |
 | 交互运行态 | `interaction/editorInteractionController.ts` | idle、拖动、空格手势和 pointer ownership                                    |
 | Agent 适配 | `editorAgentApi.ts`                          | 低层命令兼容及推荐的 Service 能力                                           |
 
