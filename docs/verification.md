@@ -20,7 +20,7 @@ git diff --check
 
 - `npm test -- --reporter=dot`：退出码 `0`；58/58 测试文件、405/405 测试通过。jsdom 输出 4 条 `HTMLMediaElement.load()` 未实现提示；模型目录离线回退测试记录 1 条预期的“加载远程模型目录失败，使用内置目录”Main warning，均不影响退出码。
 - `npm run typecheck`：退出码 `0`；Node 与 Web TypeScript 检查通过。
-- `npm run build`：退出码 `0`；Main、Preload 和 Renderer 产物生成成功。Vite 本次转换 Main 32 个模块、Preload 1 个模块、Renderer 1876 个模块；输出 Main `154.25 kB`、Preload `5.03 kB`、Renderer JS `900.79 kB`、Renderer CSS `130.44 kB`。
+- `npm run build`：退出码 `0`；Main、Preload 和 Renderer 产物生成成功。Vite 本次转换 Main 32 个模块、Preload 1 个模块、Renderer 1876 个模块；输出 Main `154.25 kB`、Preload `5.03 kB`、Renderer JS `900.79 kB`、Renderer CSS `130.85 kB`。
 - `git diff --check`：退出码 `0`。
 - `npm run lint`：退出码 `0`；0 个 error、340 个 warning，其中 339 个可由 `--fix` 自动修复。warning 仍属于当前格式基线，不能描述为 lint 无告警。
 
