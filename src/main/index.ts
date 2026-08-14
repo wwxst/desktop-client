@@ -105,75 +105,68 @@ function registerAuthIpc(): void {
  * 由Electron主进程携带Token请求Java后端。
  */
 function registerSubscriptionIpc(): void {
-  ipcMain.handle(
-    'subscription:get-current',
-    async (): Promise<SubscriptionCheckResponse> => {
-      const token = authSession.accessToken
+  ipcMain.handle('subscription:get-current', async (): Promise<SubscriptionCheckResponse> => {
+    const token = authSession.accessToken
 
-      if (!token) {
+    if (!token) {
+      return {
+        success: false,
+        authenticated: false,
+        message: '登录状态已失效，请重新登录',
+        subscription: null
+      }
+    }
+
+    try {
+      const response = await net.fetch(`${API_BASE_URL}/api/user/subscription`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      const result = (await response.json()) as ApiResult<SubscriptionData>
+
+      /*
+       * Token失效时，清空主进程中的登录会话。
+       */
+      if (response.status === 401) {
+        authSession.accessToken = null
+
         return {
           success: false,
           authenticated: false,
-          message: '登录状态已失效，请重新登录',
+          message: result.msg || '登录状态已失效，请重新登录',
           subscription: null
         }
       }
 
-      try {
-        const response = await net.fetch(
-          `${API_BASE_URL}/api/user/subscription`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-        const result =
-          (await response.json()) as ApiResult<SubscriptionData>
-
-        /*
-         * Token失效时，清空主进程中的登录会话。
-         */
-        if (response.status === 401) {
-          authSession.accessToken = null
-
-          return {
-            success: false,
-            authenticated: false,
-            message: result.msg || '登录状态已失效，请重新登录',
-            subscription: null
-          }
-        }
-
-        if (!response.ok || !result.data) {
-          return {
-            success: false,
-            authenticated: true,
-            message: result.msg || '订阅状态查询失败',
-            subscription: null
-          }
-        }
-
-        return {
-          success: true,
-          authenticated: true,
-          message: '订阅状态查询成功',
-          subscription: result.data
-        }
-      } catch (error) {
-        console.error('查询用户订阅失败：', error)
-
+      if (!response.ok || !result.data) {
         return {
           success: false,
           authenticated: true,
-          message: '无法连接服务器，请稍后重试',
+          message: result.msg || '订阅状态查询失败',
           subscription: null
         }
       }
+
+      return {
+        success: true,
+        authenticated: true,
+        message: '订阅状态查询成功',
+        subscription: result.data
+      }
+    } catch (error) {
+      console.error('查询用户订阅失败：', error)
+
+      return {
+        success: false,
+        authenticated: true,
+        message: '无法连接服务器，请稍后重试',
+        subscription: null
+      }
     }
-  )
+  })
 }
 
 function createWindow(): void {

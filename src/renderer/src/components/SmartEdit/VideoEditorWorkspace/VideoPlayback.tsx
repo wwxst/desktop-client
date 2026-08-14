@@ -84,7 +84,10 @@ function ControlledCompositionVideoPlayback({
   onResetClipTransform,
   previewPan = { x: 0, y: 0 },
   onPreviewPanChange
-}: VideoPlaybackProps & { project: EditorProjectState; playbackController: EditorPlaybackController }): JSX.Element {
+}: VideoPlaybackProps & {
+  project: EditorProjectState
+  playbackController: EditorPlaybackController
+}): JSX.Element {
   const playback = useEditorPlayback(playbackController)
   const panRef = useRef<{
     pointerId: number
@@ -105,7 +108,10 @@ function ControlledCompositionVideoPlayback({
     transform: `translate(${previewPan.x}px, ${previewPan.y}px)`
   }
 
-  useEffect(() => playbackController.setDuration(projectDuration), [playbackController, projectDuration])
+  useEffect(
+    () => playbackController.setDuration(projectDuration),
+    [playbackController, projectDuration]
+  )
 
   useEffect(() => {
     const move = (event: PointerEvent): void => {
@@ -136,7 +142,8 @@ function ControlledCompositionVideoPlayback({
   const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const useSpacePan = event.button === 0 && interactionController?.getSnapshot().spacePressed
     if (event.button !== 1 && !useSpacePan) return
-    if (interactionController && !interactionController.begin('panning-canvas', event.pointerId)) return
+    if (interactionController && !interactionController.begin('panning-canvas', event.pointerId))
+      return
     if (useSpacePan) interactionController.markSpaceGestureUsed()
     event.preventDefault()
     panRef.current = {
@@ -155,7 +162,11 @@ function ControlledCompositionVideoPlayback({
           className={`studio-player__canvas${hasVisibleLayers ? ' studio-player__canvas--composition' : ''}`}
           style={canvasStyle}
           role={hasVisibleLayers ? undefined : 'img'}
-          aria-label={hasVisibleLayers ? `工程合成预览画布，画面比例 ${selectedRatio.label}` : `暂无预览内容，画面比例 ${selectedRatio.label}`}
+          aria-label={
+            hasVisibleLayers
+              ? `工程合成预览画布，画面比例 ${selectedRatio.label}`
+              : `暂无预览内容，画面比例 ${selectedRatio.label}`
+          }
         >
           {hasVisibleLayers ? (
             <CompositionPreview
@@ -189,17 +200,42 @@ function ControlledCompositionVideoPlayback({
       <footer className="studio-player__controls" aria-label="播放控制">
         <div className="studio-player__controls-left">
           <time className="studio-player__current-time">{formatTimecode(playback.playhead)}</time>
-          <span className="studio-player__time-divider" aria-hidden="true">/</span>
+          <span className="studio-player__time-divider" aria-hidden="true">
+            /
+          </span>
           <time>{formatTimecode(projectDuration)}</time>
         </div>
         <div className="studio-player__transport">
-          <button type="button" aria-label="上一帧" title="上一帧 ←" disabled={!canPlay} onClick={() => playbackController.step(-FRAME_STEP)}>
+          <button
+            type="button"
+            aria-label="上一帧"
+            title="上一帧 ←"
+            disabled={!canPlay}
+            onClick={() => playbackController.step(-FRAME_STEP)}
+          >
             <SkipBack size={15} aria-hidden="true" />
           </button>
-          <button className="studio-player__play" type="button" aria-label={playback.isPlaying ? '暂停' : '播放'} title={`${playback.isPlaying ? '暂停' : '播放'} Space`} disabled={!canPlay} onClick={() => playbackController.toggle()}>
-            {playback.isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+          <button
+            className="studio-player__play"
+            type="button"
+            aria-label={playback.isPlaying ? '暂停' : '播放'}
+            title={`${playback.isPlaying ? '暂停' : '播放'} Space`}
+            disabled={!canPlay}
+            onClick={() => playbackController.toggle()}
+          >
+            {playback.isPlaying ? (
+              <Pause size={18} fill="currentColor" />
+            ) : (
+              <Play size={18} fill="currentColor" />
+            )}
           </button>
-          <button type="button" aria-label="下一帧" title="下一帧 →" disabled={!canPlay} onClick={() => playbackController.step(FRAME_STEP)}>
+          <button
+            type="button"
+            aria-label="下一帧"
+            title="下一帧 →"
+            disabled={!canPlay}
+            onClick={() => playbackController.step(FRAME_STEP)}
+          >
             <SkipForward size={15} aria-hidden="true" />
           </button>
         </div>
@@ -385,11 +421,19 @@ function CompositionVideoPlayback({
       <footer className="studio-player__controls" aria-label="播放控制">
         <div className="studio-player__controls-left">
           <time className="studio-player__current-time">{formatTimecode(playhead)}</time>
-          <span className="studio-player__time-divider" aria-hidden="true">/</span>
+          <span className="studio-player__time-divider" aria-hidden="true">
+            /
+          </span>
           <time>{formatTimecode(projectDuration)}</time>
         </div>
         <div className="studio-player__transport">
-          <button type="button" aria-label="上一帧" title="上一帧 ←" disabled={!canPlay} onClick={() => stepFrame(-1)}>
+          <button
+            type="button"
+            aria-label="上一帧"
+            title="上一帧 ←"
+            disabled={!canPlay}
+            onClick={() => stepFrame(-1)}
+          >
             <SkipBack size={15} aria-hidden="true" />
           </button>
           <button
@@ -400,9 +444,19 @@ function CompositionVideoPlayback({
             disabled={!canPlay}
             onClick={togglePlayback}
           >
-            {isPlaybackActive ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+            {isPlaybackActive ? (
+              <Pause size={18} fill="currentColor" />
+            ) : (
+              <Play size={18} fill="currentColor" />
+            )}
           </button>
-          <button type="button" aria-label="下一帧" title="下一帧 →" disabled={!canPlay} onClick={() => stepFrame(1)}>
+          <button
+            type="button"
+            aria-label="下一帧"
+            title="下一帧 →"
+            disabled={!canPlay}
+            onClick={() => stepFrame(1)}
+          >
             <SkipForward size={15} aria-hidden="true" />
           </button>
         </div>

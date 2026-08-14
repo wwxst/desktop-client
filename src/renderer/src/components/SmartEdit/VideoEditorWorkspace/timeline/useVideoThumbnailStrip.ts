@@ -34,7 +34,8 @@ export function useVideoThumbnailStrip({
     if (!enabled || !url || !duration || duration <= 0 || !key) {
       return
     }
-    const request = stripCache.get(key) ?? createThumbnailStrip(url, duration, sourceStart, safeEnd, safeCount)
+    const request =
+      stripCache.get(key) ?? createThumbnailStrip(url, duration, sourceStart, safeEnd, safeCount)
     stripCache.set(key, request)
     void request.then((value) => {
       if (!cancelled) setResult({ key, frames: value })

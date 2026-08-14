@@ -11,7 +11,11 @@ interface ParameterPanelProps {
   onUpdateClip?: (patch: ClipPatch) => void
 }
 
-function ParameterPanel({ clip = null, asset = null, onUpdateClip }: ParameterPanelProps): JSX.Element {
+function ParameterPanel({
+  clip = null,
+  asset = null,
+  onUpdateClip
+}: ParameterPanelProps): JSX.Element {
   return (
     <section className="studio-parameter-panel" aria-label="参数区">
       <header className="studio-workspace__panel-header">
@@ -28,10 +32,31 @@ function ParameterPanel({ clip = null, asset = null, onUpdateClip }: ParameterPa
           <>
             <InspectorSection title="时间" defaultOpen>
               <div className="studio-parameter-panel__grid studio-parameter-panel__grid--2">
-                <ScrubNumber label="开始" value={clip.timelineStart} min={0} step={0.05} suffix="s" onCommit={(timelineStart) => onUpdateClip?.({ timelineStart })} />
+                <ScrubNumber
+                  label="开始"
+                  value={clip.timelineStart}
+                  min={0}
+                  step={0.05}
+                  suffix="s"
+                  onCommit={(timelineStart) => onUpdateClip?.({ timelineStart })}
+                />
                 <ScrubNumber label="时长" value={clip.duration} step={0.05} suffix="s" disabled />
-                <ScrubNumber label="入点" value={clip.sourceStart} min={0} step={0.05} suffix="s" onCommit={(sourceStart) => onUpdateClip?.({ sourceStart })} />
-                <ScrubNumber label="出点" value={clip.sourceEnd} min={0} step={0.05} suffix="s" onCommit={(sourceEnd) => onUpdateClip?.({ sourceEnd })} />
+                <ScrubNumber
+                  label="入点"
+                  value={clip.sourceStart}
+                  min={0}
+                  step={0.05}
+                  suffix="s"
+                  onCommit={(sourceStart) => onUpdateClip?.({ sourceStart })}
+                />
+                <ScrubNumber
+                  label="出点"
+                  value={clip.sourceEnd}
+                  min={0}
+                  step={0.05}
+                  suffix="s"
+                  onCommit={(sourceEnd) => onUpdateClip?.({ sourceEnd })}
+                />
               </div>
             </InspectorSection>
 
@@ -44,17 +69,45 @@ function ParameterPanel({ clip = null, asset = null, onUpdateClip }: ParameterPa
                   className="studio-parameter-panel__icon-button"
                   title="重置变换"
                   aria-label="重置变换"
-                  onClick={() => onUpdateClip?.({ transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 } })}
+                  onClick={() =>
+                    onUpdateClip?.({ transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 } })
+                  }
                 >
                   <RotateCcw size={13} />
                 </button>
               }
             >
               <div className="studio-parameter-panel__grid studio-parameter-panel__grid--2">
-                <ScrubNumber label="位置 X" value={clip.transform.x} step={1} onCommit={(x) => onUpdateClip?.({ transform: { x } })} />
-                <ScrubNumber label="位置 Y" value={clip.transform.y} step={1} onCommit={(y) => onUpdateClip?.({ transform: { y } })} />
-                <ScrubNumber label="缩放" value={clip.transform.scaleX * 100} min={5} max={1000} step={1} suffix="%" onCommit={(scale) => onUpdateClip?.({ transform: { scaleX: scale / 100, scaleY: scale / 100 } })} />
-                <ScrubNumber label="旋转" value={clip.transform.rotation} step={1} suffix="°" onCommit={(rotation) => onUpdateClip?.({ transform: { rotation } })} />
+                <ScrubNumber
+                  label="位置 X"
+                  value={clip.transform.x}
+                  step={1}
+                  onCommit={(x) => onUpdateClip?.({ transform: { x } })}
+                />
+                <ScrubNumber
+                  label="位置 Y"
+                  value={clip.transform.y}
+                  step={1}
+                  onCommit={(y) => onUpdateClip?.({ transform: { y } })}
+                />
+                <ScrubNumber
+                  label="缩放"
+                  value={clip.transform.scaleX * 100}
+                  min={5}
+                  max={1000}
+                  step={1}
+                  suffix="%"
+                  onCommit={(scale) =>
+                    onUpdateClip?.({ transform: { scaleX: scale / 100, scaleY: scale / 100 } })
+                  }
+                />
+                <ScrubNumber
+                  label="旋转"
+                  value={clip.transform.rotation}
+                  step={1}
+                  suffix="°"
+                  onCommit={(rotation) => onUpdateClip?.({ transform: { rotation } })}
+                />
               </div>
             </InspectorSection>
 
@@ -88,11 +141,19 @@ function ParameterPanel({ clip = null, asset = null, onUpdateClip }: ParameterPa
                 onCommit={(volume) => onUpdateClip?.({ volume: volume / 100 })}
               />
               <label className="studio-parameter-panel__toggle">
-                <input type="checkbox" checked={clip.muted} onChange={(event) => onUpdateClip?.({ muted: event.currentTarget.checked })} />
+                <input
+                  type="checkbox"
+                  checked={clip.muted}
+                  onChange={(event) => onUpdateClip?.({ muted: event.currentTarget.checked })}
+                />
                 <span>片段静音</span>
               </label>
               <label className="studio-parameter-panel__toggle">
-                <input type="checkbox" checked={clip.enabled} onChange={(event) => onUpdateClip?.({ enabled: event.currentTarget.checked })} />
+                <input
+                  type="checkbox"
+                  checked={clip.enabled}
+                  onChange={(event) => onUpdateClip?.({ enabled: event.currentTarget.checked })}
+                />
                 <span>启用片段</span>
               </label>
             </InspectorSection>
@@ -118,7 +179,11 @@ function InspectorSection({
   return (
     <section className="studio-parameter-panel__section" data-open={open ? 'true' : undefined}>
       <header>
-        <button type="button" className="studio-parameter-panel__section-toggle" onClick={() => setOpen((value) => !value)}>
+        <button
+          type="button"
+          className="studio-parameter-panel__section-toggle"
+          onClick={() => setOpen((value) => !value)}
+        >
           <ChevronDown size={13} aria-hidden="true" />
           <strong>{title}</strong>
         </button>
@@ -183,7 +248,9 @@ function ScrubNumber({
 
   return (
     <label className="studio-parameter-panel__field" data-disabled={disabled ? 'true' : undefined}>
-      <span className="studio-parameter-panel__field-label" onPointerDown={startScrub}>{label}</span>
+      <span className="studio-parameter-panel__field-label" onPointerDown={startScrub}>
+        {label}
+      </span>
       <span className="studio-parameter-panel__input-wrap">
         <input
           type="number"
@@ -228,8 +295,20 @@ function InspectorSlider({
   return (
     <label className="studio-parameter-panel__slider-row">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={draft} onChange={(event) => updateDraft(Number(event.currentTarget.value))} onPointerUp={() => onCommit(draft)} onKeyUp={() => onCommit(draft)} />
-      <output>{roundForInput(draft)}{suffix}</output>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={draft}
+        onChange={(event) => updateDraft(Number(event.currentTarget.value))}
+        onPointerUp={() => onCommit(draft)}
+        onKeyUp={() => onCommit(draft)}
+      />
+      <output>
+        {roundForInput(draft)}
+        {suffix}
+      </output>
     </label>
   )
 }

@@ -145,7 +145,10 @@ function getNotificationContent(notification: HTMLElement): HTMLElement {
 }
 
 function readTtsCss(): string {
-  const cssUrl = new URL('../src/renderer/src/components/TtsVoiceover/TtsVoiceover.css', import.meta.url)
+  const cssUrl = new URL(
+    '../src/renderer/src/components/TtsVoiceover/TtsVoiceover.css',
+    import.meta.url
+  )
   return readFileSync(
     cssUrl.protocol === 'file:' ? cssUrl : resolve(process.cwd(), cssUrl.pathname.slice(1)),
     'utf8'

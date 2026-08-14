@@ -22,7 +22,12 @@ export function planToEditorCommands(plan: EditingPlan): EditorCommand[] {
   for (const clip of plan.videoClips) {
     if (!imported.has(clip.assetId)) {
       imported.add(clip.assetId)
-      commands.push({ type: 'asset.import', assetId: clip.assetId, path: clip.sourcePath, mediaType: 'video' })
+      commands.push({
+        type: 'asset.import',
+        assetId: clip.assetId,
+        path: clip.sourcePath,
+        mediaType: 'video'
+      })
     }
     commands.push({
       type: 'clip.add',
@@ -37,7 +42,12 @@ export function planToEditorCommands(plan: EditingPlan): EditorCommand[] {
   }
 
   const voiceAssetId = `${plan.id}-voice-asset`
-  commands.push({ type: 'asset.import', assetId: voiceAssetId, path: plan.voice.sourcePath, mediaType: 'audio' })
+  commands.push({
+    type: 'asset.import',
+    assetId: voiceAssetId,
+    path: plan.voice.sourcePath,
+    mediaType: 'audio'
+  })
   commands.push({
     type: 'audio.add',
     clipId: plan.voice.id,

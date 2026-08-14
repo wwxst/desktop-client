@@ -95,7 +95,8 @@ function VideoEditorWorkspace(): JSX.Element {
   const executeTransaction = useCallback(
     (commands: readonly EditorCommand[], label?: string): EditorBatchCommandResult => {
       const result = applyEditorTransactionWithResult(project, commands)
-      if (result.success && result.changed) dispatch({ type: 'command/transaction', commands, label })
+      if (result.success && result.changed)
+        dispatch({ type: 'command/transaction', commands, label })
       return result
     },
     [project]
@@ -112,7 +113,9 @@ function VideoEditorWorkspace(): JSX.Element {
 
   const setSelection = useCallback(
     (clipIds: readonly string[], activeId?: string | null): void => {
-      const unique = [...new Set(clipIds)].filter((id) => project.clips.some((clip) => clip.id === id))
+      const unique = [...new Set(clipIds)].filter((id) =>
+        project.clips.some((clip) => clip.id === id)
+      )
       setSelectedClipIds(unique)
       const nextActive = activeId === undefined ? (unique.at(-1) ?? null) : activeId
       dispatchProjectAction({
@@ -176,7 +179,9 @@ function VideoEditorWorkspace(): JSX.Element {
   const handleAddMedia = useCallback(
     (assetId: string): void => {
       const mainTrack = getMainVisualTrack(project)
-      const timelineStart = mainTrack ? getTrackEnd(project, mainTrack.id) : getProjectDuration(project)
+      const timelineStart = mainTrack
+        ? getTrackEnd(project, mainTrack.id)
+        : getProjectDuration(project)
       editorService.placeAsset({ assetId, timelineStart, trackId: mainTrack?.id })
     },
     [editorService, project]
@@ -278,7 +283,10 @@ function VideoEditorWorkspace(): JSX.Element {
       const assets = pending.assetIds
         .map((id) => project.assets.find((asset) => asset.id === id))
         .filter((asset) => asset !== undefined)
-      if (assets.length !== pending.assetIds.length || assets.some((asset) => asset.status === 'loading')) {
+      if (
+        assets.length !== pending.assetIds.length ||
+        assets.some((asset) => asset.status === 'loading')
+      ) {
         remaining.push(pending)
         continue
       }
@@ -421,10 +429,20 @@ function VideoEditorWorkspace(): JSX.Element {
 
   return (
     <section className="studio-workspace" aria-label="剪辑工作区">
-      <Group {...rowLayout} className="studio-workspace__rows" orientation="vertical" resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}>
+      <Group
+        {...rowLayout}
+        className="studio-workspace__rows"
+        orientation="vertical"
+        resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}
+      >
         <Panel id="workspace-top" defaultSize="64" minSize={280}>
           <div className="studio-workspace__top">
-            <Group {...columnLayout} className="studio-workspace__columns" orientation="horizontal" resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}>
+            <Group
+              {...columnLayout}
+              className="studio-workspace__columns"
+              orientation="horizontal"
+              resizeTargetMinimumSize={{ fine: 8, coarse: 16 }}
+            >
               <Panel
                 id="function-panel"
                 className="studio-workspace__card studio-workspace__card--function"
@@ -433,10 +451,22 @@ function VideoEditorWorkspace(): JSX.Element {
                 maxSize={360}
                 groupResizeBehavior="preserve-pixel-size"
               >
-                <FunctionPanel mediaItems={project.assets} onImportMedia={importMediaFiles} onAddMedia={handleAddMedia} />
+                <FunctionPanel
+                  mediaItems={project.assets}
+                  onImportMedia={importMediaFiles}
+                  onAddMedia={handleAddMedia}
+                />
               </Panel>
-              <Separator id="function-panel-resize-handle" className="studio-workspace__column-resize-handle" aria-label="调整素材区宽度" />
-              <Panel id="player-panel" className="studio-workspace__card studio-workspace__card--player" minSize={240}>
+              <Separator
+                id="function-panel-resize-handle"
+                className="studio-workspace__column-resize-handle"
+                aria-label="调整素材区宽度"
+              />
+              <Panel
+                id="player-panel"
+                className="studio-workspace__card studio-workspace__card--player"
+                minSize={240}
+              >
                 <PlayerPanel
                   project={project}
                   playbackController={playbackController}
@@ -451,33 +481,48 @@ function VideoEditorWorkspace(): JSX.Element {
                   onMediaError={reportMediaError}
                   onSelectClip={handleSelectClip}
                   onUpdateClip={handleUpdateClip}
-                  onUpdateClipById={(clipId, patch) => editorService.updateClip(clipId, patch, '画布变换')}
+                  onUpdateClipById={(clipId, patch) =>
+                    editorService.updateClip(clipId, patch, '画布变换')
+                  }
                   onDeleteClip={(clipId) => handleDeleteClips([clipId])}
                   onCutClip={(clipId) => handleCutClips([clipId])}
                   onCopyClip={(clipId) => handleCopyClips([clipId])}
                   onDuplicateClip={(clipId) => handleDuplicateClips([clipId])}
                   onToggleClipMuted={(clipId) => {
                     const clip = project.clips.find((item) => item.id === clipId)
-                    const asset = clip ? project.assets.find((item) => item.id === clip.assetId) ?? null : null
+                    const asset = clip
+                      ? (project.assets.find((item) => item.id === clip.assetId) ?? null)
+                      : null
                     if (!clip) return
                     const resolved = resolveTimelineClip(clip, asset)
                     execute({ type: 'clip/update', clipId, patch: { muted: !resolved.muted } })
                   }}
                   onToggleClipEnabled={(clipId) => {
                     const clip = project.clips.find((item) => item.id === clipId)
-                    const asset = clip ? project.assets.find((item) => item.id === clip.assetId) ?? null : null
+                    const asset = clip
+                      ? (project.assets.find((item) => item.id === clip.assetId) ?? null)
+                      : null
                     if (!clip) return
                     const resolved = resolveTimelineClip(clip, asset)
                     execute({ type: 'clip/update', clipId, patch: { enabled: !resolved.enabled } })
                   }}
-                  onResetClipTransform={(clipId) => execute({
-                    type: 'clip/update',
-                    clipId,
-                    patch: { transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }, opacity: 1 }
-                  })}
+                  onResetClipTransform={(clipId) =>
+                    execute({
+                      type: 'clip/update',
+                      clipId,
+                      patch: {
+                        transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+                        opacity: 1
+                      }
+                    })
+                  }
                 />
               </Panel>
-              <Separator id="parameter-panel-resize-handle" className="studio-workspace__column-resize-handle" aria-label="调整属性区宽度" />
+              <Separator
+                id="parameter-panel-resize-handle"
+                className="studio-workspace__column-resize-handle"
+                aria-label="调整属性区宽度"
+              />
               <Panel
                 id="parameter-panel"
                 className="studio-workspace__card studio-workspace__card--parameter"
@@ -486,12 +531,20 @@ function VideoEditorWorkspace(): JSX.Element {
                 maxSize={420}
                 groupResizeBehavior="preserve-pixel-size"
               >
-                <ParameterPanel clip={activeClip} asset={activeAsset} onUpdateClip={handleUpdateClip} />
+                <ParameterPanel
+                  clip={activeClip}
+                  asset={activeAsset}
+                  onUpdateClip={handleUpdateClip}
+                />
               </Panel>
             </Group>
           </div>
         </Panel>
-        <Separator id="workspace-timeline-resize-handle" className="studio-workspace__row-resize-handle" aria-label="调整时间线高度" />
+        <Separator
+          id="workspace-timeline-resize-handle"
+          className="studio-workspace__row-resize-handle"
+          aria-label="调整时间线高度"
+        />
         <Panel id="workspace-timeline" defaultSize="36" minSize={220} maxSize="72">
           <div className="studio-workspace__timeline studio-workspace__card studio-workspace__card--timeline">
             <Timeline
@@ -514,7 +567,9 @@ function VideoEditorWorkspace(): JSX.Element {
               onSelectClip={handleSelectClip}
               onSelectionChange={setSelection}
               onSetPlayhead={handleSetPlayhead}
-              onMoveClip={(clipId, timelineStart, trackId) => editorService.moveClips([{ clipId, timelineStart, trackId }])}
+              onMoveClip={(clipId, timelineStart, trackId) =>
+                editorService.moveClips([{ clipId, timelineStart, trackId }])
+              }
               onMoveClips={handleMoveClips}
               onMoveClipToNewLayer={handleMoveClipToNewLayer}
               onTrimClip={(clipId, trim) => execute({ type: 'clip/trim', clipId, ...trim })}
@@ -530,23 +585,32 @@ function VideoEditorWorkspace(): JSX.Element {
               onDuplicateClips={handleDuplicateClips}
               onToggleClipMute={(clipId) => {
                 const clip = project.clips.find((item) => item.id === clipId)
-                const asset = clip ? project.assets.find((item) => item.id === clip.assetId) ?? null : null
+                const asset = clip
+                  ? (project.assets.find((item) => item.id === clip.assetId) ?? null)
+                  : null
                 if (!clip) return
                 const resolved = resolveTimelineClip(clip, asset)
                 execute({ type: 'clip/update', clipId, patch: { muted: !resolved.muted } })
               }}
               onToggleClipEnabled={(clipId) => {
                 const clip = project.clips.find((item) => item.id === clipId)
-                const asset = clip ? project.assets.find((item) => item.id === clip.assetId) ?? null : null
+                const asset = clip
+                  ? (project.assets.find((item) => item.id === clip.assetId) ?? null)
+                  : null
                 if (!clip) return
                 const resolved = resolveTimelineClip(clip, asset)
                 execute({ type: 'clip/update', clipId, patch: { enabled: !resolved.enabled } })
               }}
-              onResetClipTransform={(clipId) => execute({
-                type: 'clip/update',
-                clipId,
-                patch: { transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }, opacity: 1 }
-              })}
+              onResetClipTransform={(clipId) =>
+                execute({
+                  type: 'clip/update',
+                  clipId,
+                  patch: {
+                    transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+                    opacity: 1
+                  }
+                })
+              }
               onUpdateTrack={handleUpdateTrack}
               onZoomChange={(zoom) => dispatchProjectAction({ type: 'timeline/zoomChanged', zoom })}
               onUndo={undo}

@@ -1,11 +1,4 @@
-import {
-  CheckCircle2,
-  Circle,
-  ClipboardCheck,
-  Info,
-  Layers3,
-  ShieldCheck
-} from 'lucide-react'
+import { CheckCircle2, Circle, ClipboardCheck, Info, Layers3, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState, type JSX } from 'react'
 
 import {
@@ -115,12 +108,16 @@ function NovelPromotionSidePanel(): JSX.Element {
 
       <div className={validation.canStart ? 'novel-side-ready is-ready' : 'novel-side-ready'}>
         <Layers3 size={17} strokeWidth={1.8} aria-hidden="true" />
-        <span>{validation.canStart ? '配置完成，可以开始批量生成。' : '把未完成项目补齐后即可开始。'}</span>
+        <span>
+          {validation.canStart ? '配置完成，可以开始批量生成。' : '把未完成项目补齐后即可开始。'}
+        </span>
       </div>
 
       <div className="novel-side-tip">
         <Info size={15} strokeWidth={1.8} aria-hidden="true" />
-        <p>当前页面已按真实业务整理；真正写入剪映草稿和调用导出，需要继续接入 Electron 主进程执行器。</p>
+        <p>
+          当前页面已按真实业务整理；真正写入剪映草稿和调用导出，需要继续接入 Electron 主进程执行器。
+        </p>
       </div>
     </section>
   )

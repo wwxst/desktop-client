@@ -6,9 +6,7 @@ import type {
   TtsModelDownloadProgress,
   TtsModelInfo
 } from '../../../../shared/tts'
-import AlertNotification, {
-  type AlertNotificationVariant
-} from '../ui/AlertNotification'
+import AlertNotification, { type AlertNotificationVariant } from '../ui/AlertNotification'
 import PluginDetailView from './PluginDetailView'
 import PluginListView from './PluginListView'
 import { getPluginPresentation } from './pluginPresentation'

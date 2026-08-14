@@ -23,10 +23,21 @@ export interface EditorAgentApi {
   /** 兼容已有 Agent：低层命令仍保留。新自动剪辑优先使用 service 能力。 */
   execute: (command: EditorCommand) => EditorCommandResult
   executeBatch: (commands: readonly EditorCommand[]) => EditorBatchCommandResult
-  executeTransaction: (commands: readonly EditorCommand[], label?: string) => EditorBatchCommandResult
-  placeAsset?: (input: { assetId: string; timelineStart: number; trackId?: string; forceNewLayer?: boolean }) => EditorBatchCommandResult
+  executeTransaction: (
+    commands: readonly EditorCommand[],
+    label?: string
+  ) => EditorBatchCommandResult
+  placeAsset?: (input: {
+    assetId: string
+    timelineStart: number
+    trackId?: string
+    forceNewLayer?: boolean
+  }) => EditorBatchCommandResult
   moveClips?: (moves: readonly MoveRequest[]) => EditorBatchCommandResult
-  deleteClips?: (clipIds: readonly string[], options?: { magnetMainTrack?: boolean }) => EditorBatchCommandResult
+  deleteClips?: (
+    clipIds: readonly string[],
+    options?: { magnetMainTrack?: boolean }
+  ) => EditorBatchCommandResult
   updateClip?: (clipId: string, patch: ClipPatch, label?: string) => EditorBatchCommandResult
   splitClip?: (clipId: string, at: number) => EditorBatchCommandResult
   undo: () => void
@@ -41,14 +52,20 @@ export interface EditorAgentApiDependencies {
   getPlayhead?: () => number
   execute: (command: EditorCommand) => EditorCommandResult
   executeBatch: (commands: readonly EditorCommand[]) => EditorBatchCommandResult
-  executeTransaction: (commands: readonly EditorCommand[], label?: string) => EditorBatchCommandResult
+  executeTransaction: (
+    commands: readonly EditorCommand[],
+    label?: string
+  ) => EditorBatchCommandResult
   service?: EditorService
   undo: () => void
   redo: () => void
 }
 
 const capabilities: readonly EditorCapability[] = [
-  { name: 'service/placeAsset', description: '按统一碰撞/自动建层规则把素材放到时间线（推荐 Agent 使用）' },
+  {
+    name: 'service/placeAsset',
+    description: '按统一碰撞/自动建层规则把素材放到时间线（推荐 Agent 使用）'
+  },
   { name: 'service/moveClips', description: '按统一 Placement Policy 移动一个或多个片段' },
   { name: 'service/deleteClips', description: '删除片段，可选择主内容磁吸' },
   { name: 'service/updateClip', description: '修改画面、音量、速度等 Clip 参数' },
@@ -79,8 +96,12 @@ export function createEditorAgentApi(deps: EditorAgentApiDependencies): EditorAg
     executeTransaction: deps.executeTransaction,
     placeAsset: deps.service ? (input) => deps.service!.placeAsset(input) : undefined,
     moveClips: deps.service ? (moves) => deps.service!.moveClips(moves) : undefined,
-    deleteClips: deps.service ? (clipIds, options) => deps.service!.deleteClips(clipIds, options) : undefined,
-    updateClip: deps.service ? (clipId, patch, label) => deps.service!.updateClip(clipId, patch, label) : undefined,
+    deleteClips: deps.service
+      ? (clipIds, options) => deps.service!.deleteClips(clipIds, options)
+      : undefined,
+    updateClip: deps.service
+      ? (clipId, patch, label) => deps.service!.updateClip(clipId, patch, label)
+      : undefined,
     splitClip: deps.service ? (clipId, at) => deps.service!.splitClip(clipId, at) : undefined,
     undo: deps.undo,
     redo: deps.redo

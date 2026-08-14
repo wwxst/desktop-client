@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { createEditorPlaybackController, type PlaybackClock } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/playback/editorPlaybackController'
+import {
+  createEditorPlaybackController,
+  type PlaybackClock
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/playback/editorPlaybackController'
 
 class FakeClock implements PlaybackClock {
   time = 0
   nextId = 1
   callbacks = new Map<number, (time: number) => void>()
   now = (): number => this.time
-  request = (callback: (time: number) => void): number => { const id = this.nextId++; this.callbacks.set(id, callback); return id }
-  cancel = (id: number): void => { this.callbacks.delete(id) }
+  request = (callback: (time: number) => void): number => {
+    const id = this.nextId++
+    this.callbacks.set(id, callback)
+    return id
+  }
+  cancel = (id: number): void => {
+    this.callbacks.delete(id)
+  }
   advance(ms: number): void {
     this.time += ms
     const callbacks = [...this.callbacks.values()]

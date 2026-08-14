@@ -1,7 +1,4 @@
-import {
-  applyEditorTransactionWithResult,
-  type EditorCommand
-} from '../editorCommands'
+import { applyEditorTransactionWithResult, type EditorCommand } from '../editorCommands'
 import {
   createAudioTrack,
   createVisualTrack,
@@ -162,7 +159,13 @@ export function planPlaceAsset(
     ids
   )
   if (!placement) {
-    return { commands: [], clipIds: [], targetTrackIds: [], changed: false, reason: '没有可用内容层' }
+    return {
+      commands: [],
+      clipIds: [],
+      targetTrackIds: [],
+      changed: false,
+      reason: '没有可用内容层'
+    }
   }
 
   const clipId = request.clipId ?? ids.clip()
@@ -201,8 +204,12 @@ export function planMoveClips(
   const orderedMoves = [...moves].sort((left, right) => {
     const leftRaw = state.clips.find((clip) => clip.id === left.clipId)
     const rightRaw = state.clips.find((clip) => clip.id === right.clipId)
-    const leftAsset = leftRaw ? state.assets.find((asset) => asset.id === leftRaw.assetId) ?? null : null
-    const rightAsset = rightRaw ? state.assets.find((asset) => asset.id === rightRaw.assetId) ?? null : null
+    const leftAsset = leftRaw
+      ? (state.assets.find((asset) => asset.id === leftRaw.assetId) ?? null)
+      : null
+    const rightAsset = rightRaw
+      ? (state.assets.find((asset) => asset.id === rightRaw.assetId) ?? null)
+      : null
     const leftClip = leftRaw ? resolveTimelineClip(leftRaw, leftAsset) : null
     const rightClip = rightRaw ? resolveTimelineClip(rightRaw, rightAsset) : null
     if (!leftClip || !rightClip) return 0
@@ -274,7 +281,10 @@ export function planDeleteClips(
       return resolveTimelineClip(clip, asset)
     })
 
-  const commands: EditorCommand[] = deleted.map((clip) => ({ type: 'clip/delete', clipId: clip.id }))
+  const commands: EditorCommand[] = deleted.map((clip) => ({
+    type: 'clip/delete',
+    clipId: clip.id
+  }))
   const oldTrackIds = deleted.map((clip) => clip.trackId)
 
   if (options.magnetMainTrack) {

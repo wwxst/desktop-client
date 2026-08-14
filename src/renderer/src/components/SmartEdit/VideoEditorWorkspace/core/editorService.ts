@@ -42,10 +42,16 @@ export interface EditorService {
     forceNewLayer?: boolean
   }): EditorBatchCommandResult
   moveClips(moves: readonly MoveRequest[]): EditorBatchCommandResult
-  deleteClips(clipIds: readonly string[], options?: { magnetMainTrack?: boolean }): EditorBatchCommandResult
+  deleteClips(
+    clipIds: readonly string[],
+    options?: { magnetMainTrack?: boolean }
+  ): EditorBatchCommandResult
   updateClip(clipId: string, patch: ClipPatch, label?: string): EditorBatchCommandResult
   splitClip(clipId: string, at: number): EditorBatchCommandResult
-  paste(snapshot: EditorClipboardSnapshot, at: number): { result: EditorBatchCommandResult; newIds: string[] }
+  paste(
+    snapshot: EditorClipboardSnapshot,
+    at: number
+  ): { result: EditorBatchCommandResult; newIds: string[] }
 }
 
 export function createEditorService(
@@ -55,7 +61,10 @@ export function createEditorService(
   return {
     placeAsset(input) {
       const plan = planPlaceAsset(runtime.getProject(), input, ids)
-      return runtime.executeTransaction(plan.commands, input.forceNewLayer ? '素材拖入新视觉层' : '放置素材')
+      return runtime.executeTransaction(
+        plan.commands,
+        input.forceNewLayer ? '素材拖入新视觉层' : '放置素材'
+      )
     },
 
     placeAssetsSequential(input) {
@@ -90,12 +99,18 @@ export function createEditorService(
 
     moveClips(moves) {
       const plan = planMoveClips(runtime.getProject(), moves, ids)
-      return runtime.executeTransaction(plan.commands, moves.length > 1 ? '移动多个片段' : '移动片段')
+      return runtime.executeTransaction(
+        plan.commands,
+        moves.length > 1 ? '移动多个片段' : '移动片段'
+      )
     },
 
     deleteClips(clipIds, options) {
       const plan = planDeleteClips(runtime.getProject(), clipIds, options)
-      return runtime.executeTransaction(plan.commands, options?.magnetMainTrack ? '磁吸删除片段' : '删除片段')
+      return runtime.executeTransaction(
+        plan.commands,
+        options?.magnetMainTrack ? '磁吸删除片段' : '删除片段'
+      )
     },
 
     updateClip(clipId, patch, label = '更新片段') {
@@ -126,9 +141,10 @@ export function createEditorService(
         const duration = resolveTimelineClip(item.clip, asset).duration
 
         if (!targetTrack) {
-          targetTrack = getMediaAssetKind(asset) === 'audio'
-            ? createAudioTrack(ids.audioTrack())
-            : createVisualTrack(ids.visualTrack())
+          targetTrack =
+            getMediaAssetKind(asset) === 'audio'
+              ? createAudioTrack(ids.audioTrack())
+              : createVisualTrack(ids.visualTrack())
           targetTrackId = targetTrack.id
           const addTrack: EditorCommand = {
             type: 'track/add',
@@ -142,9 +158,10 @@ export function createEditorService(
         }
 
         if (trackWouldCollide(simulated, targetTrackId, start, duration)) {
-          const freshTrack = getMediaAssetKind(asset) === 'audio'
-            ? createAudioTrack(ids.audioTrack())
-            : createVisualTrack(ids.visualTrack())
+          const freshTrack =
+            getMediaAssetKind(asset) === 'audio'
+              ? createAudioTrack(ids.audioTrack())
+              : createVisualTrack(ids.visualTrack())
           targetTrackId = freshTrack.id
           redirectedTracks.set(sourceTrackId, targetTrackId)
           const addTrack: EditorCommand = {

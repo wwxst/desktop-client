@@ -65,7 +65,10 @@ function formatTime(seconds: number): string {
   const minutes = Math.floor((ms % 3_600_000) / 60_000)
   const secs = Math.floor((ms % 60_000) / 1000)
   const millis = ms % 1000
-  return [hours, minutes, secs].map((n) => String(n).padStart(2, '0')).join(':') + `,${String(millis).padStart(3, '0')}`
+  return (
+    [hours, minutes, secs].map((n) => String(n).padStart(2, '0')).join(':') +
+    `,${String(millis).padStart(3, '0')}`
+  )
 }
 
 export class SubtitleTool {
@@ -76,7 +79,10 @@ export class SubtitleTool {
   async writeSrt(path: string, cues: SubtitleCue[]): Promise<void> {
     await mkdir(dirname(path), { recursive: true })
     const content = cues
-      .map((cue, index) => `${index + 1}\n${formatTime(cue.startSeconds)} --> ${formatTime(cue.endSeconds)}\n${cue.text}\n`)
+      .map(
+        (cue, index) =>
+          `${index + 1}\n${formatTime(cue.startSeconds)} --> ${formatTime(cue.endSeconds)}\n${cue.text}\n`
+      )
       .join('\n')
     await writeFile(path, content, 'utf8')
   }

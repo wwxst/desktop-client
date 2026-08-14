@@ -71,8 +71,10 @@ function normalizeModelOutput(
     segments: source.map((segment, index) => {
       const modelItem = byId.get(segment.id)
       const fallbackItem = fallback.segments[index]
-      const role = modelItem?.role && VALID_ROLES.has(modelItem.role) ? modelItem.role : fallbackItem.role
-      const pace = modelItem?.pace && VALID_PACES.has(modelItem.pace) ? modelItem.pace : fallbackItem.pace
+      const role =
+        modelItem?.role && VALID_ROLES.has(modelItem.role) ? modelItem.role : fallbackItem.role
+      const pace =
+        modelItem?.pace && VALID_PACES.has(modelItem.pace) ? modelItem.pace : fallbackItem.pace
       const importance = Number.isFinite(modelItem?.importance)
         ? Math.min(1, Math.max(0, Number(modelItem?.importance)))
         : fallbackItem.importance
@@ -141,7 +143,9 @@ export class StoryAgent {
               outputSchema: {
                 summary: '本批内容一句话摘要',
                 tone: 'string',
-                segments: [{ id: 'seg-001', role: 'hook', pace: 'fast', importance: 0.9, note: 'string' }]
+                segments: [
+                  { id: 'seg-001', role: 'hook', pace: 'fast', importance: 0.9, note: 'string' }
+                ]
               },
               segments: batch.map(({ id, index, text }) => ({ id, index, text }))
             })

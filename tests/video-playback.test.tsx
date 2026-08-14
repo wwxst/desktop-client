@@ -9,7 +9,10 @@ import {
   type MediaAsset,
   type TimelineClip
 } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/editorProject'
-import { getProjectCanvasSize, projectToViewport } from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/core/editorCoordinate'
+import {
+  getProjectCanvasSize,
+  projectToViewport
+} from '../src/renderer/src/components/SmartEdit/VideoEditorWorkspace/core/editorCoordinate'
 
 const videoA: MediaAsset = {
   id: 'asset-a',

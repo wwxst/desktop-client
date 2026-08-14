@@ -14,14 +14,7 @@ import {
   Trash2,
   Upload
 } from 'lucide-react'
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type JSX
-} from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type JSX } from 'react'
 
 import {
   buildOutputName,
@@ -39,7 +32,14 @@ import './NovelPromotion.css'
 
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg']
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v']
-const RUN_PHASES = ['替换视频素材', '替换小说音频', '音频识别字幕', '替换字幕时间轴', '替换小说口令', '等待剪映导出']
+const RUN_PHASES = [
+  '替换视频素材',
+  '替换小说音频',
+  '音频识别字幕',
+  '替换字幕时间轴',
+  '替换小说口令',
+  '等待剪映导出'
+]
 
 function createId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -387,10 +387,31 @@ function NovelPromotionView(): JSX.Element {
     <section className="novel-page" aria-label="小说推文批量生成">
       {toast && <div className="novel-toast">{toast}</div>}
 
-      <input ref={draftInputRef} className="novel-hidden-input" type="file" onChange={handleDraftFolderSelected} />
-      <input ref={audioInputRef} className="novel-hidden-input" type="file" onChange={(event) => void handleAudioFolderSelected(event)} />
-      <input ref={commandInputRef} className="novel-hidden-input" type="file" accept=".txt,text/plain" onChange={(event) => void handleCommandFileSelected(event)} />
-      <input ref={materialInputRef} className="novel-hidden-input" type="file" onChange={handleMaterialFolderSelected} />
+      <input
+        ref={draftInputRef}
+        className="novel-hidden-input"
+        type="file"
+        onChange={handleDraftFolderSelected}
+      />
+      <input
+        ref={audioInputRef}
+        className="novel-hidden-input"
+        type="file"
+        onChange={(event) => void handleAudioFolderSelected(event)}
+      />
+      <input
+        ref={commandInputRef}
+        className="novel-hidden-input"
+        type="file"
+        accept=".txt,text/plain"
+        onChange={(event) => void handleCommandFileSelected(event)}
+      />
+      <input
+        ref={materialInputRef}
+        className="novel-hidden-input"
+        type="file"
+        onChange={handleMaterialFolderSelected}
+      />
 
       <header className="novel-page__header">
         <div>
@@ -401,7 +422,9 @@ function NovelPromotionView(): JSX.Element {
             onChange={(event) => updateProject('taskName', event.target.value)}
             aria-label="任务名称"
           />
-          <p className="novel-page__subtitle">使用同一个剪映草稿，循环替换音频、字幕、口令和视频素材。</p>
+          <p className="novel-page__subtitle">
+            使用同一个剪映草稿，循环替换音频、字幕、口令和视频素材。
+          </p>
         </div>
         <div className="novel-page__header-actions">
           <span className="novel-saved-time">
@@ -427,12 +450,19 @@ function NovelPromotionView(): JSX.Element {
       <div className="novel-page__content">
         <section className="novel-card novel-template-card">
           <div className="novel-card__header">
-            <div className="novel-card__icon"><Film size={19} strokeWidth={1.8} /></div>
+            <div className="novel-card__icon">
+              <Film size={19} strokeWidth={1.8} />
+            </div>
             <div>
               <h2>剪映5.9模板草稿</h2>
               <p>用户先在剪映里做好固定内容，软件只替换动态内容。</p>
             </div>
-            <button className="novel-button" type="button" onClick={() => draftInputRef.current?.click()} disabled={isRunning}>
+            <button
+              className="novel-button"
+              type="button"
+              onClick={() => draftInputRef.current?.click()}
+              disabled={isRunning}
+            >
               <FolderOpen size={15} strokeWidth={1.8} aria-hidden="true" />
               选择草稿文件夹
             </button>
@@ -465,7 +495,11 @@ function NovelPromotionView(): JSX.Element {
             </label>
           </div>
 
-          <div className={project.draftDetected ? 'novel-template-status is-ready' : 'novel-template-status'}>
+          <div
+            className={
+              project.draftDetected ? 'novel-template-status is-ready' : 'novel-template-status'
+            }
+          >
             {project.draftDetected ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
             <span>
               {project.draftDetected
@@ -476,39 +510,67 @@ function NovelPromotionView(): JSX.Element {
 
           <div className="novel-fixed-content">
             <strong>草稿中这些内容保持不动：</strong>
-            <span>APP名称</span><span>APP图标</span><span>引导话术</span><span>字幕样式</span><span>贴纸和固定画面</span>
+            <span>APP名称</span>
+            <span>APP图标</span>
+            <span>引导话术</span>
+            <span>字幕样式</span>
+            <span>贴纸和固定画面</span>
           </div>
         </section>
 
         <section className="novel-card novel-task-card">
           <div className="novel-card__header">
-            <div className="novel-card__icon"><FileAudio size={19} strokeWidth={1.8} /></div>
+            <div className="novel-card__icon">
+              <FileAudio size={19} strokeWidth={1.8} />
+            </div>
             <div>
               <h2>批量音频与小说口令</h2>
               <p>音频和口令按照列表顺序一一对应。</p>
             </div>
             <div className="novel-inline-actions">
-              <button className="novel-button" type="button" onClick={() => audioInputRef.current?.click()} disabled={isRunning}>
-                <Upload size={15} strokeWidth={1.8} />导入音频文件夹
+              <button
+                className="novel-button"
+                type="button"
+                onClick={() => audioInputRef.current?.click()}
+                disabled={isRunning}
+              >
+                <Upload size={15} strokeWidth={1.8} />
+                导入音频文件夹
               </button>
-              <button className="novel-button" type="button" onClick={() => commandInputRef.current?.click()} disabled={isRunning}>
-                <FileText size={15} strokeWidth={1.8} />导入口令TXT
+              <button
+                className="novel-button"
+                type="button"
+                onClick={() => commandInputRef.current?.click()}
+                disabled={isRunning}
+              >
+                <FileText size={15} strokeWidth={1.8} />
+                导入口令TXT
               </button>
             </div>
           </div>
 
           <div className="novel-task-toolbar">
             <div>
-              <span>音频：<strong>{project.audioItems.length}</strong> 个</span>
-              <span>口令：<strong>{project.commands.length}</strong> 个</span>
+              <span>
+                音频：<strong>{project.audioItems.length}</strong> 个
+              </span>
+              <span>
+                口令：<strong>{project.commands.length}</strong> 个
+              </span>
               {commandDifference !== 0 && project.audioItems.length > 0 && (
                 <span className="is-warning">
-                  {commandDifference > 0 ? `多 ${commandDifference} 个口令` : `少 ${Math.abs(commandDifference)} 个口令`}
+                  {commandDifference > 0
+                    ? `多 ${commandDifference} 个口令`
+                    : `少 ${Math.abs(commandDifference)} 个口令`}
                 </span>
               )}
             </div>
             <label className="novel-checkbox novel-checkbox--locked">
-              <input type="checkbox" checked={project.autoSubtitle} onChange={(event) => updateProject('autoSubtitle', event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={project.autoSubtitle}
+                onChange={(event) => updateProject('autoSubtitle', event.target.checked)}
+              />
               <span>根据每个音频自动生成字幕，并沿用草稿原字幕样式</span>
             </label>
           </div>
@@ -525,7 +587,12 @@ function NovelPromotionView(): JSX.Element {
                 disabled={isRunning}
               />
             </label>
-            <button className="novel-button novel-button--secondary" type="button" onClick={() => applyCommands(parseCommands(commandText))} disabled={isRunning}>
+            <button
+              className="novel-button novel-button--secondary"
+              type="button"
+              onClick={() => applyCommands(parseCommands(commandText))}
+              disabled={isRunning}
+            >
               按顺序匹配
             </button>
           </div>
@@ -563,28 +630,45 @@ function NovelPromotionView(): JSX.Element {
                         <td>
                           <div className="novel-audio-name">
                             <FileAudio size={15} strokeWidth={1.8} />
-                            <div><strong title={row.audioName}>{row.audioName}</strong><span>{audio ? formatFileSize(audio.fileSize) : ''}</span></div>
+                            <div>
+                              <strong title={row.audioName}>{row.audioName}</strong>
+                              <span>{audio ? formatFileSize(audio.fileSize) : ''}</span>
+                            </div>
                           </div>
                         </td>
                         <td>{formatDuration(row.durationSeconds)}</td>
                         <td>
                           <input
-                            className={!row.command.trim() ? 'novel-command-cell is-empty' : 'novel-command-cell'}
+                            className={
+                              !row.command.trim()
+                                ? 'novel-command-cell is-empty'
+                                : 'novel-command-cell'
+                            }
                             value={project.commands[row.index] ?? ''}
                             onChange={(event) => handleCommandChange(row.index, event.target.value)}
                             placeholder="填写口令"
                             disabled={isRunning}
                           />
                         </td>
-                        <td className="novel-output-name" title={row.outputName}>{row.outputName}</td>
+                        <td className="novel-output-name" title={row.outputName}>
+                          {row.outputName}
+                        </td>
                         <td>
                           <span className={`novel-job-status is-${row.status}`}>
-                            {row.status === 'running' && <LoaderCircle size={13} className="is-spinning" />}
+                            {row.status === 'running' && (
+                              <LoaderCircle size={13} className="is-spinning" />
+                            )}
                             {row.phase}
                           </span>
                         </td>
                         <td>
-                          <button className="novel-icon-button" type="button" aria-label={`删除${row.audioName}`} onClick={() => removeAudio(row.id)} disabled={isRunning}>
+                          <button
+                            className="novel-icon-button"
+                            type="button"
+                            aria-label={`删除${row.audioName}`}
+                            onClick={() => removeAudio(row.id)}
+                            disabled={isRunning}
+                          >
                             <Trash2 size={15} strokeWidth={1.8} />
                           </button>
                         </td>
@@ -600,51 +684,113 @@ function NovelPromotionView(): JSX.Element {
         <div className="novel-bottom-grid">
           <section className="novel-card">
             <div className="novel-card__header novel-card__header--compact">
-              <div className="novel-card__icon"><Film size={19} strokeWidth={1.8} /></div>
-              <div><h2>随机视频素材</h2><p>素材会按照音频时长自动铺满。</p></div>
-              <button className="novel-button" type="button" onClick={() => materialInputRef.current?.click()} disabled={isRunning}>
-                <FolderOpen size={15} strokeWidth={1.8} />选择素材目录
+              <div className="novel-card__icon">
+                <Film size={19} strokeWidth={1.8} />
+              </div>
+              <div>
+                <h2>随机视频素材</h2>
+                <p>素材会按照音频时长自动铺满。</p>
+              </div>
+              <button
+                className="novel-button"
+                type="button"
+                onClick={() => materialInputRef.current?.click()}
+                disabled={isRunning}
+              >
+                <FolderOpen size={15} strokeWidth={1.8} />
+                选择素材目录
               </button>
             </div>
 
             <label className="novel-field">
               <span>素材文件夹</span>
-                <input
-                  value={project.materialFolder}
-                  onChange={(event) => {
-                    const materialFolder = event.target.value
-                    setProject((current) => ({
-                      ...current,
-                      materialFolder,
-                      materialCount:
-                        materialFolder === current.materialFolder ? current.materialCount : 0
-                    }))
-                  }}
-                  placeholder="请选择视频素材文件夹"
-                />
+              <input
+                value={project.materialFolder}
+                onChange={(event) => {
+                  const materialFolder = event.target.value
+                  setProject((current) => ({
+                    ...current,
+                    materialFolder,
+                    materialCount:
+                      materialFolder === current.materialFolder ? current.materialCount : 0
+                  }))
+                }}
+                placeholder="请选择视频素材文件夹"
+              />
             </label>
-            <div className="novel-material-count">已读取 <strong>{project.materialCount}</strong> 个视频素材</div>
+            <div className="novel-material-count">
+              已读取 <strong>{project.materialCount}</strong> 个视频素材
+            </div>
             <div className="novel-option-grid">
-              <label className="novel-checkbox"><input type="checkbox" checked={project.uniqueWithinVideo} onChange={(event) => updateProject('uniqueWithinVideo', event.target.checked)} /><span>单条视频内不重复</span></label>
-              <label className="novel-checkbox"><input type="checkbox" checked={project.uniqueAcrossVideos} onChange={(event) => updateProject('uniqueAcrossVideos', event.target.checked)} /><span>不同成品优先不重复</span></label>
-              <label className="novel-checkbox"><input type="checkbox" checked={project.allowMaterialReuse} onChange={(event) => updateProject('allowMaterialReuse', event.target.checked)} /><span>素材不足后允许循环</span></label>
-              <label className="novel-small-field"><span>单段默认</span><input type="number" min={1} max={60} value={project.materialSegmentSeconds} onChange={(event) => updateProject('materialSegmentSeconds', Math.max(1, Number(event.target.value) || 5))} /><em>秒</em></label>
+              <label className="novel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={project.uniqueWithinVideo}
+                  onChange={(event) => updateProject('uniqueWithinVideo', event.target.checked)}
+                />
+                <span>单条视频内不重复</span>
+              </label>
+              <label className="novel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={project.uniqueAcrossVideos}
+                  onChange={(event) => updateProject('uniqueAcrossVideos', event.target.checked)}
+                />
+                <span>不同成品优先不重复</span>
+              </label>
+              <label className="novel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={project.allowMaterialReuse}
+                  onChange={(event) => updateProject('allowMaterialReuse', event.target.checked)}
+                />
+                <span>素材不足后允许循环</span>
+              </label>
+              <label className="novel-small-field">
+                <span>单段默认</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={project.materialSegmentSeconds}
+                  onChange={(event) =>
+                    updateProject(
+                      'materialSegmentSeconds',
+                      Math.max(1, Number(event.target.value) || 5)
+                    )
+                  }
+                />
+                <em>秒</em>
+              </label>
             </div>
           </section>
 
           <section className="novel-card">
             <div className="novel-card__header novel-card__header--compact">
-              <div className="novel-card__icon"><FolderOpen size={19} strokeWidth={1.8} /></div>
-              <div><h2>成品输出</h2><p>每条视频导出完成后继续下一条。</p></div>
+              <div className="novel-card__icon">
+                <FolderOpen size={19} strokeWidth={1.8} />
+              </div>
+              <div>
+                <h2>成品输出</h2>
+                <p>每条视频导出完成后继续下一条。</p>
+              </div>
             </div>
 
             <label className="novel-field">
               <span>输出目录</span>
-              <input value={project.outputDirectory} onChange={(event) => updateProject('outputDirectory', event.target.value)} placeholder="例如：E:\\小说成品\\今日任务" />
+              <input
+                value={project.outputDirectory}
+                onChange={(event) => updateProject('outputDirectory', event.target.value)}
+                placeholder="例如：E:\\小说成品\\今日任务"
+              />
             </label>
             <label className="novel-field">
               <span>文件名前缀（可选）</span>
-              <input value={project.outputPrefix} onChange={(event) => updateProject('outputPrefix', event.target.value)} placeholder="例如：豪门复仇" />
+              <input
+                value={project.outputPrefix}
+                onChange={(event) => updateProject('outputPrefix', event.target.value)}
+                placeholder="例如：豪门复仇"
+              />
             </label>
             <div className="novel-output-preview">
               <span>命名预览</span>
@@ -658,16 +804,36 @@ function NovelPromotionView(): JSX.Element {
             <div className="novel-run-progress">
               <div>
                 <strong>批量生成进度</strong>
-                <span>成功 {completedCount} / {jobs.length}，失败 {failedCount}</span>
+                <span>
+                  成功 {completedCount} / {jobs.length}，失败 {failedCount}
+                </span>
               </div>
-              <div className="novel-progress-track"><span style={{ width: `${jobs.length ? ((completedCount + failedCount) / jobs.length) * 100 : 0}%` }} /></div>
+              <div className="novel-progress-track">
+                <span
+                  style={{
+                    width: `${jobs.length ? ((completedCount + failedCount) / jobs.length) * 100 : 0}%`
+                  }}
+                />
+              </div>
             </div>
             <div className="novel-inline-actions">
-              <button className="novel-button" type="button" onClick={togglePause} disabled={!isRunning}>
-                {isPaused ? <Play size={15} /> : <Pause size={15} />}{isPaused ? '继续' : '暂停'}
+              <button
+                className="novel-button"
+                type="button"
+                onClick={togglePause}
+                disabled={!isRunning}
+              >
+                {isPaused ? <Play size={15} /> : <Pause size={15} />}
+                {isPaused ? '继续' : '暂停'}
               </button>
-              <button className="novel-button" type="button" onClick={stopRun} disabled={!isRunning && !isPaused}>
-                <CircleStop size={15} />停止
+              <button
+                className="novel-button"
+                type="button"
+                onClick={stopRun}
+                disabled={!isRunning && !isPaused}
+              >
+                <CircleStop size={15} />
+                停止
               </button>
             </div>
           </section>

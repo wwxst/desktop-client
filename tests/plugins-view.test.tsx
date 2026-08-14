@@ -182,16 +182,14 @@ describe('PluginsView', () => {
     })
     const notification = liveRegion.closest('.ui-alert-notification')
     expect(notification).toHaveClass('ui-alert-notification--success')
-    expect(
-      notification?.querySelector('.ui-alert-notification__title')
-    ).toHaveTextContent('操作成功')
-    expect(
-      notification?.querySelector('.ui-alert-notification__message')
-    ).toHaveTextContent('中文高品质音色安装完成')
-
-    await user.click(
-      within(notification as HTMLElement).getByRole('button', { name: '知道了' })
+    expect(notification?.querySelector('.ui-alert-notification__title')).toHaveTextContent(
+      '操作成功'
     )
+    expect(notification?.querySelector('.ui-alert-notification__message')).toHaveTextContent(
+      '中文高品质音色安装完成'
+    )
+
+    await user.click(within(notification as HTMLElement).getByRole('button', { name: '知道了' }))
     expect(document.querySelector('.ui-alert-notification')).not.toBeInTheDocument()
   })
 
@@ -218,12 +216,12 @@ describe('PluginsView', () => {
     const liveRegion = await screen.findByRole('status')
     const notification = liveRegion.closest('.ui-alert-notification')
     expect(notification).toHaveClass('ui-alert-notification--success')
-    expect(
-      notification?.querySelector('.ui-alert-notification__title')
-    ).toHaveTextContent('操作成功')
-    expect(
-      notification?.querySelector('.ui-alert-notification__message')
-    ).toHaveTextContent('中英通用音色已卸载')
+    expect(notification?.querySelector('.ui-alert-notification__title')).toHaveTextContent(
+      '操作成功'
+    )
+    expect(notification?.querySelector('.ui-alert-notification__message')).toHaveTextContent(
+      '中英通用音色已卸载'
+    )
   })
 
   it('splits installed and available plugins without merging their states', async () => {
@@ -334,12 +332,12 @@ describe('PluginsView', () => {
     const liveRegion = await screen.findByRole('alert')
     const notification = liveRegion.closest('.ui-alert-notification')
     expect(notification).toHaveClass('ui-alert-notification--error')
-    expect(
-      notification?.querySelector('.ui-alert-notification__title')
-    ).toHaveTextContent('操作失败')
-    expect(
-      notification?.querySelector('.ui-alert-notification__message')
-    ).toHaveTextContent('插件目录打开失败，请重试')
+    expect(notification?.querySelector('.ui-alert-notification__title')).toHaveTextContent(
+      '操作失败'
+    )
+    expect(notification?.querySelector('.ui-alert-notification__message')).toHaveTextContent(
+      '插件目录打开失败，请重试'
+    )
   })
 
   it('installs and removes only the selected plugin from its detail page', async () => {

@@ -30,22 +30,14 @@ export function getProjectCanvasSize(ratio: CanvasAspectRatio): Size2D {
 /**
  * 工程坐标以画布中心为 (0,0)，x 向右、y 向下。
  */
-export function projectToViewport(
-  point: Point2D,
-  project: Size2D,
-  viewport: Size2D
-): Point2D {
+export function projectToViewport(point: Point2D, project: Size2D, viewport: Size2D): Point2D {
   return {
     x: (point.x / project.width) * viewport.width,
     y: (point.y / project.height) * viewport.height
   }
 }
 
-export function viewportToProject(
-  point: Point2D,
-  project: Size2D,
-  viewport: Size2D
-): Point2D {
+export function viewportToProject(point: Point2D, project: Size2D, viewport: Size2D): Point2D {
   return {
     x: viewport.width > 0 ? (point.x / viewport.width) * project.width : 0,
     y: viewport.height > 0 ? (point.y / viewport.height) * project.height : 0
@@ -100,7 +92,10 @@ export function getFitTransform(): ResolvedTimelineClip['transform'] {
   return { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
 }
 
-export function getFillTransform(asset: MediaAsset | null, canvas: Size2D): ResolvedTimelineClip['transform'] {
+export function getFillTransform(
+  asset: MediaAsset | null,
+  canvas: Size2D
+): ResolvedTimelineClip['transform'] {
   const scale = getFillScale(asset, canvas)
   return { x: 0, y: 0, scaleX: scale, scaleY: scale, rotation: 0 }
 }

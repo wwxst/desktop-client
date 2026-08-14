@@ -271,11 +271,7 @@ export class TtsJobManager {
                   : `第 ${index + 1} 段生成失败，正在第 ${attempt} 次重试`
             })
 
-            await this.engineRegistry.generateToFile(
-              job.request,
-              job.segments[index],
-              segmentPath
-            )
+            await this.engineRegistry.generateToFile(job.request, job.segments[index], segmentPath)
             lastError = null
             break
           } catch (error) {

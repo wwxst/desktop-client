@@ -17,7 +17,12 @@ function deterministicReview(plan: EditingPlan): ReviewIssue[] {
   const clips = [...plan.videoClips].sort((a, b) => a.timelineStartSeconds - b.timelineStartSeconds)
 
   if (clips.length === 0) {
-    issues.push({ code: 'NO_VIDEO', severity: 'error', message: '时间线没有视频片段', autoFixable: false })
+    issues.push({
+      code: 'NO_VIDEO',
+      severity: 'error',
+      message: '时间线没有视频片段',
+      autoFixable: false
+    })
     return issues
   }
 
@@ -59,7 +64,12 @@ function deterministicReview(plan: EditingPlan): ReviewIssue[] {
 
   const subtitleEnd = plan.subtitles.at(-1)?.endSeconds ?? 0
   if (plan.subtitles.length === 0) {
-    issues.push({ code: 'NO_SUBTITLE', severity: 'warning', message: '没有生成字幕', autoFixable: false })
+    issues.push({
+      code: 'NO_SUBTITLE',
+      severity: 'warning',
+      message: '没有生成字幕',
+      autoFixable: false
+    })
   } else if (subtitleEnd > plan.durationSeconds + 0.15) {
     issues.push({
       code: 'SUBTITLE_OVERFLOW',
@@ -101,13 +111,18 @@ export class ReviewAgent {
               story: {
                 summary: story.summary,
                 tone: story.tone,
-                paces: story.segments.map((item) => ({ id: item.id, pace: item.pace, role: item.role }))
+                paces: story.segments.map((item) => ({
+                  id: item.id,
+                  pace: item.pace,
+                  role: item.role
+                }))
               },
               plan: {
                 durationSeconds: plan.durationSeconds,
                 clipCount: plan.videoClips.length,
                 averageClipSeconds:
-                  plan.videoClips.reduce((sum, item) => sum + item.durationSeconds, 0) / Math.max(1, plan.videoClips.length)
+                  plan.videoClips.reduce((sum, item) => sum + item.durationSeconds, 0) /
+                  Math.max(1, plan.videoClips.length)
               },
               deterministicIssues: issues
             })
@@ -116,7 +131,8 @@ export class ReviewAgent {
         () => ({ score, comment: '规则质检通过，未启用额外模型复核。' })
       )
 
-      if (Number.isFinite(modelResult.score)) score = Math.round(Math.min(100, Math.max(0, Number(modelResult.score))))
+      if (Number.isFinite(modelResult.score))
+        score = Math.round(Math.min(100, Math.max(0, Number(modelResult.score))))
       modelComment = modelResult.comment?.trim() || undefined
     }
 

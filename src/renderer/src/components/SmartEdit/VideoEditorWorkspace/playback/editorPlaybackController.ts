@@ -51,7 +51,8 @@ export function createEditorPlaybackController(
       next.playhead === snapshot.playhead &&
       next.isPlaying === snapshot.isPlaying &&
       next.duration === snapshot.duration
-    ) return
+    )
+      return
     snapshot = next
     listeners.forEach((listener) => listener())
   }
@@ -90,7 +91,11 @@ export function createEditorPlaybackController(
     setDuration(duration) {
       const safeDuration = Math.max(0, Number.isFinite(duration) ? duration : 0)
       const playhead = Math.min(snapshot.playhead, safeDuration)
-      publish({ duration: safeDuration, playhead, isPlaying: safeDuration > 0 ? snapshot.isPlaying : false })
+      publish({
+        duration: safeDuration,
+        playhead,
+        isPlaying: safeDuration > 0 ? snapshot.isPlaying : false
+      })
     },
     seek(time) {
       const playhead = Math.max(0, Math.min(snapshot.duration, Number.isFinite(time) ? time : 0))

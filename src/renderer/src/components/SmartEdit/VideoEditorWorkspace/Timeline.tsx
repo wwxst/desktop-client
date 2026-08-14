@@ -54,7 +54,13 @@ import {
   type ResolvedTimelineClip,
   type TimelineClip
 } from './editorProject'
-import { clamp, formatTimecode, getRulerStep, quantizeTime, snapTimeToCandidates } from './editorTime'
+import {
+  clamp,
+  formatTimecode,
+  getRulerStep,
+  quantizeTime,
+  snapTimeToCandidates
+} from './editorTime'
 import type { EditorPlaybackController } from './playback/editorPlaybackController'
 import { useEditorPlayhead } from './playback/useEditorPlayback'
 import type { EditorInteractionController } from './interaction/editorInteractionController'
@@ -316,10 +322,12 @@ function Timeline({
       if ((clipsByTrack.get(track.id)?.length ?? 0) > 0) return true
       return interaction?.mode === 'move' && interaction.previewTrackId === track.id
     })
-    const audio = tracks.filter((track) => track.kind === 'audio').filter((track) => {
-      if ((clipsByTrack.get(track.id)?.length ?? 0) > 0) return true
-      return assetDropPreview?.trackId === track.id
-    })
+    const audio = tracks
+      .filter((track) => track.kind === 'audio')
+      .filter((track) => {
+        if ((clipsByTrack.get(track.id)?.length ?? 0) > 0) return true
+        return assetDropPreview?.trackId === track.id
+      })
     return [...visual, ...audio]
   }, [assetDropPreview?.trackId, clipsByTrack, interaction, mainVisualTrack?.id, tracks])
   const isMainTrackCentered = displayTracks.length === 1 && displayTracks[0]?.role === 'main'
@@ -329,14 +337,18 @@ function Timeline({
   const canEditActiveClip = Boolean(activeClip && !activeTrack?.locked)
   const canSplitActiveClip = Boolean(
     activeClip &&
-      canEditActiveClip &&
-      playhead > activeClip.timelineStart + MIN_CLIP_DURATION &&
-      playhead < activeClip.timelineStart + activeClip.duration - MIN_CLIP_DURATION
+    canEditActiveClip &&
+    playhead > activeClip.timelineStart + MIN_CLIP_DURATION &&
+    playhead < activeClip.timelineStart + activeClip.duration - MIN_CLIP_DURATION
   )
 
   const snapCandidates = useMemo(() => {
     const excluded = new Set(
-      interaction?.mode === 'move' ? interaction.group.map((clip) => clip.id) : activeClipId ? [activeClipId] : []
+      interaction?.mode === 'move'
+        ? interaction.group.map((clip) => clip.id)
+        : activeClipId
+          ? [activeClipId]
+          : []
     )
     const candidates = [0, playhead]
     for (const clip of resolvedClips) {
@@ -411,7 +423,9 @@ function Timeline({
       }
       if (event.shiftKey && activeClipId) {
         const ordered = [...resolvedClips].sort((a, b) =>
-          a.timelineStart === b.timelineStart ? a.id.localeCompare(b.id) : a.timelineStart - b.timelineStart
+          a.timelineStart === b.timelineStart
+            ? a.id.localeCompare(b.id)
+            : a.timelineStart - b.timelineStart
         )
         const anchorIndex = ordered.findIndex((clip) => clip.id === activeClipId)
         const targetIndex = ordered.findIndex((clip) => clip.id === clipId)
@@ -419,9 +433,8 @@ function Timeline({
           const start = Math.min(anchorIndex, targetIndex)
           const end = Math.max(anchorIndex, targetIndex)
           const rangeIds = ordered.slice(start, end + 1).map((clip) => clip.id)
-          const ids = event.ctrlKey || event.metaKey
-            ? [...new Set([...selectedIds, ...rangeIds])]
-            : rangeIds
+          const ids =
+            event.ctrlKey || event.metaKey ? [...new Set([...selectedIds, ...rangeIds])] : rangeIds
           onSelectionChange(ids, clipId)
           return ids
         }
@@ -492,7 +505,11 @@ function Timeline({
       if (interaction.mode === 'select') {
         const exceeded =
           interaction.exceededThreshold ||
-          hasExceededDragThreshold({ clientX: interaction.startClientX, clientY: interaction.startClientY }, event.clientX, event.clientY)
+          hasExceededDragThreshold(
+            { clientX: interaction.startClientX, clientY: interaction.startClientY },
+            event.clientX,
+            event.clientY
+          )
         setInteraction({
           ...interaction,
           currentClientX: event.clientX,
@@ -509,7 +526,8 @@ function Timeline({
             .querySelectorAll<HTMLElement>('.studio-timeline__clip[data-clip-id]')
             .forEach((element) => {
               const rect = element.getBoundingClientRect()
-              const intersects = rect.right >= x1 && rect.left <= x2 && rect.bottom >= y1 && rect.top <= y2
+              const intersects =
+                rect.right >= x1 && rect.left <= x2 && rect.bottom >= y1 && rect.top <= y2
               if (intersects && element.dataset.clipId) hits.push(element.dataset.clipId)
             })
           const ids = interaction.append ? [...new Set([...selectedIds, ...hits])] : hits
@@ -542,7 +560,8 @@ function Timeline({
             const startAdjustment = startSnap.time - primaryStart
             const endAdjustment = endSnap.time - primaryEnd
             const useStart =
-              startSnap.snapped && (!endSnap.snapped || Math.abs(startAdjustment) <= Math.abs(endAdjustment))
+              startSnap.snapped &&
+              (!endSnap.snapped || Math.abs(startAdjustment) <= Math.abs(endAdjustment))
             const adjustment = useStart ? startAdjustment : endAdjustment
             delta = Math.max(-minimumStart, delta + adjustment)
             snapTarget = useStart ? startSnap.target : endSnap.target
@@ -576,7 +595,9 @@ function Timeline({
           } else {
             const newLayerRect = newLayerDropRef.current?.getBoundingClientRect()
             const inNewLayerZone = Boolean(
-              newLayerRect && event.clientY >= newLayerRect.top && event.clientY < newLayerRect.bottom
+              newLayerRect &&
+              event.clientY >= newLayerRect.top &&
+              event.clientY < newLayerRect.bottom
             )
             if (inNewLayerZone) {
               isDropValid = asset?.kind !== 'audio' && Boolean(onMoveClipToNewLayer)
@@ -605,7 +626,11 @@ function Timeline({
         let newTimelineStart = clip.timelineStart + appliedDelta
         let snapTarget: number | null = null
         if (snappingEnabled && !event.shiftKey) {
-          const snap = snapTimeToCandidates(newTimelineStart, snapCandidates, SNAP_THRESHOLD_PX / zoom)
+          const snap = snapTimeToCandidates(
+            newTimelineStart,
+            snapCandidates,
+            SNAP_THRESHOLD_PX / zoom
+          )
           if (snap.snapped) {
             appliedDelta = clamp(appliedDelta + (snap.time - newTimelineStart), minDelta, maxDelta)
             newTimelineStart = clip.timelineStart + appliedDelta
@@ -676,7 +701,10 @@ function Timeline({
             onMoveClips(
               interaction.group.map((clip) => ({
                 clipId: clip.id,
-                timelineStart: Math.max(0, quantizeTime(clip.timelineStart + interaction.previewDelta)),
+                timelineStart: Math.max(
+                  0,
+                  quantizeTime(clip.timelineStart + interaction.previewDelta)
+                ),
                 trackId: clip.trackId
               }))
             )
@@ -745,7 +773,8 @@ function Timeline({
     if (event.button !== 0 || !onMoveClip) return
     const track = tracks.find((item) => item.id === clip.trackId)
     if (track?.locked) return
-    if (interactionController && !interactionController.begin('moving-clip', event.pointerId)) return
+    if (interactionController && !interactionController.begin('moving-clip', event.pointerId))
+      return
     event.preventDefault()
     event.stopPropagation()
     const nextSelection = selectClipFromPointer(clip.id, event)
@@ -803,7 +832,8 @@ function Timeline({
   const startPan = (event: ReactPointerEvent<HTMLElement>): void => {
     const scrollArea = scrollAreaRef.current
     if (!scrollArea) return
-    if (interactionController && !interactionController.begin('panning-timeline', event.pointerId)) return
+    if (interactionController && !interactionController.begin('panning-timeline', event.pointerId))
+      return
     if (event.button === 0 && spacePressed) interactionController?.markSpaceGestureUsed()
     event.preventDefault()
     setInteraction({
@@ -819,7 +849,8 @@ function Timeline({
   const startSelection = (event: ReactPointerEvent<HTMLElement>): void => {
     const scrollArea = scrollAreaRef.current
     if (!scrollArea) return
-    if (interactionController && !interactionController.begin('box-selecting', event.pointerId)) return
+    if (interactionController && !interactionController.begin('box-selecting', event.pointerId))
+      return
     setInteraction({
       mode: 'select',
       pointerId: event.pointerId,
@@ -858,7 +889,11 @@ function Timeline({
       return
     }
     if (event.button !== 0) return
-    if (interactionController && !interactionController.begin('scrubbing-playhead', event.pointerId)) return
+    if (
+      interactionController &&
+      !interactionController.begin('scrubbing-playhead', event.pointerId)
+    )
+      return
     event.preventDefault()
     onSetPlayhead?.(clientXToTime(event.clientX))
     const pointerId = event.pointerId
@@ -912,17 +947,23 @@ function Timeline({
     }
     if (event.shiftKey) {
       event.preventDefault()
-      scrollArea.scrollLeft += Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+      scrollArea.scrollLeft +=
+        Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
     }
   }
 
-  const getDropPlacement = (event: ReactDragEvent<HTMLElement>, explicitNewLayer = false): AssetDropPreview => {
+  const getDropPlacement = (
+    event: ReactDragEvent<HTMLElement>,
+    explicitNewLayer = false
+  ): AssetDropPreview => {
     const targetTrack = explicitNewLayer ? null : findTrackAtClientY(event.clientY)
     const hasAsset = Array.from(event.dataTransfer.types).includes(EDITOR_ASSET_DRAG_MIME)
     const hasFiles = containsExternalFiles(event.dataTransfer)
     const isVisualTarget = explicitNewLayer || Boolean(targetTrack && isVisualTrack(targetTrack))
     const isAudioTarget = Boolean(targetTrack?.kind === 'audio')
-    const valid = hasAsset ? Boolean(targetTrack || explicitNewLayer) : hasFiles && isVisualTarget && !isAudioTarget
+    const valid = hasAsset
+      ? Boolean(targetTrack || explicitNewLayer)
+      : hasFiles && isVisualTarget && !isAudioTarget
     return {
       trackId: targetTrack?.id ?? null,
       newVisualLayer: explicitNewLayer,
@@ -954,12 +995,18 @@ function Timeline({
       if (placement.newVisualLayer) {
         onAddMediaToNewLayer?.(assetPayload.assetId, placement.timelineStart)
       } else {
-        onAddMediaAt?.(assetPayload.assetId, placement.timelineStart, placement.trackId ?? undefined)
+        onAddMediaAt?.(
+          assetPayload.assetId,
+          placement.timelineStart,
+          placement.trackId ?? undefined
+        )
       }
       setAssetDropPreview(null)
       return
     }
-    const files = Array.from(event.dataTransfer.files ?? []).filter((file) => file.type.startsWith('video/'))
+    const files = Array.from(event.dataTransfer.files ?? []).filter((file) =>
+      file.type.startsWith('video/')
+    )
     if (files.length > 0) {
       onExternalFilesDrop?.(files, {
         timelineStart: placement.timelineStart,
@@ -970,16 +1017,22 @@ function Timeline({
     setAssetDropPreview(null)
   }
 
-  const fitTimeline = (): void => {
+  const fitTimeline = useCallback((): void => {
     const scrollArea = scrollAreaRef.current
     if (!scrollArea || projectDuration <= 0) return
     const available = Math.max(100, scrollArea.clientWidth - 32)
-    const nextZoom = clamp(available / Math.max(projectDuration, 1), MIN_TIMELINE_ZOOM, MAX_TIMELINE_ZOOM)
+    const nextZoom = clamp(
+      available / Math.max(projectDuration, 1),
+      MIN_TIMELINE_ZOOM,
+      MAX_TIMELINE_ZOOM
+    )
     onZoomChange?.(Math.round(nextZoom))
     scrollArea.scrollLeft = 0
-  }
+  }, [onZoomChange, projectDuration])
 
-  const getClipDisplay = (clip: ResolvedTimelineClip): { start: number; duration: number; trackId: string } => {
+  const getClipDisplay = (
+    clip: ResolvedTimelineClip
+  ): { start: number; duration: number; trackId: string } => {
     if (interaction?.mode === 'move') {
       const groupClip = interaction.group.find((item) => item.id === clip.id)
       if (groupClip) {
@@ -1093,7 +1146,10 @@ function Timeline({
   }, [interaction])
 
   const interactionSnapTarget =
-    interaction && (interaction.mode === 'move' || interaction.mode === 'trim-left' || interaction.mode === 'trim-right')
+    interaction &&
+    (interaction.mode === 'move' ||
+      interaction.mode === 'trim-left' ||
+      interaction.mode === 'trim-right')
       ? interaction.snapTarget
       : null
 
@@ -1210,6 +1266,7 @@ function Timeline({
   }, [
     canPaste,
     contextMenu,
+    fitTimeline,
     onCopyClips,
     onCutClips,
     onDeleteClip,
@@ -1230,7 +1287,13 @@ function Timeline({
     <section className="studio-timeline" aria-label="时间线">
       <header className="studio-timeline__toolbar">
         <div className="studio-timeline__toolbar-group">
-          <button type="button" title="撤销 Ctrl+Z" aria-label="撤销" disabled={!canUndo} onClick={onUndo}>
+          <button
+            type="button"
+            title="撤销 Ctrl+Z"
+            aria-label="撤销"
+            disabled={!canUndo}
+            onClick={onUndo}
+          >
             <Undo2 size={15} aria-hidden="true" />
           </button>
           <button
@@ -1324,8 +1387,15 @@ function Timeline({
         </div>
       </header>
 
-      <div className="studio-timeline__editor" data-main-centered={isMainTrackCentered ? 'true' : undefined}>
-        <div ref={trackHeadersRef} className="studio-timeline__track-headers" aria-label="内容层控制">
+      <div
+        className="studio-timeline__editor"
+        data-main-centered={isMainTrackCentered ? 'true' : undefined}
+      >
+        <div
+          ref={trackHeadersRef}
+          className="studio-timeline__track-headers"
+          aria-label="内容层控制"
+        >
           <div className="studio-timeline__ruler-corner" aria-hidden="true" />
           <div className="studio-timeline__new-layer-gutter" aria-hidden="true" />
           {displayTracks.map((track) => (
@@ -1390,7 +1460,8 @@ function Timeline({
           className="studio-timeline__scroll-area"
           onWheel={handleWheel}
           onScroll={(event) => {
-            if (trackHeadersRef.current) trackHeadersRef.current.scrollTop = event.currentTarget.scrollTop
+            if (trackHeadersRef.current)
+              trackHeadersRef.current.scrollTop = event.currentTarget.scrollTop
             updateVisibleTimeRange()
           }}
           onContextMenu={(event) => {
@@ -1405,7 +1476,8 @@ function Timeline({
             })
           }}
           onDragLeave={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setAssetDropPreview(null)
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+              setAssetDropPreview(null)
           }}
         >
           <div
@@ -1420,7 +1492,12 @@ function Timeline({
             <div
               ref={newLayerDropRef}
               className="studio-timeline__new-layer-drop"
-              data-active={assetDropPreview?.newVisualLayer || (interaction?.mode === 'move' && interaction.previewNewLayer) ? 'true' : undefined}
+              data-active={
+                assetDropPreview?.newVisualLayer ||
+                (interaction?.mode === 'move' && interaction.previewNewLayer)
+                  ? 'true'
+                  : undefined
+              }
               onDragOver={(event) => {
                 event.stopPropagation()
                 handleDragOver(event, true)
@@ -1458,10 +1535,13 @@ function Timeline({
             )}
 
             {displayTracks.map((track) => {
-              const isDropPreview = assetDropPreview?.trackId === track.id ||
+              const isDropPreview =
+                assetDropPreview?.trackId === track.id ||
                 (interaction?.mode === 'move' && interaction.previewTrackId === track.id)
               const interactionInvalid =
-                interaction?.mode === 'move' && interaction.previewTrackId === track.id && !interaction.isDropValid
+                interaction?.mode === 'move' &&
+                interaction.previewTrackId === track.id &&
+                !interaction.isDropValid
               return (
                 <div
                   className="studio-timeline__track-row"
@@ -1485,17 +1565,20 @@ function Timeline({
                     handleDrop(event, false)
                   }}
                 >
-                  {interaction?.mode === 'move' && interaction.exceededThreshold &&
+                  {interaction?.mode === 'move' &&
+                    interaction.exceededThreshold &&
                     interaction.group
                       .filter((clip) => clip.trackId === track.id)
                       .map((clip) => (
                         <div
                           key={`ghost-${clip.id}`}
                           className="studio-timeline__clip-origin-ghost"
-                          style={{
-                            '--clip-left': `${clip.timelineStart * zoom}px`,
-                            '--clip-width': `${Math.max(44, clip.duration * zoom)}px`
-                          } as TimelineCssProperties}
+                          style={
+                            {
+                              '--clip-left': `${clip.timelineStart * zoom}px`,
+                              '--clip-width': `${Math.max(44, clip.duration * zoom)}px`
+                            } as TimelineCssProperties
+                          }
                           aria-hidden="true"
                         />
                       ))}
@@ -1504,7 +1587,11 @@ function Timeline({
                       const display = getClipDisplay(clip)
                       if (display.trackId !== track.id) return false
                       if (selectedIds.has(clip.id)) return true
-                      if (interaction?.mode === 'move' && interaction.group.some((item) => item.id === clip.id)) return true
+                      if (
+                        interaction?.mode === 'move' &&
+                        interaction.group.some((item) => item.id === clip.id)
+                      )
+                        return true
                       return (
                         display.start + display.duration >= visibleTimeRange.start &&
                         display.start <= visibleTimeRange.end
@@ -1520,7 +1607,9 @@ function Timeline({
               )
             })}
 
-            {selectionBox && <div className="studio-timeline__selection-box" style={selectionBox} />}
+            {selectionBox && (
+              <div className="studio-timeline__selection-box" style={selectionBox} />
+            )}
           </div>
         </div>
       </div>
@@ -1531,14 +1620,20 @@ function Timeline({
           {formatTimecode(Math.max(0, interaction.clip.timelineStart + interaction.previewDelta))}
         </div>
       )}
-      {interaction && (interaction.mode === 'trim-left' || interaction.mode === 'trim-right') && interaction.exceededThreshold && (
-        <div className="studio-timeline__drag-readout">
-          {interaction.mode === 'trim-left' ? '入点' : '出点'} · {formatTimecode(
-            interaction.mode === 'trim-left' ? interaction.previewSourceStart : interaction.previewSourceEnd,
-            3
-          )} · 时长 {formatTimecode(interaction.previewDuration, 3)}
-        </div>
-      )}
+      {interaction &&
+        (interaction.mode === 'trim-left' || interaction.mode === 'trim-right') &&
+        interaction.exceededThreshold && (
+          <div className="studio-timeline__drag-readout">
+            {interaction.mode === 'trim-left' ? '入点' : '出点'} ·{' '}
+            {formatTimecode(
+              interaction.mode === 'trim-left'
+                ? interaction.previewSourceStart
+                : interaction.previewSourceEnd,
+              3
+            )}{' '}
+            · 时长 {formatTimecode(interaction.previewDuration, 3)}
+          </div>
+        )}
 
       {contextMenu && (
         <EditorContextMenu
@@ -1551,7 +1646,12 @@ function Timeline({
       )}
 
       {rows && onUpdateRow && onAddRow && onDeleteRow && (
-        <LegacyDraftRows rows={rows} onUpdateRow={onUpdateRow} onAddRow={onAddRow} onDeleteRow={onDeleteRow} />
+        <LegacyDraftRows
+          rows={rows}
+          onUpdateRow={onUpdateRow}
+          onAddRow={onAddRow}
+          onDeleteRow={onDeleteRow}
+        />
       )}
     </section>
   )
@@ -1633,7 +1733,11 @@ function LegacyDraftRows({
               }
             />
           </label>
-          <button type="button" aria-label={`在第 ${index + 1} 行后新增`} onClick={() => onAddRow(row.id)}>
+          <button
+            type="button"
+            aria-label={`在第 ${index + 1} 行后新增`}
+            onClick={() => onAddRow(row.id)}
+          >
             <Plus size={14} />
           </button>
           <button

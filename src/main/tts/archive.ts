@@ -47,7 +47,9 @@ export async function extractTarBz2(archivePath: string, targetDirectory: string
 
     void handleEntry()
       .then(() => next())
-      .catch((error) => extractor.destroy(error instanceof Error ? error : new Error(String(error))))
+      .catch((error) =>
+        extractor.destroy(error instanceof Error ? error : new Error(String(error)))
+      )
   })
 
   await pipeline(createReadStream(archivePath), unbzip2Stream(), extractor)

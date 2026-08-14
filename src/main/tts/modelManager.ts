@@ -1,14 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { open } from 'node:fs/promises'
-import {
-  access,
-  mkdir,
-  rename,
-  rm,
-  stat,
-  writeFile
-} from 'node:fs/promises'
+import { access, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { app, net, shell } from 'electron'
 

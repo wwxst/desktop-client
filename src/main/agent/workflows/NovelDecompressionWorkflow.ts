@@ -243,8 +243,7 @@ export class NovelDecompressionWorkflow {
     }
 
     if (request.export?.enabled) {
-      const ffmpegPath =
-        request.export.ffmpegPath?.trim() || resolveBundledMediaTool('ffmpeg')
+      const ffmpegPath = request.export.ffmpegPath?.trim() || resolveBundledMediaTool('ffmpeg')
       for (let index = 0; index < artifacts.length; index += 1) {
         assertNotAborted(context.signal)
         const artifact = artifacts[index]

@@ -1,7 +1,4 @@
-import type {
-  NovelPromotionProject,
-  NovelProjectValidation
-} from './novelPromotionTypes'
+import type { NovelPromotionProject, NovelProjectValidation } from './novelPromotionTypes'
 
 export const NOVEL_PROJECT_STORAGE_KEY = 'desktop-client:novel-promotion-project:v2'
 export const NOVEL_PROJECT_CHANGED_EVENT = 'novel-promotion:project-changed'

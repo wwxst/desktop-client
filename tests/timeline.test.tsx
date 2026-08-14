@@ -164,6 +164,36 @@ describe('Timeline', () => {
     expect(headers?.scrollTop).toBe(112)
   })
 
+  it('uses the latest zoom callback when fitting an open timeline menu', async () => {
+    const user = userEvent.setup()
+    const firstOnZoomChange = vi.fn()
+    const latestOnZoomChange = vi.fn()
+    const props = {
+      clips: [clip],
+      assets: [asset],
+      activeClipId: null,
+      rows: [row],
+      onSelectClip: vi.fn(),
+      onUpdateRow: vi.fn(),
+      onAddRow: vi.fn(),
+      onDeleteRow: vi.fn()
+    }
+    const { rerender } = render(<Timeline {...props} onZoomChange={firstOnZoomChange} />)
+    const scrollArea = document.querySelector<HTMLElement>('.studio-timeline__scroll-area')
+    expect(scrollArea).not.toBeNull()
+    Object.defineProperty(scrollArea, 'clientWidth', {
+      configurable: true,
+      value: 1032
+    })
+    fireEvent.contextMenu(scrollArea!, { clientX: 100, clientY: 100 })
+
+    rerender(<Timeline {...props} onZoomChange={latestOnZoomChange} />)
+    await user.click(screen.getByRole('menuitem', { name: '缩放到全部内容' }))
+
+    expect(latestOnZoomChange).toHaveBeenCalledOnce()
+    expect(firstOnZoomChange).not.toHaveBeenCalled()
+  })
+
   it('does not let left trim move the clip before timeline zero', () => {
     const onTrimClip = vi.fn()
     const clipAtOneSecond: TimelineClip = {

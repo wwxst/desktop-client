@@ -1,9 +1,4 @@
-import type {
-  TtsLanguageInfo,
-  TtsModelEngine,
-  TtsVoice,
-  TtsVoiceGender
-} from '../../shared/tts'
+import type { TtsLanguageInfo, TtsModelEngine, TtsVoice, TtsVoiceGender } from '../../shared/tts'
 
 export interface InternalTtsLanguage {
   code: string
@@ -335,11 +330,7 @@ function createKokoroV10Voices(modelId: string): TtsVoice[] {
 function createKokoroV11Voices(modelId: string): TtsVoice[] {
   return KOKORO_V1_1_NAMES.map((name, speakerId) => {
     const isChinese = name.startsWith('z')
-    const languageCodes = isChinese
-      ? ['zh-CN']
-      : name.startsWith('bf_')
-        ? ['en-GB']
-        : ['en-US']
+    const languageCodes = isChinese ? ['zh-CN'] : name.startsWith('bf_') ? ['en-GB'] : ['en-US']
 
     return {
       id: `${modelId}:${name}`,

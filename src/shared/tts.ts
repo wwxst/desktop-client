@@ -7,23 +7,12 @@
 
 export type TtsModelEngine = 'kokoro' | 'supertonic'
 
-export type TtsModelStatus =
-  | 'not-installed'
-  | 'downloading'
-  | 'extracting'
-  | 'installed'
-  | 'failed'
+export type TtsModelStatus = 'not-installed' | 'downloading' | 'extracting' | 'installed' | 'failed'
 
 export type TtsVoiceGender = 'female' | 'male' | 'unknown'
 
 export type TtsJobStatus =
-  | 'queued'
-  | 'preparing'
-  | 'generating'
-  | 'merging'
-  | 'completed'
-  | 'cancelled'
-  | 'failed'
+  'queued' | 'preparing' | 'generating' | 'merging' | 'completed' | 'cancelled' | 'failed'
 
 export interface TtsLanguageInfo {
   code: string

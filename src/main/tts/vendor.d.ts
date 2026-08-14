@@ -17,11 +17,7 @@ declare module 'tar-stream' {
   export interface Extract extends Writable {
     on(
       event: 'entry',
-      listener: (
-        header: Headers,
-        stream: Readable,
-        next: () => void
-      ) => void
+      listener: (header: Headers, stream: Readable, next: () => void) => void
     ): this
   }
 

@@ -104,9 +104,16 @@ function CompositionPreview({
   const [viewportSize, setViewportSize] = useState<Size2D>({ width: 1, height: 1 })
   const [interaction, setInteraction] = useState<CanvasInteraction | null>(null)
   const [preview, setPreview] = useState<PreviewTransformState | null>(null)
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; clip: ResolvedTimelineClip } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    clip: ResolvedTimelineClip
+  } | null>(null)
 
-  const projectCanvas = useMemo(() => getProjectCanvasSize(project.aspectRatio), [project.aspectRatio])
+  const projectCanvas = useMemo(
+    () => getProjectCanvasSize(project.aspectRatio),
+    [project.aspectRatio]
+  )
   const assetsById = useMemo(
     () => new Map(project.assets.map((asset) => [asset.id, asset])),
     [project.assets]
@@ -120,7 +127,7 @@ function CompositionPreview({
     [composition.audioLayers, composition.videoLayers]
   )
   const activeVisualClip = composition.videoLayers.find((clip) => clip.id === activeClipId) ?? null
-  const activeAsset = activeVisualClip ? assetsById.get(activeVisualClip.assetId) ?? null : null
+  const activeAsset = activeVisualClip ? (assetsById.get(activeVisualClip.assetId) ?? null) : null
 
   useEffect(() => {
     const root = rootRef.current
@@ -187,8 +194,10 @@ function CompositionPreview({
           x: interaction.initial.x + projectDelta.x,
           y: interaction.initial.y + projectDelta.y
         }
-        const clip = composition.videoLayers.find((candidate) => candidate.id === interaction.clipId)
-        const asset = clip ? assetsById.get(clip.assetId) ?? null : null
+        const clip = composition.videoLayers.find(
+          (candidate) => candidate.id === interaction.clipId
+        )
+        const asset = clip ? (assetsById.get(clip.assetId) ?? null) : null
         if (!clip) return
         const screenToProject = Math.max(
           projectCanvas.width / viewportSize.width,
@@ -217,7 +226,9 @@ function CompositionPreview({
         const baseScreenWidth = baseRect
           ? Math.max(80, (baseRect.width / projectCanvas.width) * viewportSize.width)
           : Math.max(80, viewportSize.width)
-        const delta = (event.clientX - interaction.startX + event.clientY - interaction.startY) / (baseScreenWidth * 1.5)
+        const delta =
+          (event.clientX - interaction.startX + event.clientY - interaction.startY) /
+          (baseScreenWidth * 1.5)
         const scale = clamp(interaction.initial.scaleX + delta, 0.05, 10)
         setPreview({
           clipId: interaction.clipId,
@@ -291,7 +302,11 @@ function CompositionPreview({
 
   const beginMove = (event: ReactPointerEvent<HTMLElement>, clip: ResolvedTimelineClip): void => {
     if (event.button !== 0) return
-    if (interactionController && !interactionController.begin('moving-canvas-item', event.pointerId)) return
+    if (
+      interactionController &&
+      !interactionController.begin('moving-canvas-item', event.pointerId)
+    )
+      return
     event.preventDefault()
     event.stopPropagation()
     onSelectClip?.(clip.id)
@@ -306,9 +321,16 @@ function CompositionPreview({
     })
   }
 
-  const beginScale = (event: ReactPointerEvent<HTMLButtonElement>, clip: ResolvedTimelineClip): void => {
+  const beginScale = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    clip: ResolvedTimelineClip
+  ): void => {
     if (event.button !== 0) return
-    if (interactionController && !interactionController.begin('scaling-canvas-item', event.pointerId)) return
+    if (
+      interactionController &&
+      !interactionController.begin('scaling-canvas-item', event.pointerId)
+    )
+      return
     event.preventDefault()
     event.stopPropagation()
     setInteraction({
@@ -321,11 +343,18 @@ function CompositionPreview({
     })
   }
 
-  const beginRotate = (event: ReactPointerEvent<HTMLButtonElement>, clip: ResolvedTimelineClip): void => {
+  const beginRotate = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    clip: ResolvedTimelineClip
+  ): void => {
     if (event.button !== 0) return
     const root = rootRef.current
     if (!root) return
-    if (interactionController && !interactionController.begin('rotating-canvas-item', event.pointerId)) return
+    if (
+      interactionController &&
+      !interactionController.begin('rotating-canvas-item', event.pointerId)
+    )
+      return
     event.preventDefault()
     event.stopPropagation()
     const rect = root.getBoundingClientRect()
@@ -348,24 +377,58 @@ function CompositionPreview({
   }
   const applyFill = (clip: ResolvedTimelineClip): void => {
     const asset = assetsById.get(clip.assetId) ?? null
-    if (onUpdateClipById) onUpdateClipById(clip.id, { transform: getFillTransform(asset, projectCanvas) })
+    if (onUpdateClipById)
+      onUpdateClipById(clip.id, { transform: getFillTransform(asset, projectCanvas) })
     else onUpdateClip?.({ transform: getFillTransform(asset, projectCanvas) })
   }
 
   const contextMenuItems: EditorContextMenuItem[] = contextMenu
     ? [
-        { id: 'cut', label: '剪切', shortcut: 'Ctrl+X', onSelect: () => onCutClip?.(contextMenu.clip.id) },
-        { id: 'copy', label: '复制', shortcut: 'Ctrl+C', onSelect: () => onCopyClip?.(contextMenu.clip.id) },
-        { id: 'duplicate', label: '复制片段', shortcut: 'Ctrl+D', onSelect: () => onDuplicateClip?.(contextMenu.clip.id) },
+        {
+          id: 'cut',
+          label: '剪切',
+          shortcut: 'Ctrl+X',
+          onSelect: () => onCutClip?.(contextMenu.clip.id)
+        },
+        {
+          id: 'copy',
+          label: '复制',
+          shortcut: 'Ctrl+C',
+          onSelect: () => onCopyClip?.(contextMenu.clip.id)
+        },
+        {
+          id: 'duplicate',
+          label: '复制片段',
+          shortcut: 'Ctrl+D',
+          onSelect: () => onDuplicateClip?.(contextMenu.clip.id)
+        },
         { id: 'separator-edit', separator: true },
-        { id: 'mute', label: contextMenu.clip.muted ? '取消静音' : '静音', onSelect: () => onToggleClipMuted?.(contextMenu.clip.id) },
-        { id: 'enabled', label: contextMenu.clip.enabled ? '禁用片段' : '启用片段', onSelect: () => onToggleClipEnabled?.(contextMenu.clip.id) },
+        {
+          id: 'mute',
+          label: contextMenu.clip.muted ? '取消静音' : '静音',
+          onSelect: () => onToggleClipMuted?.(contextMenu.clip.id)
+        },
+        {
+          id: 'enabled',
+          label: contextMenu.clip.enabled ? '禁用片段' : '启用片段',
+          onSelect: () => onToggleClipEnabled?.(contextMenu.clip.id)
+        },
         { id: 'separator-state', separator: true },
         { id: 'fit', label: '适应画布', onSelect: () => applyFit(contextMenu.clip) },
         { id: 'fill', label: '填充画布', onSelect: () => applyFill(contextMenu.clip) },
-        { id: 'reset-transform', label: '重置变换', onSelect: () => onResetClipTransform?.(contextMenu.clip.id) },
+        {
+          id: 'reset-transform',
+          label: '重置变换',
+          onSelect: () => onResetClipTransform?.(contextMenu.clip.id)
+        },
         { id: 'separator-delete', separator: true },
-        { id: 'delete', label: '删除', shortcut: 'Delete', danger: true, onSelect: () => onDeleteClip?.(contextMenu.clip.id) }
+        {
+          id: 'delete',
+          label: '删除',
+          shortcut: 'Delete',
+          danger: true,
+          onSelect: () => onDeleteClip?.(contextMenu.clip.id)
+        }
       ]
     : []
 
@@ -432,17 +495,39 @@ function CompositionPreview({
         <div
           className="studio-composition-preview__transform-box"
           style={getTransformBoxStyle(
-            preview?.clipId === activeVisualClip.id ? preview.transform : activeVisualClip.transform,
+            preview?.clipId === activeVisualClip.id
+              ? preview.transform
+              : activeVisualClip.transform,
             activeAsset,
             projectCanvas,
             viewportSize
           )}
           aria-label="画面变换控制"
         >
-          <button type="button" className="studio-composition-preview__handle studio-composition-preview__handle--nw" aria-label="缩放画面" onPointerDown={(event) => beginScale(event, activeVisualClip)} />
-          <button type="button" className="studio-composition-preview__handle studio-composition-preview__handle--ne" aria-label="缩放画面" onPointerDown={(event) => beginScale(event, activeVisualClip)} />
-          <button type="button" className="studio-composition-preview__handle studio-composition-preview__handle--sw" aria-label="缩放画面" onPointerDown={(event) => beginScale(event, activeVisualClip)} />
-          <button type="button" className="studio-composition-preview__handle studio-composition-preview__handle--se" aria-label="缩放画面" onPointerDown={(event) => beginScale(event, activeVisualClip)} />
+          <button
+            type="button"
+            className="studio-composition-preview__handle studio-composition-preview__handle--nw"
+            aria-label="缩放画面"
+            onPointerDown={(event) => beginScale(event, activeVisualClip)}
+          />
+          <button
+            type="button"
+            className="studio-composition-preview__handle studio-composition-preview__handle--ne"
+            aria-label="缩放画面"
+            onPointerDown={(event) => beginScale(event, activeVisualClip)}
+          />
+          <button
+            type="button"
+            className="studio-composition-preview__handle studio-composition-preview__handle--sw"
+            aria-label="缩放画面"
+            onPointerDown={(event) => beginScale(event, activeVisualClip)}
+          />
+          <button
+            type="button"
+            className="studio-composition-preview__handle studio-composition-preview__handle--se"
+            aria-label="缩放画面"
+            onPointerDown={(event) => beginScale(event, activeVisualClip)}
+          />
           <button
             type="button"
             className="studio-composition-preview__rotate-handle"
@@ -466,7 +551,12 @@ function CompositionPreview({
         />
       )}
       {contextMenu && (
-        <EditorContextMenu x={contextMenu.x} y={contextMenu.y} items={contextMenuItems} onClose={() => setContextMenu(null)} />
+        <EditorContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </div>
   )
