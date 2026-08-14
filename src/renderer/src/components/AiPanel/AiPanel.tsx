@@ -83,6 +83,7 @@ interface ConversationMessage {
 
 interface PendingPlan {
   tab: AiPanelTab
+  generation: number
   call: PlanToolCall
   conversation: AgentChatMessage[]
   approvalMessageId: number
@@ -92,6 +93,7 @@ interface PendingPlan {
 
 interface ToolContinuation {
   tab: AiPanelTab
+  generation: number
   call: AgentToolCall
   conversation: AgentChatMessage[]
   approvalMessageId?: number
@@ -216,6 +218,14 @@ function AiPanel({
   const messagesRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const approvalTriggerRef = useRef<HTMLButtonElement>(null)
+  const approvalItemRefs = useRef<Record<AgentApprovalMode, HTMLButtonElement | null>>({
+    request: null,
+    smart: null,
+    full: null
+  })
+  const mountedRef = useRef(true)
+  const requestGenerationRef = useRef(0)
   const nextMessageIdRef = useRef(1)
   const chatHistoryRef = useRef<Record<AiPanelTab, AgentChatMessage[]>>({ chat: [], codex: [] })
 
@@ -224,6 +234,17 @@ function AiPanel({
   const activeMessages = messages[activeTab]
   const isEmpty = activeMessages.length === 0
   const interactionLocked = isSending || isExecuting || pendingPlan !== null
+
+  const isCurrentGeneration = (generation: number): boolean =>
+    mountedRef.current && requestGenerationRef.current === generation
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      requestGenerationRef.current += 1
+    }
+  }, [])
 
   useEffect(() => {
     if (!openPopup) return undefined
@@ -244,6 +265,10 @@ function AiPanel({
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isFullscreen, openPopup])
+
+  useEffect(() => {
+    if (openPopup === 'approval') approvalItemRefs.current[approvalMode]?.focus()
+  }, [approvalMode, openPopup])
 
   useEffect(() => {
     const listConfigurations = window.api?.listAgentModelConfigurations
@@ -332,6 +357,7 @@ function AiPanel({
     continuation: ToolContinuation,
     result: AgentToolExecutionResult
   ): AgentChatMessage[] => {
+    if (!isCurrentGeneration(continuation.generation)) return continuation.conversation
     const toolMessage: AgentChatMessage = {
       role: 'tool',
       content: JSON.stringify(result),
@@ -360,6 +386,7 @@ function AiPanel({
     pending: PendingPlan,
     planResult: AgentToolExecutionResult
   ): AgentChatMessage[] => {
+    if (!isCurrentGeneration(pending.generation)) return pending.conversation
     const readResults = new Map(
       pending.deferredReadResults.map(({ call, result }) => [call.id, result] as const)
     )
@@ -370,6 +397,7 @@ function AiPanel({
       conversation = continueAfterToolResult(
         {
           tab: pending.tab,
+          generation: pending.generation,
           call,
           conversation,
           ...(call.id === pending.call.id ? { approvalMessageId: pending.approvalMessageId } : {})
@@ -381,20 +409,42 @@ function AiPanel({
   }
 
   const resetConversation = (): void => {
-    if (pendingPlan) {
-      continueAfterPendingPlan(pendingPlan, rejectedResult())
-      setPendingPlan(null)
-    }
+    requestGenerationRef.current += 1
     setMessages((current) => ({ ...current, [activeTab]: [] }))
     chatHistoryRef.current[activeTab] = []
     setComposerValue('')
     setSelectedFileName(null)
+    setPendingPlan(null)
+    setIsSending(false)
+    setIsExecuting(false)
     setOpenPopup(null)
     if (textareaRef.current) textareaRef.current.style.height = ''
     textareaRef.current?.focus()
   }
 
-  const runChat = async (tab: AiPanelTab, history: AgentChatMessage[]): Promise<void> => {
+  const changeExecutionMode = (mode: AgentChatMode): void => {
+    if (interactionLocked || mode === executionMode) return
+    requestGenerationRef.current += 1
+    setExecutionMode(mode)
+    writeAiExecutionMode(mode)
+    setMessages((current) => ({ ...current, [activeTab]: [] }))
+    chatHistoryRef.current[activeTab] = []
+    setComposerValue('')
+    setSelectedFileName(null)
+    setAutoAttachProject(false)
+    setPendingPlan(null)
+    setIsSending(false)
+    setIsExecuting(false)
+    setOpenPopup(null)
+    if (textareaRef.current) textareaRef.current.style.height = ''
+  }
+
+  const runChat = async (
+    tab: AiPanelTab,
+    history: AgentChatMessage[],
+    generation: number
+  ): Promise<void> => {
+    if (!isCurrentGeneration(generation)) return
     const chatApi = window.api?.runAgentChat
     if (!chatApi) return
     if (!selectedConfigId) {
@@ -406,12 +456,14 @@ function AiPanel({
     let conversation = history
     try {
       for (let turn = 0; turn < 6; turn += 1) {
+        if (!isCurrentGeneration(generation)) return
         const response = await chatApi({
           configId: selectedConfigId,
           mode: executionMode,
           approvalMode,
           messages: conversation
         })
+        if (!isCurrentGeneration(generation)) return
         if (!response.success || !response.assistant) {
           throw new Error(response.message || 'AI 对话失败')
         }
@@ -429,11 +481,12 @@ function AiPanel({
         ).length
         if (planCallCount > 1) {
           for (const call of assistant.toolCalls) {
+            if (!isCurrentGeneration(generation)) return
             const result =
               call.name === 'get_editor_context'
                 ? executeAgentToolCall(call, getActiveEditorAgentApi(), executionMode)
                 : competingPlanResult()
-            conversation = continueAfterToolResult({ tab, call, conversation }, result)
+            conversation = continueAfterToolResult({ tab, generation, call, conversation }, result)
           }
           chatHistoryRef.current[tab] = conversation
           continue
@@ -465,6 +518,7 @@ function AiPanel({
           appendMessages(tab, [approvalMessage])
           setPendingPlan({
             tab,
+            generation,
             call: planCall,
             conversation,
             approvalMessageId: approvalMessage.id,
@@ -475,8 +529,9 @@ function AiPanel({
         }
 
         for (const call of assistant.toolCalls) {
+          if (!isCurrentGeneration(generation)) return
           const editorApi = getActiveEditorAgentApi()
-          const continuation: ToolContinuation = { tab, call, conversation }
+          const continuation: ToolContinuation = { tab, generation, call, conversation }
 
           if (call.name === 'get_editor_context') {
             conversation = continueAfterToolResult(
@@ -509,8 +564,10 @@ function AiPanel({
           }
 
           if (decision === 'auto_execute') {
+            if (!isCurrentGeneration(generation)) return
             setIsExecuting(true)
             const result = executeApprovedAgentPlan(call.arguments, editorApi)
+            if (!isCurrentGeneration(generation)) return
             setIsExecuting(false)
             conversation = continueAfterToolResult(continuation, result)
             continue
@@ -522,17 +579,20 @@ function AiPanel({
       }
       throw new Error('AI 工具调用次数过多，已停止执行')
     } catch (error) {
+      if (!isCurrentGeneration(generation)) return
       appendMessages(tab, [
         createMessage('assistant', error instanceof Error ? error.message : 'AI 对话失败')
       ])
     } finally {
-      setIsSending(false)
-      setIsExecuting(false)
+      if (isCurrentGeneration(generation)) {
+        setIsSending(false)
+        setIsExecuting(false)
+      }
     }
   }
 
   const approvePendingPlan = (): void => {
-    if (!pendingPlan || isExecuting) return
+    if (!pendingPlan || isExecuting || !isCurrentGeneration(pendingPlan.generation)) return
     const editorApi = getActiveEditorAgentApi()
     updateApprovalMessage(pendingPlan.tab, pendingPlan.approvalMessageId, 'executing')
     setIsExecuting(true)
@@ -541,19 +601,22 @@ function AiPanel({
       !editorApi || editorApi.getRevision() !== pendingPlan.call.arguments.projectRevision
         ? staleContextResult()
         : executeApprovedAgentPlan(pendingPlan.call.arguments, editorApi)
+    if (!isCurrentGeneration(pendingPlan.generation)) return
     const nextConversation = continueAfterPendingPlan(pendingPlan, result)
     const tab = pendingPlan.tab
+    const generation = pendingPlan.generation
     setPendingPlan(null)
     setIsExecuting(false)
-    void runChat(tab, nextConversation)
+    void runChat(tab, nextConversation, generation)
   }
 
   const rejectPendingPlan = (): void => {
-    if (!pendingPlan || isExecuting) return
+    if (!pendingPlan || isExecuting || !isCurrentGeneration(pendingPlan.generation)) return
     const nextConversation = continueAfterPendingPlan(pendingPlan, rejectedResult())
     const tab = pendingPlan.tab
+    const generation = pendingPlan.generation
     setPendingPlan(null)
-    void runChat(tab, nextConversation)
+    void runChat(tab, nextConversation, generation)
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
@@ -564,6 +627,9 @@ function AiPanel({
       setModelError('请选择模型')
       return
     }
+    setOpenPopup(null)
+    const generation = requestGenerationRef.current + 1
+    requestGenerationRef.current = generation
 
     const message = createMessage('user', text)
     const history = [
@@ -574,7 +640,7 @@ function AiPanel({
     appendMessages(activeTab, [message])
     setComposerValue('')
     if (textareaRef.current) textareaRef.current.style.height = ''
-    void runChat(activeTab, history)
+    void runChat(activeTab, history, generation)
   }
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -608,6 +674,46 @@ function AiPanel({
 
   const togglePopup = (popup: Exclude<PopupName, null>): void => {
     setOpenPopup((current) => (current === popup ? null : popup))
+  }
+
+  const focusApprovalTrigger = (): void => {
+    window.setTimeout(() => approvalTriggerRef.current?.focus(), 0)
+  }
+
+  const handleApprovalMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const items = APPROVAL_OPTIONS.map((option) => approvalItemRefs.current[option.value]).filter(
+      (item): item is HTMLButtonElement => item !== null
+    )
+    if (items.length === 0) return
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+    let nextIndex: number | null = null
+
+    switch (event.key) {
+      case 'ArrowDown':
+        nextIndex = (currentIndex + 1 + items.length) % items.length
+        break
+      case 'ArrowUp':
+        nextIndex = (currentIndex - 1 + items.length) % items.length
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = items.length - 1
+        break
+      case 'Escape':
+        event.preventDefault()
+        event.stopPropagation()
+        setOpenPopup(null)
+        focusApprovalTrigger()
+        return
+      default:
+        return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    items[nextIndex]?.focus()
   }
 
   const selectStarter = (label: string): void => {
@@ -949,12 +1055,7 @@ function AiPanel({
               aria-label="执行模式"
               value={executionMode}
               disabled={interactionLocked}
-              onChange={(event) => {
-                const mode = event.target.value as AgentChatMode
-                setExecutionMode(mode)
-                writeAiExecutionMode(mode)
-                setOpenPopup(null)
-              }}
+              onChange={(event) => changeExecutionMode(event.target.value as AgentChatMode)}
             >
               <option value="agent">Agent</option>
               <option value="assistant">助手</option>
@@ -1031,6 +1132,7 @@ function AiPanel({
         </span>
         <div className="studio-ai-panel__approval-control">
           <button
+            ref={approvalTriggerRef}
             className="studio-ai-panel__approval-trigger"
             type="button"
             aria-label={`审批模式：${APPROVAL_LABELS[approvalMode]}`}
@@ -1044,7 +1146,12 @@ function AiPanel({
             <ChevronDown size={11} strokeWidth={1.7} aria-hidden="true" />
           </button>
           {openPopup === 'approval' && (
-            <div className="studio-ai-panel__approval-menu" role="menu" aria-label="审批模式">
+            <div
+              className="studio-ai-panel__approval-menu"
+              role="menu"
+              aria-label="审批模式"
+              onKeyDown={handleApprovalMenuKeyDown}
+            >
               {APPROVAL_OPTIONS.map((option) => {
                 const selected = approvalMode === option.value
                 const OptionIcon =
@@ -1055,14 +1162,19 @@ function AiPanel({
                       : Bot
                 return (
                   <button
+                    ref={(element) => {
+                      approvalItemRefs.current[option.value] = element
+                    }}
                     key={option.value}
                     type="button"
                     role="menuitemradio"
                     aria-checked={selected}
                     onClick={() => {
+                      if (interactionLocked || executionMode === 'assistant') return
                       setApprovalMode(option.value)
                       writeAiApprovalMode(option.value)
                       setOpenPopup(null)
+                      focusApprovalTrigger()
                     }}
                   >
                     <OptionIcon size={16} strokeWidth={1.65} aria-hidden="true" />

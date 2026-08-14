@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AiPanel from '../src/renderer/src/components/AiPanel/AiPanel'
@@ -33,6 +33,23 @@ import type {
 import { isAgentChatRequest } from '../src/shared/agent/chatContract'
 
 let unregisterEditorApi: (() => void) | null = null
+
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+} {
+  let resolvePromise: ((value: T) => void) | undefined
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  return {
+    promise,
+    resolve: (value) => {
+      if (!resolvePromise) throw new Error('Deferred promise is not initialized')
+      resolvePromise(value)
+    }
+  }
+}
 
 function setAgentModels(configurations: AgentModelRegistryItem[]): void {
   Object.defineProperty(window, 'api', {
@@ -229,6 +246,154 @@ describe('AiPanel', () => {
       approvalMode: 'smart',
       messages: [{ role: 'user', content: '分析当前工程' }]
     })
+  })
+
+  it('starts a clean Assistant conversation instead of reusing Agent plan history', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'full')
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }]))
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: 'Agent 修改已完成。', toolCalls: [] }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: '对话完成',
+        assistant: { content: '助手只分析新问题。', toolCalls: [] }
+      })
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user, '先修改工程')
+    expect(await screen.findByText('Agent 修改已完成。')).toBeInTheDocument()
+    expect(executeTransaction).toHaveBeenCalledOnce()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '执行模式' }), 'assistant')
+
+    expect(screen.getByText('欢迎使用智剪')).toBeInTheDocument()
+    expect(screen.queryByText('Agent 修改已完成。')).not.toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '只分析新问题')
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText('助手只分析新问题。')).toBeInTheDocument()
+    const assistantRequest = runAgentChat.mock.calls[2][0]
+    expect(isAgentChatRequest(assistantRequest)).toBe(true)
+    expect(assistantRequest).toMatchObject({
+      mode: 'assistant',
+      messages: [{ role: 'user', content: '只分析新问题' }]
+    })
+  })
+
+  it('does not apply a stale smart plan after a new conversation starts', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'smart')
+    const pendingResponse = createDeferred<AgentChatResponse>()
+    const runAgentChat = vi.fn().mockReturnValueOnce(pendingResponse.promise)
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await submitPrompt(user, '稍后返回计划')
+    await waitFor(() => expect(runAgentChat).toHaveBeenCalledOnce())
+    await user.click(screen.getByRole('button', { name: '新建会话' }))
+
+    await act(async () => {
+      pendingResponse.resolve({
+        ...planResponse(plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }])),
+        assistant: {
+          content: '这条旧回答不应出现',
+          toolCalls: [
+            {
+              id: 'call-plan-1',
+              name: 'propose_editor_plan',
+              arguments: plan([{ type: 'clip.move', clipId: 'clip-2', timelineStart: 8 }])
+            }
+          ]
+        }
+      })
+      await Promise.resolve()
+    })
+
+    expect(executeTransaction).not.toHaveBeenCalled()
+    expect(screen.getByText('欢迎使用智剪')).toBeInTheDocument()
+    expect(screen.queryByText('这条旧回答不应出现')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '批准执行' })).not.toBeInTheDocument()
+  })
+
+  it('does not apply a stale full-access plan after the panel unmounts', async () => {
+    const user = userEvent.setup()
+    const executeTransaction = registerTestEditor()
+    window.localStorage.setItem(AI_APPROVAL_MODE_KEY, 'full')
+    const pendingResponse = createDeferred<AgentChatResponse>()
+    const runAgentChat = vi.fn().mockReturnValueOnce(pendingResponse.promise)
+    setAgentChat(runAgentChat)
+    const mounted = render(<AiPanel />)
+
+    await submitPrompt(user, '卸载后返回计划')
+    await waitFor(() => expect(runAgentChat).toHaveBeenCalledOnce())
+    mounted.unmount()
+
+    await act(async () => {
+      pendingResponse.resolve(planResponse(plan([{ type: 'clip.delete', clipIds: ['clip-1'] }])))
+      await Promise.resolve()
+    })
+
+    expect(executeTransaction).not.toHaveBeenCalled()
+  })
+
+  it('closes and disables the approval menu when a plan enters the pending state', async () => {
+    const user = userEvent.setup()
+    registerTestEditor()
+    const runAgentChat = vi
+      .fn()
+      .mockResolvedValueOnce(planResponse(plan([{ type: 'clip.delete', clipIds: ['clip-1'] }])))
+    setAgentChat(runAgentChat)
+    render(<AiPanel />)
+
+    await screen.findByRole('option', { name: 'chat-model' })
+    await user.type(screen.getByRole('textbox', { name: '描述要构建的内容' }), '删除片段')
+    await user.click(screen.getByRole('button', { name: '审批模式：请求批准' }))
+    expect(screen.getByRole('menu', { name: '审批模式' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByRole('button', { name: '批准执行' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '审批模式：请求批准' })).toBeDisabled()
+    expect(screen.queryByRole('menu', { name: '审批模式' })).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(AI_APPROVAL_MODE_KEY)).toBeNull()
+  })
+
+  it('supports keyboard navigation in the approval menu and restores trigger focus', async () => {
+    const user = userEvent.setup()
+    render(<AiPanel />)
+    const trigger = screen.getByRole('button', { name: '审批模式：请求批准' })
+
+    await user.click(trigger)
+    const requestItem = screen.getByRole('menuitemradio', { name: /^请求批准/ })
+    const smartItem = screen.getByRole('menuitemradio', { name: /^智能审批/ })
+    const fullItem = screen.getByRole('menuitemradio', { name: /^完全访问/ })
+    await waitFor(() => expect(requestItem).toHaveFocus())
+
+    await user.keyboard('{ArrowDown}')
+    expect(smartItem).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(fullItem).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(requestItem).toHaveFocus()
+    await user.keyboard('{ArrowUp}')
+    expect(fullItem).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(requestItem).toHaveFocus()
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu', { name: '审批模式' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 
   it('rejects a forged Assistant plan without executing it and resumes the model', async () => {
