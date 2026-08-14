@@ -816,6 +816,7 @@
 }
 
 .studio-ai-panel__statusbar {
+  position: relative;
   display: flex;
   flex: 0 0 27px;
   min-width: 0;
@@ -835,7 +836,7 @@
 }
 
 .studio-ai-panel__approval-control {
-  position: relative;
+  position: static;
   min-width: 0;
 }
 
@@ -873,11 +874,11 @@
 
 .studio-ai-panel__approval-menu {
   position: absolute;
-  right: -4px;
-  bottom: 28px;
+  right: 12px;
+  bottom: 31px;
   z-index: 12;
   display: grid;
-  width: min(292px, calc(100vw - 24px));
+  width: min(292px, calc(100% - 24px));
   padding: 4px;
   color: #262626;
   background: #ffffff;
