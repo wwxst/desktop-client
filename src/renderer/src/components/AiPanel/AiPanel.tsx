@@ -61,6 +61,7 @@ type AiPanelTab = 'chat' | 'codex'
 type PopupName = 'history' | 'more' | 'approval' | null
 type ApprovalState = 'awaiting' | 'executing' | 'completed' | 'rejected' | 'stale' | 'failed'
 type PlanToolCall = Extract<AgentToolCall, { name: 'propose_editor_plan' }>
+type ReadToolCall = Extract<AgentToolCall, { name: 'get_editor_context' }>
 
 interface AiPanelProps {
   onCollapse?: () => void
@@ -85,6 +86,8 @@ interface PendingPlan {
   call: PlanToolCall
   conversation: AgentChatMessage[]
   approvalMessageId: number
+  toolCalls: AgentToolCall[]
+  deferredReadResults: Array<{ call: ReadToolCall; result: AgentToolExecutionResult }>
 }
 
 interface ToolContinuation {
@@ -353,9 +356,33 @@ function AiPanel({
     return nextConversation
   }
 
+  const continueAfterPendingPlan = (
+    pending: PendingPlan,
+    planResult: AgentToolExecutionResult
+  ): AgentChatMessage[] => {
+    const readResults = new Map(
+      pending.deferredReadResults.map(({ call, result }) => [call.id, result] as const)
+    )
+    let conversation = pending.conversation
+    for (const call of pending.toolCalls) {
+      const result = call.id === pending.call.id ? planResult : readResults.get(call.id)
+      if (!result) throw new Error(`缺少工具结果：${call.id}`)
+      conversation = continueAfterToolResult(
+        {
+          tab: pending.tab,
+          call,
+          conversation,
+          ...(call.id === pending.call.id ? { approvalMessageId: pending.approvalMessageId } : {})
+        },
+        result
+      )
+    }
+    return conversation
+  }
+
   const resetConversation = (): void => {
     if (pendingPlan) {
-      continueAfterToolResult(pendingPlan, rejectedResult())
+      continueAfterPendingPlan(pendingPlan, rejectedResult())
       setPendingPlan(null)
     }
     setMessages((current) => ({ ...current, [activeTab]: [] }))
@@ -412,6 +439,41 @@ function AiPanel({
           continue
         }
 
+        const planCall = assistant.toolCalls.find(
+          (call): call is PlanToolCall => call.name === 'propose_editor_plan'
+        )
+        const editorApi = getActiveEditorAgentApi()
+        if (
+          planCall &&
+          decideAgentPlanApproval(executionMode, approvalMode, planCall.arguments) ===
+            'require_approval' &&
+          editorApi &&
+          planCall.arguments.projectRevision === editorApi.getRevision()
+        ) {
+          const deferredReadResults = assistant.toolCalls
+            .filter((call): call is ReadToolCall => call.name === 'get_editor_context')
+            .map((call) => ({
+              call,
+              result: executeAgentToolCall(call, editorApi, executionMode)
+            }))
+          const approvalMessage = createMessage('tool', planCall.arguments.summary, {
+            toolName: TOOL_LABELS[planCall.name],
+            success: false,
+            plan: planCall.arguments,
+            approvalState: 'awaiting'
+          })
+          appendMessages(tab, [approvalMessage])
+          setPendingPlan({
+            tab,
+            call: planCall,
+            conversation,
+            approvalMessageId: approvalMessage.id,
+            toolCalls: [...assistant.toolCalls],
+            deferredReadResults
+          })
+          return
+        }
+
         for (const call of assistant.toolCalls) {
           const editorApi = getActiveEditorAgentApi()
           const continuation: ToolContinuation = { tab, call, conversation }
@@ -454,20 +516,7 @@ function AiPanel({
             continue
           }
 
-          const approvalMessage = createMessage('tool', call.arguments.summary, {
-            toolName: TOOL_LABELS[call.name],
-            success: false,
-            plan: call.arguments,
-            approvalState: 'awaiting'
-          })
-          appendMessages(tab, [approvalMessage])
-          setPendingPlan({
-            tab,
-            call,
-            conversation,
-            approvalMessageId: approvalMessage.id
-          })
-          return
+          throw new Error('编辑计划审批状态初始化失败')
         }
         chatHistoryRef.current[tab] = conversation
       }
@@ -492,7 +541,7 @@ function AiPanel({
       !editorApi || editorApi.getRevision() !== pendingPlan.call.arguments.projectRevision
         ? staleContextResult()
         : executeApprovedAgentPlan(pendingPlan.call.arguments, editorApi)
-    const nextConversation = continueAfterToolResult(pendingPlan, result)
+    const nextConversation = continueAfterPendingPlan(pendingPlan, result)
     const tab = pendingPlan.tab
     setPendingPlan(null)
     setIsExecuting(false)
@@ -501,7 +550,7 @@ function AiPanel({
 
   const rejectPendingPlan = (): void => {
     if (!pendingPlan || isExecuting) return
-    const nextConversation = continueAfterToolResult(pendingPlan, rejectedResult())
+    const nextConversation = continueAfterPendingPlan(pendingPlan, rejectedResult())
     const tab = pendingPlan.tab
     setPendingPlan(null)
     void runChat(tab, nextConversation)
