@@ -131,7 +131,7 @@ Run:
 npm test -- tests/ai-panel.test.tsx --reporter=dot
 ```
 
-Expected: `1` 个测试文件、`38/38` 测试通过。
+Expected: `1` 个测试文件、`46/46` 测试通过。
 
 - [ ] **Step 8: 提交行为改动**
 
