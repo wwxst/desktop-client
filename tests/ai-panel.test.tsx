@@ -1103,7 +1103,8 @@ describe('AiPanel', () => {
     expect(screen.getByRole('button', { name: '小说推文' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '短剧' })).toBeInTheDocument()
     expect(composer).toHaveAttribute('placeholder', '描述要构建的内容')
-    expect(screen.getByText('桌面端自动剪辑产品PRD.md')).toBeInTheDocument()
+    expect(screen.queryByText('桌面端自动剪辑产品PRD.md')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '添加上下文' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '发送' })).toBeDisabled()
 
     await user.click(screen.getByRole('tab', { name: 'CODEX' }))

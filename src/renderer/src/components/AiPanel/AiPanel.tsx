@@ -10,7 +10,6 @@ import {
   CircleCheck,
   Copy,
   Ellipsis,
-  FileText,
   Maximize2,
   Mic,
   Minimize2,
@@ -103,8 +102,6 @@ interface ToolContinuation {
   conversation: AgentChatMessage[]
   approvalMessageId?: number
 }
-
-const DEFAULT_CONTEXT_FILE = '桌面端自动剪辑产品PRD.md'
 
 const TOOL_LABELS: Record<string, string> = {
   get_editor_context: '读取工程',
@@ -260,8 +257,6 @@ function AiPanel({
     chat: [],
     codex: []
   })
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
-  const [autoAttachProject, setAutoAttachProject] = useState(true)
   const [openPopup, setOpenPopup] = useState<PopupName>(null)
   const [showComposerOptions, setShowComposerOptions] = useState(false)
   const [thinkingMode, setThinkingMode] = useState('平衡')
@@ -278,7 +273,6 @@ function AiPanel({
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null)
   const panelRef = useRef<HTMLElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const approvalTriggerRef = useRef<HTMLButtonElement>(null)
   const approvalItemRefs = useRef<Record<AgentApprovalMode, HTMLButtonElement | null>>({
@@ -291,7 +285,6 @@ function AiPanel({
   const nextMessageIdRef = useRef(1)
   const chatHistoryRef = useRef<Record<AiPanelTab, AgentChatMessage[]>>({ chat: [], codex: [] })
 
-  const attachmentName = selectedFileName ?? (autoAttachProject ? DEFAULT_CONTEXT_FILE : null)
   const chatAvailable = typeof window.api?.runAgentChat === 'function'
   const activeMessages = messages[activeTab]
   const isEmpty = activeMessages.length === 0
@@ -481,7 +474,6 @@ function AiPanel({
     chatHistoryRef.current[activeTab] = []
     if (pendingTab) chatHistoryRef.current[pendingTab] = []
     setComposerValue('')
-    setSelectedFileName(null)
     setPendingPlan(null)
     setIsSending(false)
     setIsExecuting(false)
@@ -498,8 +490,6 @@ function AiPanel({
     setMessages({ chat: [], codex: [] })
     chatHistoryRef.current = { chat: [], codex: [] }
     setComposerValue('')
-    setSelectedFileName(null)
-    setAutoAttachProject(false)
     setPendingPlan(null)
     setIsSending(false)
     setIsExecuting(false)
@@ -735,11 +725,6 @@ function AiPanel({
     event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`
   }
 
-  const handleFileSelected = (event: ChangeEvent<HTMLInputElement>): void => {
-    setSelectedFileName(event.target.files?.[0]?.name ?? null)
-    event.target.value = ''
-  }
-
   const handleCollapse = (): void => {
     setIsFullscreen(false)
     setIsCollapsed(true)
@@ -897,7 +882,6 @@ function AiPanel({
                   role="menuitem"
                   onClick={() => {
                     setThinkingMode('平衡')
-                    setAutoAttachProject(true)
                     setOpenPopup(null)
                   }}
                 >
@@ -1068,24 +1052,6 @@ function AiPanel({
       </div>
 
       <form className="studio-ai-panel__composer" onSubmit={handleSubmit}>
-        {attachmentName && (
-          <div className="studio-ai-panel__attachment">
-            <FileText size={13} strokeWidth={1.7} aria-hidden="true" />
-            <span>{attachmentName}</span>
-            <button
-              type="button"
-              aria-label={`移除附件 ${attachmentName}`}
-              title="移除附件"
-              onClick={() => {
-                setSelectedFileName(null)
-                setAutoAttachProject(false)
-              }}
-            >
-              <X size={12} strokeWidth={1.8} aria-hidden="true" />
-            </button>
-          </div>
-        )}
-
         <textarea
           ref={textareaRef}
           value={composerValue}
@@ -1112,23 +1078,6 @@ function AiPanel({
         )}
 
         <div className="studio-ai-panel__composer-toolbar">
-          <input
-            ref={fileInputRef}
-            className="studio-ai-panel__file-input"
-            type="file"
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={handleFileSelected}
-          />
-          <button
-            className="studio-ai-panel__composer-icon"
-            type="button"
-            aria-label="添加上下文"
-            title="添加上下文"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Plus size={18} strokeWidth={1.5} aria-hidden="true" />
-          </button>
           <label className="studio-ai-panel__select" title="选择执行模式">
             <Bot size={13} strokeWidth={1.7} aria-hidden="true" />
             <select
