@@ -24,11 +24,15 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "capcut-cli": "^0.19.0",
+    "jsonc-parser": "^3.3.1",
     "lucide-react": "^1.27.0",
     "react-resizable-panels": "^4.12.2",
     "sherpa-onnx-node": "^1.13.4",
     "tar-stream": "^3.1.7",
-    "unbzip2-stream": "^1.4.3"
+    "unbzip2-stream": "^1.4.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

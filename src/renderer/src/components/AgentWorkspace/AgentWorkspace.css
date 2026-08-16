@@ -283,6 +283,72 @@
   background: #f1f1f1;
 }
 
+.agent-workspace__approval {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin: 0 0 24px 40px;
+  padding: 12px;
+  color: #3d3527;
+  background: #fffaf0;
+  border: 1px solid #ead9b8;
+  border-radius: 8px;
+}
+
+.agent-workspace__approval > svg {
+  margin-top: 2px;
+  color: #a26417;
+}
+
+.agent-workspace__approval-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.agent-workspace__approval-body strong {
+  font-size: 13px;
+}
+
+.agent-workspace__approval-body span,
+.agent-workspace__approval-body small {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.agent-workspace__approval-body small {
+  color: #766b59;
+}
+
+.agent-workspace__approval-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.agent-workspace__approval-actions button {
+  min-height: 28px;
+  padding: 0 10px;
+  color: #55585d;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #d5d6d9;
+  border-radius: 5px;
+}
+
+.agent-workspace__approval-actions button.is-primary {
+  color: #ffffff;
+  background: #34363a;
+  border-color: #34363a;
+}
+
+.agent-workspace__approval-actions button:hover {
+  border-color: #a8aaae;
+}
+
 .agent-workspace__thinking {
   display: flex;
   height: 28px;
@@ -656,6 +722,16 @@
 
   .agent-workspace__context span:nth-child(2) {
     display: none;
+  }
+
+  .agent-workspace__approval {
+    grid-template-columns: 24px minmax(0, 1fr);
+    margin-left: 0;
+  }
+
+  .agent-workspace__approval-actions {
+    grid-column: 2;
+    justify-content: flex-end;
   }
 }
 

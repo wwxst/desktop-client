@@ -6,6 +6,7 @@ import { registerTtsIpc } from './tts/registerTtsIpc'
 import { registerAgentIpc } from './agent/registerAgentIpc'
 import { registerMediaLibraryIpc } from './mediaLibrary/registerMediaLibraryIpc'
 import { registerProjectIpc } from './project/registerProjectIpc'
+import { registerCodexIpc } from './codex/registerCodexIpc'
 
 import type {
   ApiResult,
@@ -35,6 +36,8 @@ const authSession: {
 } = {
   accessToken: null
 }
+
+let disposeCodexIpc: (() => void) | null = null
 
 /**
  * 注册用户登录IPC接口。
@@ -233,6 +236,7 @@ app.whenReady().then(() => {
   registerSubscriptionIpc()
   registerTtsIpc()
   registerAgentIpc()
+  disposeCodexIpc = registerCodexIpc()
   registerMediaLibraryIpc()
   registerProjectIpc()
 
@@ -250,6 +254,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  disposeCodexIpc?.()
+  disposeCodexIpc = null
 })
 
 // 在此文件中，您可以包含应用的其他特定主进程代码...

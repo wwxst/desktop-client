@@ -13,7 +13,10 @@ React Renderer
 Preload / contextBridge
   -> ipcRenderer.invoke / ipcRenderer.on
 Electron Main
-  -> 项目存储、本地 TTS、素材索引、Agent 工作流、登录和订阅请求
+  -> 项目存储、本地 TTS、素材索引、Codex App Server、旧 Agent 工作流、登录和订阅请求
+Codex App Server
+  -> Thread / Turn / 流式事件 / 审批 / 模型目录
+  -> 受控 Jianying MCP（真实草稿只读检查 / 隔离工作副本安全写入）
 Java 后端
   -> 当前开发地址 http://localhost:8080
 ```
@@ -38,7 +41,9 @@ App
 
 侧边栏在启动时通过 `window.api.listProjects` 恢复 Main 持久化的项目列表。新建项目使用原生目录选择框，不再读取浏览器文件输入或只保存 React 会话状态；创建成功后立即显示持久化记录，应用重启后从全局项目索引恢复。
 
-设置页以单一表格管理多个模型配置，只提供添加、编辑和删除，不提供启用、停用或默认模型。“模型服务商”模式通过 Main 获取 Java 后台目录，后台不可用或返回无效数据时使用桌面端内置目录；Renderer 不获得服务商官方 Base URL。自定义配置固定使用 OpenAI Chat Completions 兼容协议，API Key 不回填到 Renderer。
+首页当前通过 Main 管理的 Codex App Server 加载官方模型列表，第一次发送创建 Thread，后续消息在同一 Thread 创建 Turn，并通过 `codex:event` 增量渲染助手消息。设置页原有模型配置继续供旧工作流兼容使用，只提供添加、编辑和删除；它不再是首页 Codex 对话的前置条件。
+
+Codex 当前固定在 Electron `userData/codex-workspace` 专用目录内以只读 sandbox 运行。Renderer 不能传入工作目录、sandbox、系统提示或任意协议方法。命令、文件修改和 MCP 工具审批由 Main 登记后以结构化操作区呈现，专用目录之外的命令或文件请求自动拒绝。Main 通过进程级 `-c` 配置注入受控 Jianying MCP，`enabled_tools` 固定九个业务工具；四个会创建或修改隔离数据的工具逐次使用 `prompt` 审批。三档权限偏好不会注册真实草稿写入、启动、桌面控制或导出能力，也不会放宽禁止升级策略。
 
 ## Agent 工作流
 
@@ -46,7 +51,9 @@ Main 当前保留模型注册表、无工具的通用 `ModelGateway.chat`、`Mod
 
 当前 `EditorTool` 只把抽象 `EditingPlan` 转成 JSON 命令文件，`ExportTool` 直接调用 FFmpeg；它们都不会读取、启动或控制剪映。接入剪映 5.9 时必须新增独立 Adapter，不能把现有 `editor-staging` 阶段描述为剪映执行。
 
-`agent:chat:run` 当前只接受显式模型配置和交替的用户/助手纯文本消息。Main 固定系统提示并拒绝 system、tool、额外字段和模型返回的工具调用；首页 `AgentWorkspace` 通过 Preload 暴露的 `window.api.runAgentChat` 调用该通道，支持多轮纯文本对话和模型选择。页面明确显示“仅对话”和“剪映 5.9 未连接”，不把计划中的自动化描述为当前能力。
+`AgentWorkspace` 当前使用 Codex App Server 的 `model/list`、`thread/start`、`turn/start` 和流式通知。Codex 负责 Thread/Turn 历史、模型交互和审批协议；Jianying MCP 已能检查本机环境和 5.9 草稿，并在应用隔离工作副本中执行受控字幕修改与回滚，但首页还没有独立的 MCP 连接状态 UI，不得将这一基础描述为已经能启动剪映、自动剪辑或导出。
+
+旧的 `agent:chat:run` 仍只接受显式模型配置和交替的用户/助手纯文本消息，继续作为自研工作流兼容接口。它不再驱动首页，待 Codex 链路和剪映工具覆盖现有使用场景后再删除。
 
 旧的内部编辑器工具链已经移除，包括 `get_editor_context`、`propose_editor_plan`、Renderer 审批状态和内部 Clip 事务执行器。这些协议只适用于已删除的内置 Project 模型，不能代表剪映 5.9 的真实状态。
 
@@ -70,9 +77,35 @@ Main 当前保留模型注册表、无工具的通用 `ModelGateway.chat`、`Mod
 
 TTS 模型管理、试听、长文本任务、取消、进度事件和 WAV 保存均通过 Main/Preload 业务 IPC。Renderer 不直接加载原生模型或写入目标文件。
 
-## 剪映 5.9 自动化方向
+## 剪映 5.9 适配状态
 
-> 状态：计划中，当前尚未实现或暴露对应 IPC。
+> 状态：真实草稿只读检查和隔离工作副本安全写入已实现；启动、UI Automation 和导出仍在计划中。
+
+当前链路：
+
+```text
+Codex App Server
+  -> Jianying MCP
+     -> JianyingReadService
+        -> 剪映 5.9 版本白名单
+        -> 可执行文件版本 / 进程 / 隔离用户 / 更新开关启动前门禁
+        -> 草稿根目录直接子目录约束
+        -> draft_content.json / template-2.tmp 只读一致性检查
+     -> JianyingWorkingCopyService
+        -> 应用隔离目录工作副本
+        -> 一次性预览令牌 / 原始字节备份 / SHA256
+        -> 白名单字段变更 / 原子替换 / 验证与回滚
+```
+
+当前注册三个真实草稿只读工具：`jianying_environment_status`、`jianying_inspect_draft`、`jianying_preview_text_change`；四个工作副本工具：`jianying_prepare_working_copy`、`jianying_preview_working_copy_text_change`、`jianying_apply_text_change`、`jianying_rollback_text_change`；以及 `jianying_preview_no_upgrade_policy`、`jianying_apply_no_upgrade_policy` 两个隔离用户升级策略工具。工作副本固定在 Electron `userData/jianying-working-copies`，不能与真实草稿根互相包含。写入前要求剪映进程关闭、5.9 版本匹配且双镜像一致；写入只允许目标字幕文本和首个样式范围变化，失败恢复原始字节，显式回滚不会覆盖事务后的其他修改。
+
+`capcut-cli` 只复用草稿解析、版本检测和素材查找 API；不使用其写入、restore、轨道排序或字幕范围更新实现。最小修改由 `jsonc-parser` 生成，真实草稿目录不产生备份、标记文件或任何写操作。
+
+`jianying_environment_status` 还会读取 `JianyingPro.exe` 的 Windows 文件版本、确认进程状态，并返回结构化 `launchBlockers`。独立 Windows 用户通过 `JIANYING_ISOLATION_MODE=separate-windows-user` 与 `JIANYING_RUNTIME_PROFILE` 显式配置；该模式读取隔离用户自己的 `AppData/Local/JianyingPro/User Data/Config/globalSetting`。虚拟机执行通道尚未实现，因此选择 `virtual-machine` 仍会阻塞。当前机器已确认版本为 `5.9.0.11632`、进程未运行，但因未配置独立用户且自动更新、静默升级开启，`readyForControlledLaunch=false`，并且 `launchToolsEnabled=false`。
+
+升级策略固定为 `deny`，不提供允许升级的反向配置。策略工具只能读取和修改隔离 Windows 用户的 `globalSetting`，当前共享用户目录或互相包含的目录会被拒绝。应用前必须先预览并审批；写入只把 `enableAutoUpdate` 和 `totalSilentUpgradeSwitch` 设为 `false`，保留其他字节结构，写前保存原始字节备份，失败自动恢复。
+
+后续自动化目标边界如下：
 
 剪辑执行目标是固定版本的剪映 5.9，不再建设内置视频编辑器。建议边界如下：
 
@@ -95,10 +128,11 @@ Main Task Runner
 
 ## 当前非目标和缺口
 
-- 不提供内置多轨编辑器、时间线、预览合成、内部 Clip 命令或对应 Agent 工具；通用对话暂时也不执行任何工具。
+- 不提供内置多轨编辑器、时间线、预览合成、内部 Clip 命令或对应 Agent 工具；当前只写应用管理的隔离工作副本，不执行真实草稿写入、启动、桌面控制或导出。
 - “小说推文”页面当前仍以浏览器状态和定时器演示批量阶段，尚未真正修改剪映草稿或导出文件。
-- 剪映 5.9 版本检测、草稿适配、UI Automation、导出验证和断点恢复尚未实现。
-- 项目与对话目前尚未建立关联；对话历史仍未持久化，项目项点击后的项目工作区切换也尚未接入。
+- 剪映 5.9 受控启动、真实草稿发布、UI Automation、导出验证和跨进程断点恢复尚未实现；启动前 readiness 门禁已实现，但当前主机隔离与升级条件尚未达标。
+- Codex 已持久化 Thread，Main 也已开放列表和恢复接口；侧边栏尚未接入这些接口，项目与 Thread 仍未建立关联。
+- 当前安装包尚未内置固定版本 Codex 运行时；开发环境使用 `CODEX_BIN`、资源目录或官方 npm 安装中的原生二进制。
 
 ## 代码定位
 
@@ -107,6 +141,8 @@ Main Task Runner
 - 本地项目：`src/main/project/`、`src/renderer/src/components/Sidebar/Sidebar.tsx`
 - 总工作区：`src/renderer/src/components/Workspace/WorkspaceView.tsx`
 - 剪辑 Agent 首页：`src/renderer/src/components/AgentWorkspace/`
+- Codex App Server：`src/main/codex/`
+- 剪映受控 MCP：`src/main/jianying/`
 - 小说推文：`src/renderer/src/components/NovelPromotion/`
 - Agent 工作流：`src/main/agent/`
 - TTS：`src/main/tts/`、`src/renderer/src/components/TtsVoiceover/`

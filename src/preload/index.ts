@@ -36,6 +36,20 @@ import type {
   ProjectDirectorySelectionResponse,
   ProjectListResponse
 } from '../shared/project'
+import type {
+  CodexActionResponse,
+  CodexApprovalResponseRequest,
+  CodexEvent,
+  CodexInterruptTurnRequest,
+  CodexModelListResponse,
+  CodexResumeThreadRequest,
+  CodexStartThreadRequest,
+  CodexStartTurnRequest,
+  CodexStatusResponse,
+  CodexThreadListResponse,
+  CodexThreadResponse,
+  CodexTurnResponse
+} from '../shared/codex'
 
 /**
  * 只向 React 页面开放允许使用的功能。
@@ -151,6 +165,36 @@ const api = {
   /** 使用显式模型配置运行一轮无工具的通用对话。 */
   runAgentChat: (request: AgentChatRequest): Promise<AgentChatResponse> => {
     return ipcRenderer.invoke('agent:chat:run', request)
+  },
+  /** 连接 Main 管理的 Codex App Server。 */
+  getCodexStatus: (): Promise<CodexStatusResponse> => {
+    return ipcRenderer.invoke('codex:status:get')
+  },
+  listCodexModels: (): Promise<CodexModelListResponse> => {
+    return ipcRenderer.invoke('codex:model:list')
+  },
+  listCodexThreads: (): Promise<CodexThreadListResponse> => {
+    return ipcRenderer.invoke('codex:thread:list')
+  },
+  startCodexThread: (request: CodexStartThreadRequest): Promise<CodexThreadResponse> => {
+    return ipcRenderer.invoke('codex:thread:start', request)
+  },
+  resumeCodexThread: (request: CodexResumeThreadRequest): Promise<CodexThreadResponse> => {
+    return ipcRenderer.invoke('codex:thread:resume', request)
+  },
+  startCodexTurn: (request: CodexStartTurnRequest): Promise<CodexTurnResponse> => {
+    return ipcRenderer.invoke('codex:turn:start', request)
+  },
+  interruptCodexTurn: (request: CodexInterruptTurnRequest): Promise<CodexActionResponse> => {
+    return ipcRenderer.invoke('codex:turn:interrupt', request)
+  },
+  respondCodexApproval: (request: CodexApprovalResponseRequest): Promise<CodexActionResponse> => {
+    return ipcRenderer.invoke('codex:approval:respond', request)
+  },
+  onCodexEvent: (callback: (event: CodexEvent) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, event: CodexEvent): void => callback(event)
+    ipcRenderer.on('codex:event', listener)
+    return () => ipcRenderer.removeListener('codex:event', listener)
   },
   /** 启动“解压类小说推文”多 Agent 工作流。 */
   runNovelDecompression: (

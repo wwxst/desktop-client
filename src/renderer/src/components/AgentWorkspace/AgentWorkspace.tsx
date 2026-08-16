@@ -14,14 +14,13 @@ import {
   MonitorDot,
   Plus,
   Search,
-  Settings,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type JSX, type KeyboardEvent } from 'react'
-import type { AgentChatMessage, AgentModelRegistryItem } from '../../../../shared/agent/workflow'
+import type { CodexApprovalRequest, CodexEvent, CodexModelSummary } from '../../../../shared/codex'
 import {
   readLastUsedAgentModelConfigId,
   resolveAgentModelConfigId,
@@ -59,7 +58,16 @@ interface PermissionOption {
   icon: LucideIcon
 }
 
-type AgentChatApi = Pick<typeof window.api, 'listAgentModelConfigurations' | 'runAgentChat'>
+type AgentChatApi = Pick<
+  typeof window.api,
+  | 'getCodexStatus'
+  | 'listCodexModels'
+  | 'startCodexThread'
+  | 'startCodexTurn'
+  | 'interruptCodexTurn'
+  | 'respondCodexApproval'
+  | 'onCodexEvent'
+>
 
 const STARTER_PROMPTS: readonly StarterPrompt[] = [
   {
@@ -113,25 +121,31 @@ function getAgentChatApi(): AgentChatApi | null {
   const api = (window as unknown as { api?: unknown }).api
   if (typeof api !== 'object' || api === null) return null
   const candidate = api as Record<string, unknown>
-  return typeof candidate.listAgentModelConfigurations === 'function' &&
-    typeof candidate.runAgentChat === 'function'
+  return typeof candidate.getCodexStatus === 'function' &&
+    typeof candidate.listCodexModels === 'function' &&
+    typeof candidate.startCodexThread === 'function' &&
+    typeof candidate.startCodexTurn === 'function' &&
+    typeof candidate.interruptCodexTurn === 'function' &&
+    typeof candidate.respondCodexApproval === 'function' &&
+    typeof candidate.onCodexEvent === 'function'
     ? (api as AgentChatApi)
     : null
 }
 
-function modelDisplayName(configuration: AgentModelRegistryItem): string {
-  const model = configuration.modelName ?? configuration.modelId
-  return configuration.providerName ? `${configuration.providerName} / ${model}` : model
+function modelDisplayName(model: CodexModelSummary): string {
+  return model.displayName || model.model
 }
 
-function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceProps): JSX.Element {
+function AgentWorkspace({ modelRefreshKey = 0 }: AgentWorkspaceProps): JSX.Element {
   const [agentApi] = useState<AgentChatApi | null>(() => getAgentChatApi())
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [composerValue, setComposerValue] = useState('')
-  const [modelConfigurations, setModelConfigurations] = useState<AgentModelRegistryItem[]>([])
+  const [modelConfigurations, setModelConfigurations] = useState<CodexModelSummary[]>([])
   const [selectedConfigId, setSelectedConfigId] = useState('')
   const [modelLoading, setModelLoading] = useState(agentApi !== null)
+  const [codexConnected, setCodexConnected] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [pendingApprovals, setPendingApprovals] = useState<CodexApprovalRequest[]>([])
   const [permissionMode, setPermissionMode] = useState<AgentPermissionMode>(() =>
     readAgentPermissionMode()
   )
@@ -141,7 +155,10 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const permissionControlRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
-  const historyRef = useRef<AgentChatMessage[]>([])
+  const threadIdRef = useRef<string | null>(null)
+  const activeTurnIdRef = useRef<string | null>(null)
+  const completedTurnIdsRef = useRef(new Set<string>())
+  const assistantMessageIdsRef = useRef(new Map<string, number>())
   const nextMessageIdRef = useRef(1)
   const requestGenerationRef = useRef(0)
   const mountedRef = useRef(true)
@@ -158,25 +175,29 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
     if (!agentApi) return undefined
     let active = true
 
-    void agentApi
-      .listAgentModelConfigurations()
-      .then((response) => {
+    void Promise.all([agentApi.getCodexStatus(), agentApi.listCodexModels()])
+      .then(([status, response]) => {
         if (!active) return
-        if (!response.success) throw new Error(response.message || '模型配置加载失败')
-        setModelConfigurations(response.configurations)
+        setCodexConnected(status.connected)
+        if (!status.success || !status.connected) throw new Error(status.message)
+        if (!response.success) throw new Error(response.message || 'Codex 模型加载失败')
+        setModelConfigurations(response.models)
         setSelectedConfigId((current) => {
-          const next = resolveAgentModelConfigId(
-            response.configurations,
-            current,
-            readLastUsedAgentModelConfigId()
-          )
+          const persisted = readLastUsedAgentModelConfigId()
+          const preferred = response.models.some((model) => model.id === persisted)
+            ? persisted
+            : response.models.find((model) => model.isDefault)?.id || ''
+          const next = resolveAgentModelConfigId(response.models, current, preferred)
           writeLastUsedAgentModelConfigId(next)
           return next
         })
-        setErrorMessage(response.configurations.length ? '' : '请先在设置中添加模型')
+        setErrorMessage(response.models.length ? '' : 'Codex 没有返回可用模型')
       })
       .catch((error: unknown) => {
-        if (active) setErrorMessage(error instanceof Error ? error.message : '模型配置加载失败')
+        if (active) {
+          setCodexConnected(false)
+          setErrorMessage(error instanceof Error ? error.message : 'Codex 连接失败')
+        }
       })
       .finally(() => {
         if (active) setModelLoading(false)
@@ -188,9 +209,63 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
   }, [agentApi, modelRefreshKey])
 
   useEffect(() => {
+    if (!agentApi) return undefined
+    return agentApi.onCodexEvent((event: CodexEvent) => {
+      if (event.type === 'status-changed') {
+        setCodexConnected(event.connected)
+        if (!event.connected) {
+          setIsSending(false)
+          setErrorMessage(event.message)
+        }
+        return
+      }
+      if (event.type === 'approval-requested') {
+        if (event.approval.threadId !== threadIdRef.current) return
+        setPendingApprovals((current) => [...current, event.approval])
+        return
+      }
+      if ('threadId' in event && event.threadId !== threadIdRef.current) return
+      if (event.type === 'turn-started') {
+        activeTurnIdRef.current = event.turnId
+        return
+      }
+      if (event.type === 'message-delta') {
+        let messageId = assistantMessageIdsRef.current.get(event.turnId)
+        if (messageId === undefined) {
+          messageId = nextMessageIdRef.current
+          nextMessageIdRef.current += 1
+          assistantMessageIdsRef.current.set(event.turnId, messageId)
+          const nextMessage = { id: messageId, role: 'assistant' as const, content: event.delta }
+          setMessages((current) => [...current, nextMessage])
+        } else {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === messageId
+                ? { ...message, content: `${message.content}${event.delta}` }
+                : message
+            )
+          )
+        }
+        return
+      }
+      if (event.type === 'turn-completed') {
+        completedTurnIdsRef.current.add(event.turnId)
+        if (activeTurnIdRef.current === event.turnId) activeTurnIdRef.current = null
+        setIsSending(false)
+        if (event.status === 'failed') setErrorMessage(event.error || 'Codex Turn 执行失败')
+        return
+      }
+      if (event.type === 'error') {
+        setErrorMessage(event.message)
+        setIsSending(false)
+      }
+    })
+  }, [agentApi])
+
+  useEffect(() => {
     const list = messageListRef.current
     if (list) list.scrollTop = list.scrollHeight
-  }, [isSending, messages.length])
+  }, [isSending, messages.length, pendingApprovals.length])
 
   useEffect(() => {
     if (!permissionMenuOpen) return undefined
@@ -229,10 +304,19 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
 
   const resetConversation = (): void => {
     requestGenerationRef.current += 1
-    historyRef.current = []
+    const threadId = threadIdRef.current
+    const turnId = activeTurnIdRef.current
+    if (agentApi && threadId && turnId) {
+      void agentApi.interruptCodexTurn({ threadId, turnId })
+    }
+    threadIdRef.current = null
+    activeTurnIdRef.current = null
+    completedTurnIdsRef.current.clear()
+    assistantMessageIdsRef.current.clear()
     setMessages([])
+    setPendingApprovals([])
     setComposerValue('')
-    setErrorMessage(modelConfigurations.length ? '' : '请先在设置中添加模型')
+    setErrorMessage(codexConnected && modelConfigurations.length ? '' : 'Codex 当前不可用')
     setIsSending(false)
     if (textareaRef.current) textareaRef.current.style.height = ''
     textareaRef.current?.focus()
@@ -240,14 +324,11 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
 
   const sendMessage = async (): Promise<void> => {
     const prompt = composerValue.trim()
-    if (!agentApi || !prompt || !selectedConfigId || isSending) return
+    if (!agentApi || !prompt || !selectedConfigId || !codexConnected || isSending) return
 
     const generation = requestGenerationRef.current + 1
     requestGenerationRef.current = generation
     const userMessage = createMessage('user', prompt)
-    const previousHistory = historyRef.current.slice(-58)
-    const nextHistory: AgentChatMessage[] = [...previousHistory, { role: 'user', content: prompt }]
-    historyRef.current = nextHistory
     setMessages((current) => [...current, userMessage])
     setComposerValue('')
     setErrorMessage('')
@@ -255,23 +336,33 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
     if (textareaRef.current) textareaRef.current.style.height = ''
 
     try {
-      const response = await agentApi.runAgentChat({
-        configId: selectedConfigId,
-        messages: nextHistory
-      })
-      if (!mountedRef.current || requestGenerationRef.current !== generation) return
-      if (!response.success || !response.assistant?.content) {
-        throw new Error(response.message || 'AI 对话失败')
+      let threadId = threadIdRef.current
+      if (!threadId) {
+        const model = modelConfigurations.find((item) => item.id === selectedConfigId)
+        const threadResponse = await agentApi.startCodexThread({
+          model: model?.model,
+          permissionMode
+        })
+        if (!threadResponse.success || !threadResponse.thread) {
+          throw new Error(threadResponse.message || 'Codex 对话创建失败')
+        }
+        if (!mountedRef.current || requestGenerationRef.current !== generation) return
+        threadId = threadResponse.thread.id
+        threadIdRef.current = threadId
       }
-      const assistantContent = response.assistant.content
-      historyRef.current = [...nextHistory, { role: 'assistant', content: assistantContent }]
-      setMessages((current) => [...current, createMessage('assistant', assistantContent)])
+      const response = await agentApi.startCodexTurn({ threadId, text: prompt, permissionMode })
+      if (!mountedRef.current || requestGenerationRef.current !== generation) return
+      if (!response.success || !response.turnId) throw new Error(response.message)
+      if (completedTurnIdsRef.current.has(response.turnId)) {
+        completedTurnIdsRef.current.delete(response.turnId)
+      } else {
+        activeTurnIdRef.current = response.turnId
+      }
     } catch (error: unknown) {
       if (!mountedRef.current || requestGenerationRef.current !== generation) return
-      historyRef.current = previousHistory
-      setErrorMessage(error instanceof Error ? error.message : 'AI 对话失败')
-    } finally {
-      if (mountedRef.current && requestGenerationRef.current === generation) setIsSending(false)
+      setMessages((current) => current.filter((message) => message.id !== userMessage.id))
+      setErrorMessage(error instanceof Error ? error.message : 'Codex 对话失败')
+      setIsSending(false)
     }
   }
 
@@ -312,8 +403,28 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
     }
   }
 
+  const respondToApproval = async (
+    approval: CodexApprovalRequest,
+    decision: 'accept' | 'decline'
+  ): Promise<void> => {
+    if (!agentApi) return
+    const response = await agentApi.respondCodexApproval({
+      requestId: approval.requestId,
+      decision
+    })
+    if (!response.success) {
+      setErrorMessage(response.message)
+      return
+    }
+    setPendingApprovals((current) =>
+      current.filter((item) => item.requestId !== approval.requestId)
+    )
+  }
+
   const isEmpty = messages.length === 0
-  const canSend = Boolean(composerValue.trim() && selectedConfigId && agentApi && !isSending)
+  const canSend = Boolean(
+    composerValue.trim() && selectedConfigId && agentApi && codexConnected && !isSending
+  )
   const permissionLabel =
     PERMISSION_OPTIONS.find((option) => option.mode === permissionMode)?.label ?? '请求批准'
 
@@ -399,6 +510,38 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
                 </div>
               </article>
             ))}
+            {pendingApprovals.map((approval) => (
+              <section
+                key={approval.requestId}
+                className="agent-workspace__approval"
+                aria-label="Agent 操作审批"
+              >
+                <ShieldAlert size={17} strokeWidth={1.7} aria-hidden="true" />
+                <div className="agent-workspace__approval-body">
+                  <strong>
+                    {approval.kind === 'command'
+                      ? '执行命令'
+                      : approval.kind === 'file-change'
+                        ? '修改文件'
+                        : '剪映工具'}
+                  </strong>
+                  <span>{approval.summary}</span>
+                  {approval.reason && <small>{approval.reason}</small>}
+                </div>
+                <div className="agent-workspace__approval-actions">
+                  <button type="button" onClick={() => void respondToApproval(approval, 'decline')}>
+                    拒绝
+                  </button>
+                  <button
+                    className="is-primary"
+                    type="button"
+                    onClick={() => void respondToApproval(approval, 'accept')}
+                  >
+                    允许一次
+                  </button>
+                </div>
+              </section>
+            ))}
             {isSending && (
               <div className="agent-workspace__thinking" role="status">
                 <span />
@@ -472,7 +615,7 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
                   >
                     <div className="agent-workspace__permission-heading">
                       <span>应如何批准 Agent 操作？</span>
-                      <small>剪映连接后生效</small>
+                      <small>命令与文件操作</small>
                     </div>
                     {PERMISSION_OPTIONS.map((option) => {
                       const Icon = option.icon
@@ -508,29 +651,24 @@ function AgentWorkspace({ onOpenSettings, modelRefreshKey = 0 }: AgentWorkspaceP
                   {errorMessage}
                 </span>
               )}
-              {!modelLoading && modelConfigurations.length === 0 && onOpenSettings && (
-                <button
-                  className="agent-workspace__settings-link"
-                  type="button"
-                  onClick={onOpenSettings}
-                >
-                  <Settings size={14} strokeWidth={1.7} aria-hidden="true" />
-                  配置模型
-                </button>
-              )}
               <label className="agent-workspace__model">
                 <span className="agent-workspace__sr-only">模型</span>
                 <select
                   value={selectedConfigId}
                   aria-label="模型"
-                  disabled={modelLoading || isSending || modelConfigurations.length === 0}
+                  disabled={
+                    modelLoading ||
+                    isSending ||
+                    messages.length > 0 ||
+                    modelConfigurations.length === 0
+                  }
                   onChange={(event) => {
                     setSelectedConfigId(event.target.value)
                     writeLastUsedAgentModelConfigId(event.target.value)
                     setErrorMessage('')
                   }}
                 >
-                  <option value="">{modelLoading ? '加载模型...' : '选择模型'}</option>
+                  <option value="">{modelLoading ? '连接 Codex...' : '选择模型'}</option>
                   {modelConfigurations.map((configuration) => (
                     <option key={configuration.id} value={configuration.id}>
                       {modelDisplayName(configuration)}

@@ -35,6 +35,20 @@ import type {
   ProjectDirectorySelectionResponse,
   ProjectListResponse
 } from '../shared/project'
+import type {
+  CodexActionResponse,
+  CodexApprovalResponseRequest,
+  CodexEvent,
+  CodexInterruptTurnRequest,
+  CodexModelListResponse,
+  CodexResumeThreadRequest,
+  CodexStartThreadRequest,
+  CodexStartTurnRequest,
+  CodexStatusResponse,
+  CodexThreadListResponse,
+  CodexThreadResponse,
+  CodexTurnResponse
+} from '../shared/codex'
 
 interface DesktopApi {
   login(loginRequest: LoginRequest): Promise<LoginResponse>
@@ -70,6 +84,15 @@ interface DesktopApi {
   ): Promise<AgentModelMutationResponse>
   deleteAgentModelConfiguration(configId: string): Promise<AgentModelMutationResponse>
   runAgentChat(request: AgentChatRequest): Promise<AgentChatResponse>
+  getCodexStatus(): Promise<CodexStatusResponse>
+  listCodexModels(): Promise<CodexModelListResponse>
+  listCodexThreads(): Promise<CodexThreadListResponse>
+  startCodexThread(request: CodexStartThreadRequest): Promise<CodexThreadResponse>
+  resumeCodexThread(request: CodexResumeThreadRequest): Promise<CodexThreadResponse>
+  startCodexTurn(request: CodexStartTurnRequest): Promise<CodexTurnResponse>
+  interruptCodexTurn(request: CodexInterruptTurnRequest): Promise<CodexActionResponse>
+  respondCodexApproval(request: CodexApprovalResponseRequest): Promise<CodexActionResponse>
+  onCodexEvent(callback: (event: CodexEvent) => void): () => void
   runNovelDecompression(request: NovelDecompressionRequest): Promise<StartAgentWorkflowResponse>
   getAgentTask(taskId: string): Promise<WorkflowTaskSnapshot | null>
   cancelAgentTask(taskId: string): Promise<AgentActionResponse>
