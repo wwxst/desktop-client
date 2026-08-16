@@ -29,10 +29,20 @@ import type {
   GlobalMediaLibraryResponse,
   GlobalMediaRelocationResponse
 } from '../shared/mediaLibrary'
+import type {
+  ProjectCreateRequest,
+  ProjectCreateResponse,
+  ProjectDirectorySelectionResponse,
+  ProjectListResponse
+} from '../shared/project'
 
 interface DesktopApi {
   login(loginRequest: LoginRequest): Promise<LoginResponse>
   getSubscription(): Promise<SubscriptionCheckResponse>
+
+  listProjects(): Promise<ProjectListResponse>
+  selectProjectDirectory(): Promise<ProjectDirectorySelectionResponse>
+  createProject(request: ProjectCreateRequest): Promise<ProjectCreateResponse>
 
   listGlobalMediaLibrary(): Promise<GlobalMediaLibraryResponse>
   importGlobalMediaFiles(): Promise<GlobalMediaImportResponse>

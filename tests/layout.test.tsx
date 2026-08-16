@@ -8,7 +8,7 @@ describe('Layout', () => {
       <Layout
         sidebar={<span>left region</span>}
         content={<span>center region</span>}
-        aiPanel={<span>right region</span>}
+        rightPanel={<span>right region</span>}
       />
     )
 
@@ -19,5 +19,12 @@ describe('Layout', () => {
     expect(within(complementaryRegions[1]).getByText('right region')).toBeInTheDocument()
     expect(screen.getByRole('separator', { name: '调整左侧栏宽度' })).toBeInTheDocument()
     expect(screen.getByRole('separator', { name: '调整右侧栏宽度' })).toBeInTheDocument()
+  })
+
+  it('can render the focused two-column layout without a right panel', () => {
+    render(<Layout sidebar={<span>left region</span>} content={<span>center region</span>} />)
+
+    expect(screen.getAllByRole('complementary')).toHaveLength(1)
+    expect(screen.queryByRole('separator', { name: '调整右侧栏宽度' })).not.toBeInTheDocument()
   })
 })

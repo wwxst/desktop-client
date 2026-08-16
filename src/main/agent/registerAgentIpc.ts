@@ -244,29 +244,6 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
   )
 
   ipcMain.handle(
-    'agent:chat:run',
-    async (_event, request: AgentChatRequest): Promise<AgentChatResponse> => {
-      if (!isAgentChatRequest(request)) return { success: false, message: '无效的 AI 对话请求' }
-      try {
-        await ready
-        await mutationQueue
-        return {
-          success: true,
-          message: '对话完成',
-          assistant: await services.gateway.chat(
-            request.configId,
-            request.messages,
-            request.mode,
-            request.approvalMode
-          )
-        }
-      } catch (error) {
-        return { success: false, message: errorMessage(error, 'AI 对话失败') }
-      }
-    }
-  )
-
-  ipcMain.handle(
     'agent:model-config:update',
     async (_event, request: AgentModelUpdateRequest): Promise<AgentModelMutationResponse> => {
       try {
@@ -277,6 +254,24 @@ export function registerAgentIpc(options: RegisterAgentIpcOptions = {}): void {
         }
       } catch (error) {
         return { success: false, message: errorMessage(error, '模型配置更新失败') }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'agent:chat:run',
+    async (_event, request: AgentChatRequest): Promise<AgentChatResponse> => {
+      if (!isAgentChatRequest(request)) return { success: false, message: '无效的 AI 对话请求' }
+      try {
+        await ready
+        await mutationQueue
+        return {
+          success: true,
+          message: '对话完成',
+          assistant: await services.gateway.chat(request.configId, request.messages)
+        }
+      } catch (error) {
+        return { success: false, message: errorMessage(error, 'AI 对话失败') }
       }
     }
   )

@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { registerTtsIpc } from './tts/registerTtsIpc'
 import { registerAgentIpc } from './agent/registerAgentIpc'
 import { registerMediaLibraryIpc } from './mediaLibrary/registerMediaLibraryIpc'
+import { registerProjectIpc } from './project/registerProjectIpc'
 
 import type {
   ApiResult,
@@ -233,6 +234,7 @@ app.whenReady().then(() => {
   registerTtsIpc()
   registerAgentIpc()
   registerMediaLibraryIpc()
+  registerProjectIpc()
 
   createWindow()
 

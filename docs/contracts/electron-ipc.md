@@ -3,7 +3,7 @@
 > 状态：当前契约
 > 适用范围：`src/main`、`src/preload`、Renderer 的 `window.api`
 > 事实来源：`src/preload/index.ts`、`src/preload/index.d.ts` 和 Main IPC 注册文件
-> 最近验证：`16a55be5` / 2026-08-14
+> 最近验证：当前工作区 / 2026-08-16
 
 ## 安全边界
 
@@ -19,6 +19,9 @@
 | ------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `window.api.login`                         | `auth:login`                               | 调用 Java 登录接口并在 Main 保存 Token                                                                                  |
 | `window.api.getSubscription`               | `subscription:get-current`                 | Main 携带 Token 查询订阅，401 时清空会话                                                                                |
+| `window.api.listProjects`                  | `project:list`                             | 读取 Main 管理的本地项目索引，供侧边栏在应用启动后恢复项目                                                              |
+| `window.api.selectProjectDirectory`        | `project:directory:select`                 | 打开原生目录选择框，并为发起选择的 Renderer 临时授权该项目根目录                                                        |
+| `window.api.createProject`                 | `project:create`                           | 仅在同一 Renderer 已授权的目录中创建项目结构、项目清单和持久化索引                                                      |
 | `window.api.listGlobalMediaLibrary`        | `media-library:list`                       | 读取全局素材索引并刷新本地来源文件状态                                                                                  |
 | `window.api.importGlobalMediaFiles`        | `media-library:import`                     | 打开原生多选文件框，将支持的媒体元数据写入全局索引                                                                      |
 | `window.api.addGlobalMediaTag`             | `media-library:tags:add`                   | 为素材添加去重标签并持久化索引                                                                                          |
@@ -37,7 +40,7 @@
 | `window.api.createAgentModelConfiguration` | `agent:model-config:create`                | 添加并持久化服务商或自定义模型配置；服务商 Base URL 由 Main 解析                                                        |
 | `window.api.updateAgentModelConfiguration` | `agent:model-config:update`                | 更新并持久化模型配置；API Key 留空时保留原密钥                                                                          |
 | `window.api.deleteAgentModelConfiguration` | `agent:model-config:delete`                | 删除指定配置 ID 并持久化，不维护默认模型                                                                                |
-| `window.api.runAgentChat`                  | `agent:chat:run`                           | 使用显式模型配置、执行模式和审批模式运行一轮非流式对话；Main 持有 API Key 并校验结构化工具调用，Renderer 决定审批和执行 |
+| `window.api.runAgentChat`                  | `agent:chat:run`                           | 使用显式模型配置运行一轮无工具的通用文本对话；Main 固定系统提示并持有 API Key                                            |
 | `window.api.runNovelDecompression`         | `agent:workflow:novel-decompression:start` | 启动多 Agent 工作流                                                                                                     |
 | `window.api.getAgentTask`                  | `agent:workflow:get`                       | 查询长任务状态                                                                                                          |
 | `window.api.cancelAgentTask`               | `agent:workflow:cancel`                    | 取消长任务                                                                                                              |
@@ -52,20 +55,22 @@
 
 页面卸载或任务结束时必须移除监听器。Main 发送进度前要检查 `event.sender.isDestroyed()`。
 
+## 项目存储边界
+
+项目列表索引由 Main 写入 Electron `userData/projects/index.json`。创建项目时，Main 在用户通过原生选择框授权的根目录写入版本化 `project.json`，并创建 `text`、`audio`、`subtitles`、`materials`、`output`、`cache`、`backups`、`batches` 和 `logs` 子目录。项目清单与全局索引均采用同目录临时文件加原子替换写入。
+
+`project:create` 只接受 `{ name, rootDirectory }`，且 `rootDirectory` 必须由同一 Renderer 调用 `project:directory:select` 获得；创建成功后该次目录授权立即失效。已有 `project.json`、重复根目录、非绝对路径、非目录路径或损坏的全局索引都会拒绝创建，Main 不覆盖已有项目清单或损坏索引。Renderer 不获得通用文件系统能力。
+
 ## 后端边界
 
-当前开发后端地址为 `http://localhost:8080`。认证和模型目录接口由 Main 调用，Renderer 不直接请求 Java 服务。模型目录响应必须经过 Main 严格验证；服务商官方 Base URL 只进入 Main 内部目录，Renderer 仅获得公开目录字段。模型配置元数据持久化到 Electron `userData/agent/model-configurations.json`，API Key 经 `safeStorage` 加密后以 Base64 密文保存；列表、变更和对话响应都不返回密钥。存储写入采用临时文件原子替换，变更在 IPC 返回成功前完成落盘，失败时回滚内存状态；损坏或无法解密的存储不会被新配置覆盖。自定义配置固定使用 OpenAI Chat Completions 兼容协议。模型配置没有启用、停用或默认状态，AI 对话和具体工作流必须显式提供配置 ID。
+当前开发后端地址为 `http://localhost:8080`。认证和模型目录接口由 Main 调用，Renderer 不直接请求 Java 服务。模型目录响应必须经过 Main 严格验证；服务商官方 Base URL 只进入 Main 内部目录，Renderer 仅获得公开目录字段。模型配置元数据持久化到 Electron `userData/agent/model-configurations.json`，API Key 经 `safeStorage` 加密后以 Base64 密文保存；列表、变更和对话响应都不返回密钥。存储写入采用临时文件原子替换，变更在 IPC 返回成功前完成落盘，失败时回滚内存状态；损坏或无法解密的存储不会被新配置覆盖。自定义配置固定使用 OpenAI Chat Completions 兼容协议。模型配置没有启用、停用或默认状态，通用对话和具体工作流必须显式选择配置。
 
-### AI 对话边界
+### 通用对话边界
 
-`window.api.runAgentChat` 继续使用现有 `agent:chat:run` 通道，没有为 Agent 或助手模式新增通用 IPC。Renderer 每轮都把当前 `mode` 和 `approvalMode` 与 `configId`、`messages` 一起发送给 Main；Main 对字段白名单、消息数量/长度、工具调用和工具结果对应关系进行严格校验。模型单轮响应最多包含 12 个 `tool_calls`；Main 先整批验证每项都是 `function`、ID 非空且批内唯一，再解析任何一项的 JSON 参数，任一项非法则整批拒绝。
+`window.api.runAgentChat` 只接受 `{ configId, messages }`。消息必须从用户开始、以用户结束，并在 `user` 与 `assistant` 之间交替；单条消息最多 20,000 字符，单次请求最多 60 条。Renderer 不能传入 system、tool、工具调用、执行模式、审批模式或额外字段。
 
-- `mode: 'assistant'`：Main 使用固定的只读系统提示，并只向模型声明 `get_editor_context`；请求中的 `approvalMode` 不附加到助手系统提示。助手模式不能提交编辑计划；即使响应或历史中伪造 `propose_editor_plan`，Main 契约和 Renderer 策略都会拒绝。
-- `mode: 'agent'`：Main 声明 `get_editor_context` 和 `propose_editor_plan`，并把当前 `approvalMode: 'request' | 'smart' | 'full'` 的说明附加到 Agent 系统提示。计划工具只能返回含 `projectRevision` 的结构化计划，首期动作白名单为 `clip.delete`、`clip.split`、`clip.move` 和 `clip.update`，不直接修改工程。
-- `approvalMode` 虽然是每轮请求的必填上下文，但模型不能据此自行决定是否执行。实际审批策略、当前编辑器 revision 和计划执行均由 Renderer 持有。
+Main 添加固定系统提示，明确当前对话没有剪映、文件系统或桌面操作能力。请求不向模型声明工具；如果模型仍返回 `tool_calls`，Main 拒绝整轮响应。AI 面板 UI 已移除并准备重做，当前通道只提供后端和 Preload 基础。
 
-Main 的 schema/协议校验与 Renderer 的审批/执行校验是两道独立防线：Main 拒绝未知、旧式或畸形工具调用；Renderer 再按当前模式、审批权限、编辑器 session、工程 revision 和编辑器规则决定拒绝、等待批准或执行。执行模式和审批模式的持久化副本只存在 Renderer `localStorage` 的独立键中；存储不可用时回退到 `Agent + 请求批准`。当前值仅随 `runAgentChat` 请求传给 Main，没有独立的偏好持久化 IPC，Main 也不持久化这两项偏好。
-
-“完全访问”只表示 Renderer 可自动执行已经注册且通过校验的编辑计划，不开放任意 IPC、文件系统、网络、代码执行或底层 reducer action。当前聊天仍是逐轮非流式请求；请求取消、流式输出和跨重启会话持久化尚未实现。
+已退役的 `get_editor_context`、`propose_editor_plan` 和内部 Clip 审批执行器不得恢复。剪映 5.9 自动化仍处于计划阶段；新增时必须定义独立的结构化动作、审批策略、取消协议和进度事件，不能开放通用桌面控制或把任意模型工具调用直接传给操作系统。
 
 全局素材库只开放业务级“列出/刷新”“原生导入”“标签修改”和“失效素材重新定位”能力，不开放任意文件系统或通用 IPC。项目引用次数仍等待项目持久化和稳定 ID 映射；当前索引只保存用户源路径，没有可由应用安全删除的托管缓存，因此未引用缓存清理仍未实现。

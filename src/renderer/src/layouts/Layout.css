@@ -1,7 +1,7 @@
 /*
  * 客户端登录后的可调整三栏布局。
  *
- * 左侧和右侧使用浅灰背景，中间使用白色背景。
+ * 左侧和可选右侧使用浅灰背景，中间使用白色背景。
  * 拖拽边界默认不显示，交互时显示加粗深色线。
  */
 
@@ -29,7 +29,7 @@
  */
 .app-layout__sidebar,
 .app-layout__content,
-.app-layout__ai-panel {
+.app-layout__right-panel {
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -48,7 +48,7 @@
   background: #ffffff;
 }
 
-.app-layout__ai-panel {
+.app-layout__right-panel {
   container-type: inline-size;
   background: #f3f3f3;
 }

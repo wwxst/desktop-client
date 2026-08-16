@@ -1,6 +1,6 @@
 # desktop-client
 
-Electron + React + TypeScript 桌面端，当前包含总工作区、TTS 配音、插件管理、Agent 工作流和 Editor V2 视频编辑器。
+Electron + React + TypeScript 桌面端，定位为专注视频剪辑的 Agent 工作台。当前包含通用对话首页、小说推文工作区、TTS 配音、素材库、插件管理和 Agent 工作流。
 
 ## 快速开始
 
@@ -15,9 +15,8 @@ npm run dev
 
 - [`AGENTS.md`](AGENTS.md)：项目硬约束和按路径加载规则。
 - [`docs/README.md`](docs/README.md)：文档索引、当前事实和历史资料的分层入口。
-- [`docs/architecture/current.md`](docs/architecture/current.md)：当前进程、Renderer 和 Editor V2 架构。
+- [`docs/architecture/current.md`](docs/architecture/current.md)：当前进程、Renderer 和业务工作区架构。
 - [`docs/contracts/electron-ipc.md`](docs/contracts/electron-ipc.md)：`window.api` 与 IPC 契约。
-- [`docs/contracts/editor-v2.md`](docs/contracts/editor-v2.md)：编辑器状态、Service、Command 和生命周期契约。
 - [`docs/桌面端自动剪辑产品PRD.md`](docs/桌面端自动剪辑产品PRD.md)：产品需求基线，不等同于已实现功能。
 
 ## 技术栈
@@ -30,4 +29,4 @@ npm run dev
 - react-resizable-panels
 - lucide-react
 
-当前开发环境的 Java 后端地址为 `http://localhost:8080`。编辑器草稿持久化和编辑器文件 IPC 仍属于后续能力。
+当前开发环境的 Java 后端地址为 `http://localhost:8080`。剪映 5.9 自动化控制和批量导出仍属于后续能力。

@@ -10,18 +10,18 @@ interface LayoutProps {
   /** 中间区域。 */
   content: ReactNode
 
-  /** 右侧区域。 */
-  aiPanel: ReactNode
+  /** 可选的右侧区域。 */
+  rightPanel?: ReactNode
 
-  /** 允许右侧面板从自身工具栏折叠或恢复。 */
-  aiPanelRef?: Ref<PanelImperativeHandle | null>
+  /** 允许右侧区域从自身工具栏折叠或恢复。 */
+  rightPanelRef?: Ref<PanelImperativeHandle | null>
 }
 
 /**
  * 客户端登录后的可调整三栏布局。
  * 只负责三栏排列、尺寸约束和拖拽边界，具体内容由外部组件传入。
  */
-function Layout({ sidebar, content, aiPanel, aiPanelRef }: LayoutProps): JSX.Element {
+function Layout({ sidebar, content, rightPanel, rightPanelRef }: LayoutProps): JSX.Element {
   return (
     <Group
       className="app-layout"
@@ -30,9 +30,9 @@ function Layout({ sidebar, content, aiPanel, aiPanelRef }: LayoutProps): JSX.Ele
     >
       <Panel
         id="sidebar"
-        defaultSize={160}
-        minSize={160}
-        maxSize={360}
+        defaultSize={224}
+        minSize={200}
+        maxSize={320}
         groupResizeBehavior="preserve-pixel-size"
       >
         <aside className="app-layout__sidebar">{sidebar}</aside>
@@ -48,24 +48,28 @@ function Layout({ sidebar, content, aiPanel, aiPanelRef }: LayoutProps): JSX.Ele
         <main className="app-layout__content">{content}</main>
       </Panel>
 
-      <Separator
-        id="ai-panel-resize-handle"
-        className="app-layout__resize-handle"
-        aria-label="调整右侧栏宽度"
-      />
+      {rightPanel && (
+        <>
+          <Separator
+            id="right-panel-resize-handle"
+            className="app-layout__resize-handle"
+            aria-label="调整右侧栏宽度"
+          />
 
-      <Panel
-        id="ai-panel"
-        defaultSize={400}
-        minSize={300}
-        maxSize={560}
-        collapsedSize={40}
-        collapsible
-        groupResizeBehavior="preserve-pixel-size"
-        panelRef={aiPanelRef}
-      >
-        <aside className="app-layout__ai-panel">{aiPanel}</aside>
-      </Panel>
+          <Panel
+            id="right-panel"
+            defaultSize={400}
+            minSize={300}
+            maxSize={560}
+            collapsedSize={40}
+            collapsible
+            groupResizeBehavior="preserve-pixel-size"
+            panelRef={rightPanelRef}
+          >
+            <aside className="app-layout__right-panel">{rightPanel}</aside>
+          </Panel>
+        </>
+      )}
     </Group>
   )
 }

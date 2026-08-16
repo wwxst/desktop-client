@@ -90,78 +90,16 @@ export interface AgentModelMutationResponse extends AgentActionResponse {
   configuration?: AgentModelRegistryItem
 }
 
-export type AgentChatMode = 'agent' | 'assistant'
-
-export type AgentApprovalMode = 'request' | 'smart' | 'full'
-
-export type AgentEditorPlanAction =
-  | { type: 'clip.delete'; clipIds: string[]; magnetMainTrack?: boolean }
-  | { type: 'clip.split'; clipId: string; at: number }
-  | { type: 'clip.move'; clipId: string; timelineStart: number; trackId?: string }
-  | {
-      type: 'clip.update'
-      clipId: string
-      patch: {
-        opacity?: number
-        volume?: number
-        muted?: boolean
-        speed?: number
-        enabled?: boolean
-        transform?: {
-          x?: number
-          y?: number
-          scaleX?: number
-          scaleY?: number
-          rotation?: number
-        }
-      }
-    }
-
-export interface AgentEditorPlan {
-  planId: string
-  projectRevision: number
-  summary: string
-  actions: AgentEditorPlanAction[]
-}
-
-export type AgentToolResultCode =
-  | 'OK'
-  | 'AWAITING_APPROVAL'
-  | 'REJECTED'
-  | 'STALE_CONTEXT'
-  | 'INVALID_PLAN'
-  | 'UNSUPPORTED_ACTION'
-  | 'EDITOR_UNAVAILABLE'
-  | 'EXECUTION_FAILED'
-
-export interface AgentToolExecutionResult {
-  success: boolean
-  code: AgentToolResultCode
-  message: string
-  changed: boolean
-  affectedClipIds: string[]
-  data?: unknown
-}
-
-export type AgentToolCall =
-  | { id: string; name: 'get_editor_context'; arguments: Record<string, never> }
-  | { id: string; name: 'propose_editor_plan'; arguments: AgentEditorPlan }
-
 export type AgentChatMessage =
-  | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string; toolCalls?: AgentToolCall[] }
-  | { role: 'tool'; content: string; toolCallId: string; name: AgentToolCall['name'] }
+  { role: 'user'; content: string } | { role: 'assistant'; content: string }
 
 export interface AgentChatRequest {
   configId: string
-  mode: AgentChatMode
-  approvalMode: AgentApprovalMode
   messages: AgentChatMessage[]
 }
 
 export interface AgentChatAssistantMessage {
   content: string
-  toolCalls: AgentToolCall[]
 }
 
 export interface AgentChatResponse extends AgentActionResponse {

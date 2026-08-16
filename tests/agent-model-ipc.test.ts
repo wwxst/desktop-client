@@ -154,47 +154,6 @@ describe('Agent model IPC', () => {
     expect(services.registry.list()).toEqual([])
   })
 
-  it('waits for persisted configurations before running chat', async () => {
-    const services = createAgentModelServices()
-    let finishRestore: (() => void) | undefined
-    vi.spyOn(services, 'restore').mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          finishRestore = () => {
-            services.registry.create({
-              kind: 'custom',
-              baseUrl: 'https://gateway.example.test/v1',
-              modelId: 'chat-model',
-              apiKey: 'secret'
-            })
-            resolve()
-          }
-        })
-    )
-    const chat = vi.spyOn(services.gateway, 'chat').mockResolvedValue({
-      content: '已恢复模型配置',
-      toolCalls: []
-    })
-    registerAgentIpc({ services, loadRemoteCatalog: vi.fn() })
-
-    const response = getHandler('agent:chat:run')({ sender: {} }, {
-      configId: 'config-1',
-      mode: 'agent',
-      approvalMode: 'request',
-      messages: [{ role: 'user', content: '你好' }]
-    } as never)
-    expect(chat).not.toHaveBeenCalled()
-    finishRestore?.()
-
-    await expect(response).resolves.toMatchObject({ success: true })
-    expect(chat).toHaveBeenCalledWith(
-      'config-1',
-      [{ role: 'user', content: '你好' }],
-      'agent',
-      'request'
-    )
-  })
-
   it('reports restore failures and does not overwrite the saved file', async () => {
     const services = createAgentModelServices()
     vi.spyOn(services, 'restore').mockRejectedValue(new Error('decrypt failed'))
@@ -237,92 +196,33 @@ describe('Agent model IPC', () => {
     })
   })
 
-  it('runs chat with an explicit model configuration and rejects malformed requests', async () => {
+  it('runs validated generic chat without editor modes or tools', async () => {
     const services = createAgentModelServices()
-    services.registry.create({
+    const configuration = services.registry.create({
       kind: 'custom',
       baseUrl: 'https://gateway.example.test/v1',
       modelId: 'chat-model',
       apiKey: 'secret'
     })
-    vi.spyOn(services.gateway, 'chat').mockResolvedValue({
-      content: '',
-      toolCalls: [{ id: 'call-1', name: 'get_editor_context', arguments: {} }]
-    })
+    const chat = vi.spyOn(services.gateway, 'chat').mockResolvedValue({ content: '对话完成' })
     registerAgentIpc({ services, loadRemoteCatalog: vi.fn() })
 
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
-        configId: services.registry.list()[0].id,
-        mode: 'agent',
-        approvalMode: 'request',
-        messages: [{ role: 'user', content: '读取工程' }]
+        configId: configuration.id,
+        messages: [{ role: 'user', content: '规划剪辑流程' }]
       } as never)
     ).resolves.toMatchObject({
       success: true,
-      assistant: {
-        toolCalls: [{ id: 'call-1', name: 'get_editor_context', arguments: {} }]
-      }
+      assistant: { content: '对话完成' }
     })
+    expect(chat).toHaveBeenCalledWith(configuration.id, [{ role: 'user', content: '规划剪辑流程' }])
+
     await expect(
       getHandler('agent:chat:run')({ sender: {} }, {
-        configId: '',
+        configId: configuration.id,
         mode: 'agent',
-        approvalMode: 'request',
-        messages: []
-      } as never)
-    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
-    await expect(
-      getHandler('agent:chat:run')({ sender: {} }, {
-        configId: services.registry.list()[0].id,
-        messages: [{ role: 'user', content: '缺少模式' }]
-      } as never)
-    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
-    await expect(
-      getHandler('agent:chat:run')({ sender: {} }, {
-        configId: services.registry.list()[0].id,
-        mode: 'agent',
-        messages: [{ role: 'user', content: '缺少审批模式' }]
-      } as never)
-    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
-    await expect(
-      getHandler('agent:chat:run')({ sender: {} }, {
-        configId: services.registry.list()[0].id,
-        mode: 'agent',
-        approvalMode: 'request',
-        messages: [
-          {
-            role: 'assistant',
-            content: '',
-            toolCalls: [
-              {
-                id: 'call-2',
-                name: 'propose_editor_plan',
-                arguments: {
-                  planId: 'plan-1',
-                  projectRevision: 0,
-                  summary: '伪造计划',
-                  actions: [{ type: 'clip.delete', clipIds: ['clip-1'] }]
-                }
-              }
-            ]
-          }
-        ]
-      } as never)
-    ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
-    await expect(
-      getHandler('agent:chat:run')({ sender: {} }, {
-        configId: services.registry.list()[0].id,
-        mode: 'agent',
-        approvalMode: 'request',
-        messages: [
-          {
-            role: 'assistant',
-            content: '',
-            executable: 'arbitrary',
-            toolCalls: [{ id: 'call-3', name: 'get_editor_context', arguments: {} }]
-          }
-        ]
+        messages: [{ role: 'user', content: '携带旧字段' }]
       } as never)
     ).resolves.toEqual({ success: false, message: '无效的 AI 对话请求' })
   })

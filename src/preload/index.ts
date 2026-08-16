@@ -30,6 +30,12 @@ import type {
   GlobalMediaLibraryResponse,
   GlobalMediaRelocationResponse
 } from '../shared/mediaLibrary'
+import type {
+  ProjectCreateRequest,
+  ProjectCreateResponse,
+  ProjectDirectorySelectionResponse,
+  ProjectListResponse
+} from '../shared/project'
 
 /**
  * 只向 React 页面开放允许使用的功能。
@@ -45,6 +51,21 @@ const api = {
   /** 查询当前登录用户的订阅状态。 */
   getSubscription: (): Promise<SubscriptionCheckResponse> => {
     return ipcRenderer.invoke('subscription:get-current')
+  },
+
+  /** 加载 Main 进程持久化的项目索引。 */
+  listProjects: (): Promise<ProjectListResponse> => {
+    return ipcRenderer.invoke('project:list')
+  },
+
+  /** 通过系统目录选择框授权一个项目根目录。 */
+  selectProjectDirectory: (): Promise<ProjectDirectorySelectionResponse> => {
+    return ipcRenderer.invoke('project:directory:select')
+  },
+
+  /** 在已授权目录中创建并持久化项目。 */
+  createProject: (request: ProjectCreateRequest): Promise<ProjectCreateResponse> => {
+    return ipcRenderer.invoke('project:create', request)
   },
 
   /** 加载全局素材索引并检查本地来源是否仍然有效。 */
@@ -127,7 +148,7 @@ const api = {
   deleteAgentModelConfiguration: (configId: string): Promise<AgentModelMutationResponse> => {
     return ipcRenderer.invoke('agent:model-config:delete', configId)
   },
-  /** 使用显式选择的模型配置运行一轮 AI 对话。 */
+  /** 使用显式模型配置运行一轮无工具的通用对话。 */
   runAgentChat: (request: AgentChatRequest): Promise<AgentChatResponse> => {
     return ipcRenderer.invoke('agent:chat:run', request)
   },

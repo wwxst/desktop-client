@@ -1,14 +1,11 @@
-import { useReducer, useRef, useState, type JSX } from 'react'
-import type { PanelImperativeHandle } from 'react-resizable-panels'
-import AiPanel from '../AiPanel/AiPanel'
+import { useReducer, useState, type JSX } from 'react'
+import AgentWorkspace from '../AgentWorkspace/AgentWorkspace'
 import MediaLibraryView from '../MediaLibrary/MediaLibraryView'
 import NovelPromotionSidePanel from '../NovelPromotion/NovelPromotionSidePanel'
 import NovelPromotionView from '../NovelPromotion/NovelPromotionView'
 import PluginsView from '../Plugins/PluginsView'
 import SettingsView from '../Settings/SettingsView'
 import Sidebar from '../Sidebar/Sidebar'
-import SmartEditDraftView from '../SmartEdit/SmartEditDraftView'
-import SmartEditEditorView from '../SmartEdit/SmartEditEditorView'
 import TtsVoiceoverView from '../TtsVoiceover/TtsVoiceoverView'
 import Layout from '../../layouts/Layout'
 import './WorkspaceView.css'
@@ -26,10 +23,9 @@ function WorkspaceView(): JSX.Element {
     workspaceNavigationReducer,
     initialWorkspaceNavigationState
   )
-  const smartEditEnabled = import.meta.env.DEV
-  const aiPanelRef = useRef<PanelImperativeHandle>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [modelRefreshKey, setModelRefreshKey] = useState(0)
+  const [agentWorkspaceKey, setAgentWorkspaceKey] = useState(0)
 
   const openSettings = (): void => {
     setSettingsOpen(true)
@@ -41,28 +37,18 @@ function WorkspaceView(): JSX.Element {
   }
 
   const handleSidebarItemSelect = (menu: WorkspaceMenu): void => {
-    dispatchNavigation({
-      type: 'menu/selected',
-      menu: menu === 'smart-edit' && !smartEditEnabled ? 'home' : menu
-    })
+    if (menu === 'home') setAgentWorkspaceKey((current) => current + 1)
+    dispatchNavigation({ type: 'menu/selected', menu })
   }
 
-  const activeSidebarItem =
-    navigation.activeMenu === 'smart-edit' && !smartEditEnabled ? 'home' : navigation.activeMenu
-
-  let workspaceContent: JSX.Element = <div className="workspace-empty-page" aria-hidden="true" />
+  let workspaceContent: JSX.Element = (
+    <AgentWorkspace
+      key={agentWorkspaceKey}
+      onOpenSettings={openSettings}
+      modelRefreshKey={modelRefreshKey}
+    />
+  )
   let useNovelPromotionPanel = false
-
-  if (smartEditEnabled && navigation.activeMenu === 'smart-edit') {
-    workspaceContent =
-      navigation.smartEditPage === 'editor' ? (
-        <SmartEditEditorView
-          onReturnToDrafts={() => dispatchNavigation({ type: 'draft/closed' })}
-        />
-      ) : (
-        <SmartEditDraftView onCreateDraft={() => dispatchNavigation({ type: 'draft/created' })} />
-      )
-  }
 
   if (navigation.activeMenu === 'novel-promotion') {
     workspaceContent = <NovelPromotionView />
@@ -95,26 +81,13 @@ function WorkspaceView(): JSX.Element {
         <Layout
           sidebar={
             <Sidebar
-              activeItem={activeSidebarItem}
-              showSmartEdit={smartEditEnabled}
+              activeItem={navigation.activeMenu}
               onItemSelect={handleSidebarItemSelect}
               onSettingsSelect={openSettings}
             />
           }
           content={workspaceContent}
-          aiPanel={
-            useNovelPromotionPanel ? (
-              <NovelPromotionSidePanel />
-            ) : (
-              <AiPanel
-                modelRefreshKey={modelRefreshKey}
-                onCollapse={() => aiPanelRef.current?.collapse()}
-                onExpand={() => aiPanelRef.current?.expand()}
-                onOpenSettings={openSettings}
-              />
-            )
-          }
-          aiPanelRef={aiPanelRef}
+          rightPanel={useNovelPromotionPanel ? <NovelPromotionSidePanel /> : undefined}
         />
       </div>
       {settingsOpen && <SettingsView onBack={closeSettings} />}

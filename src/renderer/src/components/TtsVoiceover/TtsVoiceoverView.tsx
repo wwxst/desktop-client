@@ -38,8 +38,7 @@ const voiceFilterOptions: Array<{ value: 'all' | TtsVoiceGender; label: string }
 ]
 
 const previewSamples: Record<string, string> = {
-  'zh-CN':
-    '智剪是一款简单好用、功能丰富的智能创作工具，可以满足小说推文、短剧制作等多种创作需求，让内容生产更轻松、更高效。',
+  'zh-CN': '小说推文工具可以批量处理配音、字幕、素材和口令，让内容生产更稳定、更高效。',
   'en-US':
     'Smart Edit is an easy-to-use, feature-rich creative tool for novel promotion, short drama production, and more, making content creation simpler and more efficient.',
   'en-GB':
@@ -55,7 +54,7 @@ const previewSamples: Record<string, string> = {
   'de-DE':
     'Smart Edit ist ein benutzerfreundliches und vielseitiges Kreativwerkzeug für Romanwerbung, Kurzdramen und viele weitere Inhalte und macht die Produktion einfacher und effizienter.',
   'ja-JP':
-    '智剪は、使いやすく機能豊富なクリエイティブツールです。小説のプロモーションやショートドラマ制作など、さまざまな創作ニーズに対応し、コンテンツ制作をより簡単で効率的にします。',
+    '小説プロモーションツールは、音声、字幕、素材をまとめて処理し、コンテンツ制作をより安定かつ効率的にします。',
   'ko-KR':
     '스마트 에디트는 사용하기 쉽고 기능이 풍부한 창작 도구입니다. 소설 홍보와 숏드라마 제작 등 다양한 콘텐츠 작업을 더 쉽고 효율적으로 완성할 수 있습니다.',
   'vi-VN':

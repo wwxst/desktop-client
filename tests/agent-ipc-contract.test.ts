@@ -32,11 +32,10 @@ describe('Agent model preload contract', () => {
     expect(preloadTypes).toContain('onAgentWorkflowProgress(')
   })
 
-  it('uses the shared mode-aware chat request validator in Main', () => {
+  it('uses a validated generic chat contract without internal editor tools', () => {
     expect(mainIpcSource).toContain("from '../../shared/agent/chatContract'")
     expect(mainIpcSource).toContain('isAgentChatRequest(request)')
-    expect(mainIpcSource).not.toContain('function isChatRequest(')
-    expect(mainIpcSource).not.toContain("value === 'delete_selected_clips'")
-    expect(mainIpcSource).not.toContain("value === 'split_selected_clip'")
+    expect(mainIpcSource).not.toContain('get_editor_context')
+    expect(mainIpcSource).not.toContain('propose_editor_plan')
   })
 })

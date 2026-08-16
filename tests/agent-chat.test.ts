@@ -1,300 +1,70 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentApprovalMode, AgentChatMode } from '../src/shared/agent/workflow'
-import { findInternalModelProvider } from '../src/main/agent/modelCatalog'
 import { ModelGateway } from '../src/main/agent/runtime/ModelGateway'
 import { ModelRegistry } from '../src/main/agent/runtime/ModelRegistry'
 
 afterEach(() => vi.unstubAllGlobals())
 
-function createGatewayReturning(
-  message: Record<string, unknown>,
-  mode: AgentChatMode = 'agent',
-  approvalMode: AgentApprovalMode = 'request'
-): {
-  gateway: ModelGateway
-  fetchMock: ReturnType<typeof vi.fn>
-  run: () => ReturnType<ModelGateway['chat']>
-} {
-  const registry = new ModelRegistry(findInternalModelProvider, () => 'config-1')
-  registry.create({
+function createGateway(): { gateway: ModelGateway; configId: string } {
+  const registry = new ModelRegistry()
+  const configuration = registry.create({
     kind: 'custom',
     baseUrl: 'https://gateway.example.test/v1',
     modelId: 'chat-model',
     apiKey: 'secret'
   })
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: true,
-    json: vi.fn().mockResolvedValue({ choices: [{ message }] })
-  })
-  vi.stubGlobal('fetch', fetchMock)
-  return {
-    gateway: new ModelGateway(registry),
-    fetchMock,
-    run: () =>
-      new ModelGateway(registry).chat(
-        'config-1',
-        [{ role: 'user', content: '整理时间线' }],
-        mode,
-        approvalMode
-      )
-  }
+  return { gateway: new ModelGateway(registry), configId: configuration.id }
 }
 
-function requestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
-  return JSON.parse(fetchMock.mock.calls[0][1].body as string) as Record<string, unknown>
-}
-
-describe('Agent chat model gateway', () => {
-  it('exposes only the read tool and a read-only prompt in Assistant mode', async () => {
-    const { gateway, fetchMock } = createGatewayReturning({ content: '工程有 3 个片段' })
-
-    await gateway.chat(
-      'config-1',
-      [{ role: 'user', content: '工程里有什么？' }],
-      'assistant',
-      'full'
-    )
-
-    const body = requestBody(fetchMock) as {
-      messages: Array<{ role: string; content: string }>
-      tools: Array<{ function: { name: string } }>
-    }
-    expect(body.tools.map((tool) => tool.function.name)).toEqual(['get_editor_context'])
-    expect(body.messages[0].content).toContain('不能修改工程')
-  })
-
-  it('exposes read and structured plan tools in Agent mode', async () => {
-    const { gateway, fetchMock } = createGatewayReturning({ content: '准备规划' })
-
-    await gateway.chat('config-1', [{ role: 'user', content: '整理时间线' }], 'agent', 'request')
-
-    const body = requestBody(fetchMock) as {
-      messages: Array<{ role: string; content: string }>
-      tools: Array<{ function: { name: string; parameters: Record<string, unknown> } }>
-    }
-    expect(body.tools.map((tool) => tool.function.name)).toEqual([
-      'get_editor_context',
-      'propose_editor_plan'
-    ])
-    expect(body.messages[0].content).toContain('projectRevision')
-    expect(body.messages[0].content).toContain('propose_editor_plan')
-    expect(body.messages[0].content).toContain('请求批准')
-    expect(body.tools[1].function.parameters).toMatchObject({
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        actions: { minItems: 1, maxItems: 20, items: { oneOf: expect.any(Array) } }
-      }
-    })
-    const actionBranches = body.tools[1].function.parameters.properties?.actions as {
-      items: { oneOf: Array<Record<string, unknown>> }
-    }
-    expect(actionBranches.items.oneOf).toHaveLength(4)
-    expect(actionBranches.items.oneOf.map((branch) => branch.properties?.type)).toEqual([
-      { const: 'clip.delete' },
-      { const: 'clip.split' },
-      { const: 'clip.move' },
-      { const: 'clip.update' }
-    ])
-    expect(actionBranches.items.oneOf.map((branch) => branch.additionalProperties)).toEqual([
-      false,
-      false,
-      false,
-      false
-    ])
-    const update = actionBranches.items.oneOf[3]
-    expect(update.properties?.patch).toMatchObject({
-      type: 'object',
-      additionalProperties: false
-    })
-    expect(
-      (update.properties?.patch as { properties?: { transform?: Record<string, unknown> } })
-        .properties?.transform
-    ).toMatchObject({ type: 'object', additionalProperties: false })
-  })
-
-  it('parses a valid structured editor plan', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: {
-            name: 'propose_editor_plan',
-            arguments: JSON.stringify({
-              planId: 'plan-1',
-              projectRevision: 4,
-              summary: '整理两个片段',
-              actions: [
-                { type: 'clip.move', clipId: 'clip-1', timelineStart: 2 },
-                { type: 'clip.update', clipId: 'clip-2', patch: { volume: 0.8 } }
-              ]
-            })
-          }
-        }
-      ]
-    })
-
-    await expect(run()).resolves.toEqual({
-      content: '',
-      toolCalls: [
-        {
-          id: 'call-1',
-          name: 'propose_editor_plan',
-          arguments: {
-            planId: 'plan-1',
-            projectRevision: 4,
-            summary: '整理两个片段',
-            actions: [
-              { type: 'clip.move', clipId: 'clip-1', timelineStart: 2 },
-              { type: 'clip.update', clipId: 'clip-2', patch: { volume: 0.8 } }
-            ]
-          }
-        }
-      ]
-    })
-  })
-
-  it('rejects a forged plan tool call in Assistant mode', async () => {
-    const { gateway } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: {
-            name: 'propose_editor_plan',
-            arguments: JSON.stringify({
-              planId: 'plan-1',
-              projectRevision: 0,
-              summary: '删除片段',
-              actions: [{ type: 'clip.delete', clipIds: ['clip-1'] }]
-            })
-          }
-        }
-      ]
-    })
-
-    await expect(
-      gateway.chat('config-1', [{ role: 'user', content: '删除片段' }], 'assistant', 'request')
-    ).rejects.toThrow('Editor plans are not allowed in assistant mode')
-  })
-
-  it('rejects unknown plan fields through the shared validator', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: {
-            name: 'propose_editor_plan',
-            arguments: JSON.stringify({
-              planId: 'plan-1',
-              projectRevision: 0,
-              summary: '移动片段',
-              actions: [{ type: 'clip.move', clipId: 'clip-1', timelineStart: 2, command: 'raw' }]
-            })
-          }
-        }
-      ]
-    })
-
-    await expect(run()).rejects.toThrow('Invalid Agent editor plan')
-  })
-
-  it.each(['delete_selected_clips', 'split_selected_clip'])(
-    'rejects legacy direct-edit tool call %s',
-    async (name) => {
-      const { run } = createGatewayReturning({
-        content: null,
-        tool_calls: [
-          {
-            id: 'call-1',
-            type: 'function',
-            function: { name, arguments: '{}' }
-          }
-        ]
+describe('generic Agent chat gateway', () => {
+  it('sends text-only messages without tools or editor instructions', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        choices: [{ message: { content: '可以先校验剪映版本和模板。' } }]
       })
-
-      await expect(run()).rejects.toThrow(`Unsupported Agent tool: ${name}`)
-    }
-  )
-
-  it('rejects malformed JSON tool arguments', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: { name: 'get_editor_context', arguments: '{' }
-        }
-      ]
     })
-
-    await expect(run()).rejects.toThrow('工具 get_editor_context 的参数不是有效 JSON')
-  })
-
-  it('rejects duplicate tool call IDs before parsing any call arguments', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: { name: 'get_editor_context', arguments: '{' }
-        },
-        {
-          id: 'call-1',
-          type: 'function',
-          function: { name: 'get_editor_context', arguments: '{}' }
-        }
-      ]
-    })
-
-    await expect(run()).rejects.toThrow('工具调用 ID 重复：call-1')
-  })
-
-  it('rejects a non-function tool call before parsing any call arguments', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: [
-        {
-          id: 'call-1',
-          type: 'function',
-          function: { name: 'get_editor_context', arguments: '{' }
-        },
-        {
-          id: 'call-2',
-          type: 'custom',
-          function: { name: 'get_editor_context', arguments: '{}' }
-        }
-      ]
-    })
-
-    await expect(run()).rejects.toThrow('工具调用类型必须为 function')
-  })
-
-  it('rejects more than 12 tool calls as one invalid batch', async () => {
-    const { run } = createGatewayReturning({
-      content: null,
-      tool_calls: Array.from({ length: 13 }, (_, index) => ({
-        id: `call-${index + 1}`,
-        type: 'function',
-        function: { name: 'get_editor_context', arguments: '{}' }
-      }))
-    })
-
-    await expect(run()).rejects.toThrow('大模型单轮返回的工具调用不能超过 12 个')
-  })
-
-  it('rejects a missing explicit model configuration', async () => {
-    const gateway = new ModelGateway(new ModelRegistry(findInternalModelProvider))
+    vi.stubGlobal('fetch', fetchMock)
+    const { gateway, configId } = createGateway()
 
     await expect(
-      gateway.chat('', [{ role: 'user', content: '你好' }], 'agent', 'request')
-    ).rejects.toThrow('请选择模型配置')
+      gateway.chat(configId, [{ role: 'user', content: '帮我规划批量剪辑流程' }])
+    ).resolves.toEqual({ content: '可以先校验剪映版本和模板。' })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as Record<string, unknown>
+    expect(body).not.toHaveProperty('tools')
+    expect(body).not.toHaveProperty('tool_choice')
+    expect(JSON.stringify(body)).not.toContain('get_editor_context')
+    expect(JSON.stringify(body)).not.toContain('propose_editor_plan')
+    expect(body.messages).toEqual([
+      {
+        role: 'system',
+        content: expect.stringContaining('当前对话没有剪映、文件系统或桌面操作工具')
+      },
+      { role: 'user', content: '帮我规划批量剪辑流程' }
+    ])
+  })
+
+  it('rejects tool calls until a dedicated execution contract exists', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          choices: [
+            {
+              message: {
+                content: '正在执行',
+                tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'click' } }]
+              }
+            }
+          ]
+        })
+      })
+    )
+    const { gateway, configId } = createGateway()
+
+    await expect(gateway.chat(configId, [{ role: 'user', content: '执行任务' }])).rejects.toThrow(
+      '当前通用对话不支持工具调用'
+    )
   })
 })

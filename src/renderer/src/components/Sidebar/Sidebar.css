@@ -1,54 +1,76 @@
-/* 左侧菜单填满布局分配的空间，并保留紧凑内边距。 */
 .studio-sidebar {
   display: flex;
-  flex-direction: column;
-
   width: 100%;
   height: 100%;
-  padding: 8px;
+  padding: 8px 10px 10px;
+  flex-direction: column;
+  color: #2d2e31;
+  background: #f5f5f5;
 }
 
-/* 一级菜单纵向排列，清除列表默认样式。 */
+.studio-sidebar__brand {
+  display: flex;
+  min-width: 0;
+  height: 40px;
+  gap: 9px;
+  padding: 0 8px;
+  align-items: center;
+}
+
+.studio-sidebar__brand-mark {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  color: #ffffff;
+  background: #26272a;
+  border-radius: 6px;
+  place-items: center;
+}
+
+.studio-sidebar__brand strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .studio-sidebar__menu {
   display: flex;
-  flex-direction: column;
   gap: 2px;
-
   padding: 0;
   margin: 0;
-
+  flex-direction: column;
   list-style: none;
 }
 
-/* 菜单按钮使用固定高度，避免选中状态引发布局位移。 */
 .studio-sidebar__menu-item {
   display: flex;
-  gap: 10px;
-  align-items: center;
-
   width: 100%;
   height: 32px;
-  padding: 0 10px;
-
-  font-size: 13px;
-  color: #3b3b3b;
+  gap: 9px;
+  padding: 0 9px;
+  align-items: center;
+  color: #3f4145;
+  font-size: 12px;
   text-align: left;
-
   cursor: pointer;
   background: transparent;
   border: 0;
-  border-radius: 10px;
+  border-radius: 7px;
 }
 
-/* 图标尺寸固定，不随菜单文字宽度变化。 */
 .studio-sidebar__menu-item svg {
   flex: 0 0 auto;
+  color: #55585d;
 }
 
-/* 鼠标悬停和键盘聚焦使用轻微加深的灰色。 */
 .studio-sidebar__menu-item:hover,
 .studio-sidebar__menu-item:focus-visible {
-  background: #e8e8e8;
+  color: #1f2023;
+  background: #e9e9e9;
 }
 
 .studio-sidebar__menu-item:focus-visible {
@@ -56,23 +78,379 @@
   outline-offset: -1px;
 }
 
-/* 当前菜单项使用更深背景与文字，突出所在位置。 */
 .studio-sidebar__menu-item[aria-current='page'] {
   font-weight: 500;
-  color: #1f1f1f;
-  background: #e8e8e8;
+  color: #18191b;
+  background: #e4e4e4;
 }
 
-/* 用户信息固定在侧栏底部，头像、昵称和设置保持在同一行。 */
-.studio-sidebar__user {
+.studio-sidebar__menu-item[aria-current='page'] svg {
+  color: #282a2e;
+}
+
+.studio-sidebar__section {
+  margin-top: 17px;
+}
+
+.studio-sidebar__section h2 {
+  margin: 0 9px 6px;
+  color: #96989c;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.studio-sidebar__section-tools {
+  position: relative;
+}
+
+.studio-sidebar__section-header {
   display: flex;
+  min-width: 0;
+  height: 24px;
+  padding-left: 9px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.studio-sidebar__section-header h2 {
+  min-width: 0;
+  margin: 0;
+}
+
+.studio-sidebar__section-actions {
+  display: flex;
+  gap: 1px;
+  align-items: center;
+}
+
+.studio-sidebar__section-action {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: #7f8186;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  place-items: center;
+}
+
+.studio-sidebar__section-action:hover,
+.studio-sidebar__section-action:focus-visible {
+  color: #2e3034;
+  background: #e5e5e5;
+}
+
+.studio-sidebar__section-action:focus-visible {
+  outline: 1px solid #707070;
+  outline-offset: -1px;
+}
+
+.studio-sidebar__sort-menu {
+  position: absolute;
+  top: 27px;
+  right: 0;
+  z-index: 5;
+  width: 178px;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #dedfe2;
+  border-radius: 9px;
+  box-shadow: 0 10px 25px rgba(25, 28, 33, 0.14);
+}
+
+.studio-sidebar__sort-title {
+  display: block;
+  padding: 5px 8px 6px;
+  color: #9a9ca0;
+  font-size: 10px;
+}
+
+.studio-sidebar__sort-divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: #ececee;
+}
+
+.studio-sidebar__sort-menu button {
+  display: grid;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  gap: 7px;
+  align-items: center;
+  color: #424449;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  grid-template-columns: 12px minmax(0, 1fr);
+}
+
+.studio-sidebar__sort-menu button:hover,
+.studio-sidebar__sort-menu button:focus-visible {
+  color: #1e2023;
+  background: #eeeeee;
+}
+
+.studio-sidebar__sort-menu button:focus-visible {
+  outline: 1px solid #707070;
+  outline-offset: -1px;
+}
+
+.studio-sidebar__project-list {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+
+.studio-sidebar__project-item {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  gap: 9px;
+  padding: 0 9px;
+  align-items: center;
+  overflow: hidden;
+  color: #424449;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+}
+
+.studio-sidebar__project-item:hover,
+.studio-sidebar__project-item:focus-visible {
+  color: #1e2023;
+  background: #e9e9e9;
+}
+
+.studio-sidebar__project-item:focus-visible {
+  outline: 1px solid #707070;
+  outline-offset: -1px;
+}
+
+.studio-sidebar__project-item svg {
+  flex: 0 0 auto;
+  color: #55585d;
+}
+
+.studio-sidebar__project-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-sidebar__empty-state {
+  height: 28px;
+  padding: 0 9px;
+  margin: 0;
+  overflow: hidden;
+  color: #b5b6b9;
+  font-size: 12px;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-sidebar__dialog-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  background: rgba(20, 22, 25, 0.24);
+  place-items: center;
+}
+
+.studio-sidebar__dialog {
+  width: min(100%, 480px);
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #dedfe2;
+  border-radius: 14px;
+  box-shadow: 0 18px 42px rgba(25, 28, 33, 0.2);
+}
+
+.studio-sidebar__dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.studio-sidebar__dialog-header h2 {
+  margin: 0;
+  color: #242529;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.studio-sidebar__dialog-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #696b70;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  place-items: center;
+}
+
+.studio-sidebar__dialog-close:hover,
+.studio-sidebar__dialog-close:focus-visible {
+  color: #242529;
+  background: #ededee;
+}
+
+.studio-sidebar__dialog-close:focus-visible {
+  outline: 1px solid #707070;
+  outline-offset: -1px;
+}
+
+.studio-sidebar__dialog-field {
+  display: flex;
+  margin-bottom: 16px;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.studio-sidebar__dialog-field > span {
+  color: #383a3e;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.studio-sidebar__dialog-field input:not(.studio-sidebar__file-input) {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px;
+  color: #25262a;
+  font-size: 13px;
+  background: #ffffff;
+  border: 1px solid #cfd1d5;
+  border-radius: 7px;
+  outline: none;
+}
+
+.studio-sidebar__dialog-field input:not(.studio-sidebar__file-input):focus {
+  border-color: #5b8def;
+  box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.15);
+}
+
+.studio-sidebar__folder-picker {
+  display: flex;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px;
   gap: 8px;
   align-items: center;
+  justify-content: center;
+  color: #62656a;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fafafa;
+  border: 1px solid #e1e2e4;
+  border-radius: 8px;
+}
 
+.studio-sidebar__folder-picker:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.studio-sidebar__folder-picker:hover,
+.studio-sidebar__folder-picker:focus-visible {
+  color: #25262a;
+  background: #f1f1f1;
+  border-color: #bfc1c5;
+}
+
+.studio-sidebar__folder-picker:focus-visible {
+  outline: 1px solid #5b8def;
+  outline-offset: 1px;
+}
+
+.studio-sidebar__folder-picker span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-sidebar__dialog-error {
+  margin: -4px 0 0;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.studio-sidebar__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.studio-sidebar__dialog-cancel,
+.studio-sidebar__dialog-submit {
+  height: 32px;
+  padding: 0 13px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.studio-sidebar__dialog-cancel {
+  color: #62656a;
+  background: transparent;
+  border: 0;
+}
+
+.studio-sidebar__dialog-cancel:hover,
+.studio-sidebar__dialog-cancel:focus-visible {
+  color: #25262a;
+  background: #ededee;
+}
+
+.studio-sidebar__dialog-submit {
+  color: #ffffff;
+  background: #242529;
+  border: 1px solid #242529;
+}
+
+.studio-sidebar__dialog-submit:hover:not(:disabled) {
+  background: #050505;
+}
+
+.studio-sidebar__dialog-submit:disabled {
+  color: #a8aaad;
+  cursor: default;
+  background: #ececed;
+  border-color: #ececed;
+}
+
+.studio-sidebar__user {
+  display: flex;
   min-width: 0;
   height: 40px;
-  padding: 4px;
+  gap: 8px;
+  padding: 4px 3px;
   margin-top: auto;
+  align-items: center;
 }
 
 /* 头像使用固定圆形区域，展示用户昵称缩写。 */
@@ -147,7 +525,7 @@
 /* 设置按钮悬停或键盘聚焦时显示浅灰背景。 */
 .studio-sidebar__settings:hover,
 .studio-sidebar__settings:focus-visible {
-  background: #dcdcdc;
+  background: #e2e2e2;
 }
 
 .studio-sidebar__settings:focus-visible {
